@@ -39,7 +39,7 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
       toast.error('Enter a valid share amount')
       return
     }
-    // Simple cost estimate
+    // Approximate cost: actual LMSR cost may differ slightly due to market mechanics
     const cost = sharesNum * currentPrice
     setPreview({ cost, price: currentPrice })
     setConfirmOpen(true)
