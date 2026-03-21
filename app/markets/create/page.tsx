@@ -29,7 +29,7 @@ export default function CreateMarketPage() {
     if (form.title.length < 10) errs.title = 'Title must be at least 10 characters'
     if (form.description.length < 20) errs.description = 'Description must be at least 20 characters'
     if (!form.endDate) errs.endDate = 'End date is required'
-    else if (new Date(form.endDate) <= new Date()) errs.endDate = 'End date must be in the future'
+    else if (new Date(form.endDate) <= new Date()) errs.endDate = 'End date must be after the current date and time'
     if (form.resolutionSource && !form.resolutionSource.startsWith('http')) errs.resolutionSource = 'Must be a valid URL'
     if (form.initialLiquidity < 10 || form.initialLiquidity > 10000) errs.initialLiquidity = 'Liquidity must be between $10 and $10,000'
     setErrors(errs)

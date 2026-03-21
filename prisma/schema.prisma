@@ -1,7 +1,5 @@
 generator client {
-  provider   = "prisma-client-js"
-  # engineType = "library" is not used by Prisma v7; the pg driver adapter in lib/prisma.ts handles the connection
-  engineType = "library"
+  provider = "prisma-client-js"
 }
 
 datasource db {
