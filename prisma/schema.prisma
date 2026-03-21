@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum MarketStatus {
+  OPEN
+  CLOSED
+  RESOLVED
+  INVALID
+}
+
+enum ResolutionOutcome {
+  YES
+  NO
+  INVALID
+}
+
+enum TradeType {
+  BUY
+  SELL
+}
+
+enum TradeOutcome {
+  YES
+  NO
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  username      String    @unique
+  passwordHash  String?
+  avatar        String?
+  bio           String?
+  balance       Float     @default(1000.0)
+  isAdmin       Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  trades        Trade[]
+  positions     Position[]
+  markets       Market[]
+  comments      Comment[]
+}
+
+model Market {
+  id               String           @id @default(cuid())
+  title            String
+  description      String
+  category         String
+  status           MarketStatus     @default(OPEN)
+  resolution       ResolutionOutcome?
+  resolutionSource String?
+  endDate          DateTime
+  creatorId        String
+  creator          User             @relation(fields: [creatorId], references: [id])
+  yesShares        Float            @default(0)
+  noShares         Float            @default(0)
+  liquidityParam   Float            @default(100.0)
+  totalVolume      Float            @default(0)
+  initialLiquidity Float            @default(100.0)
+  tags             String[]         @default([])
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  trades           Trade[]
+  positions        Position[]
+  comments         Comment[]
+  priceHistory     PriceHistory[]
+}
+
+model Trade {
+  id         String       @id @default(cuid())
+  userId     String
+  user       User         @relation(fields: [userId], references: [id])
+  marketId   String
+  market     Market       @relation(fields: [marketId], references: [id])
+  outcome    TradeOutcome
+  type       TradeType
+  shares     Float
+  price      Float
+  totalCost  Float
+  createdAt  DateTime     @default(now())
+}
+
+model Position {
+  id            String       @id @default(cuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id])
+  marketId      String
+  market        Market       @relation(fields: [marketId], references: [id])
+  outcome       TradeOutcome
+  shares        Float        @default(0)
+  avgEntryPrice Float        @default(0)
+  realizedPnl   Float        @default(0)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@unique([userId, marketId, outcome])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  marketId  String
+  market    Market   @relation(fields: [marketId], references: [id])
+  content   String
+  createdAt DateTime @default(now())
+}
+
+model PriceHistory {
+  id        String   @id @default(cuid())
+  marketId  String
+  market    Market   @relation(fields: [marketId], references: [id])
+  yesPrice  Float
+  noPrice   Float
+  volume    Float    @default(0)
+  timestamp DateTime @default(now())
+}
