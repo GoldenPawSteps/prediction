@@ -10,6 +10,16 @@ const registerSchema = z.object({
   password: z.string().min(8),
 })
 
+function shouldUseSecureCookies(req: NextRequest): boolean {
+  if (req.nextUrl.hostname === 'localhost' || req.nextUrl.hostname === '127.0.0.1') {
+    return false
+  }
+
+  const forwardedProto = req.headers.get('x-forwarded-proto')
+  if (forwardedProto) return forwardedProto === 'https'
+  return req.nextUrl.protocol === 'https:'
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
@@ -39,9 +49,11 @@ export async function POST(req: NextRequest) {
     const token = signToken({ userId: user.id, email: user.email, isAdmin: user.isAdmin })
 
     const response = apiSuccess({ user, token }, 201)
+    // Clear any stale token first to prevent multiple tokens
+    response.cookies.delete('token')
     response.cookies.set('token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: shouldUseSecureCookies(req),
       sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 7,
     })

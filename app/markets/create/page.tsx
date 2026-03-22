@@ -11,7 +11,7 @@ const CATEGORIES = ['Politics', 'Crypto', 'Sports', 'Tech', 'Entertainment', 'Sc
 
 export default function CreateMarketPage() {
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, optimisticUpdateBalance } = useAuth()
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({
     title: '',
@@ -46,6 +46,7 @@ export default function CreateMarketPage() {
       const res = await fetch('/api/markets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           ...form,
           endDate: new Date(form.endDate).toISOString(),
@@ -55,6 +56,7 @@ export default function CreateMarketPage() {
       })
       const data = await res.json()
       if (res.ok) {
+        optimisticUpdateBalance(Number(form.initialLiquidity))
         toast.success('Market created!')
         router.push(`/markets/${data.market.id}`)
       } else {

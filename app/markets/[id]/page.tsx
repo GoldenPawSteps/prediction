@@ -34,7 +34,7 @@ interface Market {
 
 export default function MarketPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const { user } = useAuth()
+  const { user, refreshUser } = useAuth()
   const [market, setMarket] = useState<Market | null>(null)
   const [loading, setLoading] = useState(true)
   const [comment, setComment] = useState('')
@@ -91,11 +91,18 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ outcome }),
       })
+      const data = await res.json()
+
       if (res.ok) {
-        toast.success(`Market resolved as ${outcome}`)
+        const refunded = data?.settlement?.refundedToCreator ?? 0
+        if (refunded > 0) {
+          toast.success(`Market resolved as ${outcome}. Returned ${formatCurrency(refunded)} to creator.`)
+        } else {
+          toast.success(`Market resolved as ${outcome}`)
+        }
+        await refreshUser()
         fetchMarket()
       } else {
-        const data = await res.json()
         toast.error(data.error || 'Resolution failed')
       }
     } catch {

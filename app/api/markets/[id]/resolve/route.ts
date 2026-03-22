@@ -17,16 +17,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return apiError('Invalid outcome')
     }
 
-    const market = await prisma.market.findUnique({ where: { id: marketId } })
+    const market = await prisma.market.findUnique({
+      where: { id: marketId },
+      select: {
+        id: true,
+        status: true,
+        creatorId: true,
+        initialLiquidity: true,
+      },
+    })
     if (!market) return apiError('Market not found', 404)
     if (market.status === 'RESOLVED') return apiError('Market already resolved')
 
     // Resolve the market and calculate payouts
-    await prisma.$transaction(async (tx: any) => {
+    const settlement = await prisma.$transaction(async (tx: any) => {
       await tx.market.update({
         where: { id: marketId },
         data: { status: outcome === 'INVALID' ? 'INVALID' : 'RESOLVED', resolution: outcome },
       })
+
+      let totalPayout = 0
 
       if (outcome !== 'INVALID') {
         // Pay out winning positions
@@ -35,6 +45,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         })
 
         for (const position of winningPositions) {
+          totalPayout += position.shares
           await tx.user.update({
             where: { id: position.userId },
             data: { balance: { increment: position.shares } },
@@ -50,15 +61,38 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         const positions = await tx.position.findMany({ where: { marketId } })
         for (const position of positions) {
           const refund = position.avgEntryPrice * position.shares
+          totalPayout += refund
           await tx.user.update({
             where: { id: position.userId },
             data: { balance: { increment: refund } },
           })
         }
       }
+
+      // Return unused market maker liquidity to the market creator.
+      const tradeAggregate = await tx.trade.aggregate({
+        where: { marketId },
+        _sum: { totalCost: true },
+      })
+      const netTradeCost = tradeAggregate._sum.totalCost ?? 0
+      const remainingLiquidity = market.initialLiquidity + netTradeCost - totalPayout
+      const refundedToCreator = Math.max(0, remainingLiquidity)
+
+      if (refundedToCreator > 0) {
+        await tx.user.update({
+          where: { id: market.creatorId },
+          data: { balance: { increment: refundedToCreator } },
+        })
+      }
+
+      return {
+        totalPayout,
+        netTradeCost,
+        refundedToCreator,
+      }
     })
 
-    return apiSuccess({ success: true, outcome })
+    return apiSuccess({ success: true, outcome, settlement })
   } catch (err) {
     console.error('Resolve market error:', err)
     return apiError('Internal server error', 500)

@@ -21,6 +21,7 @@ interface AuthContextType {
   register: (email: string, username: string, password: string) => Promise<boolean>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
+  optimisticUpdateBalance: (amount: number) => () => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -31,7 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshUser = useCallback(async () => {
     try {
-      const res = await fetch('/api/auth/me')
+      const res = await fetch('/api/auth/me', { cache: 'no-store' })
       if (res.ok) {
         const data = await res.json()
         setUser(data)
@@ -47,20 +48,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshUser().finally(() => setLoading(false))
   }, [refreshUser])
 
+  useEffect(() => {
+    // Keep auth-dependent UI (like balance) in sync when background events resolve markets.
+    const intervalId = window.setInterval(() => {
+      void refreshUser()
+    }, 30000)
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshUser()
+      }
+    }
+
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
+    return () => {
+      window.clearInterval(intervalId)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [refreshUser])
+
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email, password }),
       })
-      const data = await res.json()
+      const raw = await res.text()
+      let data: { user?: User; error?: string } = {}
+      try {
+        data = raw ? JSON.parse(raw) : {}
+      } catch {
+        data = {}
+      }
+
       if (res.ok) {
+        if (!data.user) {
+          toast.error('Login failed')
+          return false
+        }
         setUser(data.user)
         toast.success('Welcome back!')
         return true
       } else {
-        toast.error(data.error || 'Login failed')
+        toast.error(data.error || `Login failed (${res.status})`)
         return false
       }
     } catch {
@@ -74,15 +107,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email, username, password }),
       })
-      const data = await res.json()
+      const raw = await res.text()
+      let data: { user?: User; error?: string } = {}
+      try {
+        data = raw ? JSON.parse(raw) : {}
+      } catch {
+        data = {}
+      }
+
       if (res.ok) {
+        if (!data.user) {
+          toast.error('Registration failed')
+          return false
+        }
         setUser(data.user)
         toast.success('Account created!')
         return true
       } else {
-        toast.error(data.error || 'Registration failed')
+        toast.error(data.error || `Registration failed (${res.status})`)
         return false
       }
     } catch {
@@ -92,13 +137,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' })
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
     setUser(null)
     toast.success('Logged out')
   }
 
+  const optimisticUpdateBalance = (amount: number) => {
+    const previousUser = user
+    if (user) {
+      setUser({ ...user, balance: user.balance - amount })
+    }
+    // Verify in background (don't block)
+    refreshUser().catch(() => {
+      if (previousUser) setUser(previousUser)
+    })
+    // Return rollback function
+    return () => {
+      if (previousUser) setUser(previousUser)
+    }
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser, optimisticUpdateBalance }}>
       {children}
     </AuthContext.Provider>
   )
