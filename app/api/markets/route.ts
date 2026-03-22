@@ -46,7 +46,13 @@ export async function GET(req: NextRequest) {
 
     const marketsWithPrices = markets.map((m) => ({
       ...m,
-      probabilities: getMarketProbabilities(m.yesShares, m.noShares, m.liquidityParam),
+      probabilities: m.resolution === 'YES'
+        ? { yes: 1, no: 0 }
+        : m.resolution === 'NO'
+        ? { yes: 0, no: 1 }
+        : m.resolution === 'INVALID'
+        ? { yes: 0.5, no: 0.5 }
+        : getMarketProbabilities(m.yesShares, m.noShares, m.liquidityParam),
     }))
 
     return apiSuccess({ markets: marketsWithPrices, total, page, limit })

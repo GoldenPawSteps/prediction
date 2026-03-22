@@ -36,14 +36,23 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         data: { status: outcome === 'INVALID' ? 'INVALID' : 'RESOLVED', resolution: outcome },
       })
 
+      // Record final price history point reflecting resolution
+      const finalYesPrice = outcome === 'YES' ? 1.0 : outcome === 'NO' ? 0.0 : 0.5
+      const finalNoPrice = 1.0 - finalYesPrice
+      await tx.priceHistory.create({
+        data: { marketId, yesPrice: finalYesPrice, noPrice: finalNoPrice, volume: 0 },
+      })
+
       let totalPayout = 0
 
       if (outcome !== 'INVALID') {
         // Pay out winning positions
-        const winningPositions = await tx.position.findMany({
-          where: { marketId, outcome: outcome as 'YES' | 'NO' },
-        })
+        const winningOutcome = outcome as 'YES' | 'NO'
+        const losingOutcome = outcome === 'YES' ? 'NO' : 'YES'
 
+        const winningPositions = await tx.position.findMany({
+          where: { marketId, outcome: winningOutcome },
+        })
         for (const position of winningPositions) {
           totalPayout += position.shares
           await tx.user.update({
@@ -51,6 +60,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             data: { balance: { increment: position.shares } },
           })
           const pnl = position.shares - position.avgEntryPrice * position.shares
+          await tx.position.update({
+            where: { id: position.id },
+            data: { realizedPnl: { increment: pnl } },
+          })
+        }
+
+        // Record loss for losing positions (worth $0 at resolution)
+        const losingPositions = await tx.position.findMany({
+          where: { marketId, outcome: losingOutcome },
+        })
+        for (const position of losingPositions) {
+          const pnl = -(position.avgEntryPrice * position.shares)
           await tx.position.update({
             where: { id: position.id },
             data: { realizedPnl: { increment: pnl } },
@@ -68,6 +89,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           })
         }
       }
+
+      // Close all positions by zeroing shares (removes them from Open Positions)
+      await tx.position.updateMany({
+        where: { marketId },
+        data: { shares: 0 },
+      })
 
       // Return unused market maker liquidity to the market creator.
       const tradeAggregate = await tx.trade.aggregate({

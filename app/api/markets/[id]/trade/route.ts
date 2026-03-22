@@ -116,7 +116,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
               marketId,
               outcome,
               shares,
-              avgEntryPrice: price,
+              avgEntryPrice: tradeCost / shares,
             },
           })
         }

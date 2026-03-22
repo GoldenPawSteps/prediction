@@ -31,8 +31,15 @@ export async function GET(req: NextRequest) {
     })
 
     const positionsWithValue = positions.map((p) => {
-      const probs = getMarketProbabilities(p.market.yesShares, p.market.noShares, p.market.liquidityParam)
-      const currentPrice = p.outcome === 'YES' ? probs.yes : probs.no
+      let currentPrice: number
+      if (p.market.status === 'RESOLVED') {
+        currentPrice = p.market.resolution === p.outcome ? 1.0 : 0.0
+      } else if (p.market.status === 'INVALID') {
+        currentPrice = p.avgEntryPrice // break-even (already refunded)
+      } else {
+        const probs = getMarketProbabilities(p.market.yesShares, p.market.noShares, p.market.liquidityParam)
+        currentPrice = p.outcome === 'YES' ? probs.yes : probs.no
+      }
       const currentValue = p.shares * currentPrice
       const costBasis = p.avgEntryPrice * p.shares
       const unrealizedPnl = currentValue - costBasis
