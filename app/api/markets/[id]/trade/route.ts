@@ -27,7 +27,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const { outcome, type, shares } = parsed.data
 
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: any) => {
       const market = await tx.market.findUnique({ where: { id: marketId } })
       if (!market) throw new Error('Market not found')
       if (market.status !== 'OPEN') throw new Error('Market is not open for trading')

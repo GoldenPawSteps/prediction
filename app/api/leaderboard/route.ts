@@ -2,12 +2,28 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { apiError, apiSuccess } from '@/lib/api-helpers'
 
+type LeaderboardUser = {
+  id: string
+  username: string
+  avatar: string | null
+  balance: number
+  positions: Array<{
+    realizedPnl: number
+    shares: number
+    avgEntryPrice: number
+  }>
+  trades: Array<{
+    totalCost: number
+    type: string
+  }>
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const sortBy = searchParams.get('sortBy') || 'profit'
 
-    const users = await prisma.user.findMany({
+    const users: LeaderboardUser[] = await prisma.user.findMany({
       select: {
         id: true,
         username: true,

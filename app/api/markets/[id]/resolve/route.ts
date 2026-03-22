@@ -22,7 +22,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (market.status === 'RESOLVED') return apiError('Market already resolved')
 
     // Resolve the market and calculate payouts
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       await tx.market.update({
         where: { id: marketId },
         data: { status: outcome === 'INVALID' ? 'INVALID' : 'RESOLVED', resolution: outcome },

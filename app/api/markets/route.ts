@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
     if (!user) return apiError('User not found', 404)
     if (user.balance < initialLiquidity) return apiError('Insufficient balance')
 
-    const market = await prisma.$transaction(async (tx) => {
+    const market = await prisma.$transaction(async (tx: any) => {
       await tx.user.update({
         where: { id: authUser.userId },
         data: { balance: { decrement: initialLiquidity } },
