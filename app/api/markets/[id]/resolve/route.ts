@@ -64,6 +64,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             where: { id: position.id },
             data: { realizedPnl: { increment: pnl } },
           })
+          // Record settlement as a SELL at resolution price (1.0 for winner)
+          await tx.trade.create({
+            data: {
+              userId: position.userId,
+              marketId,
+              outcome: position.outcome,
+              type: 'SELL',
+              shares: position.shares,
+              price: 1.0,
+              totalCost: position.shares,
+            },
+          })
         }
 
         // Record loss for losing positions (worth $0 at resolution)
@@ -76,6 +88,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             where: { id: position.id },
             data: { realizedPnl: { increment: pnl } },
           })
+          // Record settlement as a SELL at resolution price (0.0 for loser)
+          await tx.trade.create({
+            data: {
+              userId: position.userId,
+              marketId,
+              outcome: position.outcome,
+              type: 'SELL',
+              shares: position.shares,
+              price: 0.0,
+              totalCost: 0.0,
+            },
+          })
         }
       } else {
         // INVALID: refund based on cost paid
@@ -86,6 +110,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           await tx.user.update({
             where: { id: position.userId },
             data: { balance: { increment: refund } },
+          })
+          // Record settlement as a SELL at break-even price (avgEntryPrice)
+          await tx.trade.create({
+            data: {
+              userId: position.userId,
+              marketId,
+              outcome: position.outcome,
+              type: 'SELL',
+              shares: position.shares,
+              price: position.avgEntryPrice,
+              totalCost: refund,
+            },
           })
         }
       }

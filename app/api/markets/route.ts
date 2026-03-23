@@ -10,7 +10,7 @@ const createMarketSchema = z.object({
   description: z.string().min(20),
   category: z.string(),
   endDate: z.string().datetime(),
-  resolutionSource: z.string().url().optional(),
+  resolutionSource: z.string().url(),
   initialLiquidity: z.number().min(10).max(10000).default(100),
   tags: z.array(z.string()).default([]),
 })

@@ -30,7 +30,8 @@ export default function CreateMarketPage() {
     if (form.description.length < 20) errs.description = 'Description must be at least 20 characters'
     if (!form.endDate) errs.endDate = 'End date is required'
     else if (new Date(form.endDate) <= new Date()) errs.endDate = 'End date must be after the current date and time'
-    if (form.resolutionSource && !form.resolutionSource.startsWith('http')) errs.resolutionSource = 'Must be a valid URL'
+    if (!form.resolutionSource) errs.resolutionSource = 'Resolution source URL is required'
+    else if (!form.resolutionSource.startsWith('http')) errs.resolutionSource = 'Must be a valid URL'
     if (form.initialLiquidity < 10 || form.initialLiquidity > 10000) errs.initialLiquidity = 'Liquidity must be between $10 and $10,000'
     setErrors(errs)
     return Object.keys(errs).length === 0
@@ -150,15 +151,20 @@ export default function CreateMarketPage() {
         </div>
 
         {/* Resolution Source */}
-        <Input
-          label="Resolution Source URL"
-          type="url"
-          value={form.resolutionSource}
-          onChange={(e) => setForm({ ...form, resolutionSource: e.target.value })}
-          placeholder="https://example.com/news/article"
-          error={errors.resolutionSource}
-          hint="Where will the outcome be determined?"
-        />
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">
+            Resolution Source URL <span className="text-red-400">*</span>
+          </label>
+          <input
+            type="url"
+            value={form.resolutionSource}
+            onChange={(e) => setForm({ ...form, resolutionSource: e.target.value })}
+            placeholder="https://example.com/news/article"
+            className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+          {errors.resolutionSource && <p className="text-red-400 text-xs mt-1">{errors.resolutionSource}</p>}
+          <p className="text-gray-500 text-xs mt-1">Where will the outcome be determined?</p>
+        </div>
 
         {/* Initial Liquidity */}
         <div>

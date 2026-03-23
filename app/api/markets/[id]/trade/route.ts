@@ -50,9 +50,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       if (newYesShares < 0 || newNoShares < 0) throw new Error('Invalid trade: negative shares')
 
       const tradeCost = lmsrTradeCost(market.yesShares, market.noShares, newYesShares, newNoShares, b)
-      const price = outcome === 'YES'
-        ? lmsrYesPrice(market.yesShares, market.noShares, b)
-        : lmsrNoPrice(market.yesShares, market.noShares, b)
+      const actualPrice = Math.abs(tradeCost) / shares
 
       if (type === 'BUY' && user.balance < tradeCost) {
         throw new Error('Insufficient balance')
@@ -91,7 +89,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           outcome,
           type,
           shares,
-          price,
+          price: actualPrice,
           totalCost: tradeCost,
         },
       })
