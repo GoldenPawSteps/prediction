@@ -19,6 +19,18 @@ function shouldUseSecureCookies(req: NextRequest): boolean {
   return req.nextUrl.protocol === 'https:'
 }
 
+function clearCookiePathVariants(response: ReturnType<typeof apiSuccess>, name: string) {
+  for (const path of ['/', '/api']) {
+    response.cookies.set(name, '', {
+      httpOnly: true,
+      sameSite: 'lax',
+      path,
+      maxAge: 0,
+      expires: new Date(0),
+    })
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
@@ -50,6 +62,9 @@ export async function POST(req: NextRequest) {
     const secureCookie = shouldUseSecureCookies(req)
 
     const response = apiSuccess({ user: userWithoutPassword, token })
+    clearCookiePathVariants(response, AUTH_COOKIE_NAME)
+    clearCookiePathVariants(response, LEGACY_AUTH_COOKIE_NAME)
+
     // Set the auth cookie once. Setting with a longer maxAge naturally replaces any
     // existing session_token cookie in the browser.
     response.cookies.set(AUTH_COOKIE_NAME, token, {
@@ -59,14 +74,7 @@ export async function POST(req: NextRequest) {
       path: '/',
       maxAge: 60 * 60 * 24 * 7,
     })
-    // Best-effort cleanup for the legacy cookie name.
-    response.cookies.set(LEGACY_AUTH_COOKIE_NAME, '', {
-      httpOnly: true,
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 0,
-      expires: new Date(0),
-    })
+
     return response
   } catch (err) {
     console.error('Login error:', err)
