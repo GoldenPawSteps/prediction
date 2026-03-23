@@ -13,11 +13,24 @@ function getTokenFromCookieHeader(cookieHeader: string | null): string | null {
 
   if (tokenPairs.length === 0) return null
 
-  // Return the last token (most recently sent by browser).
-  // Multiple tokens shouldn't exist, but if they do, always use the last one.
-  // Do NOT pick by iat timestamp — that creates a privilege escalation vulnerability
-  // where a more recent admin token would be selected over a regular user token.
-  return tokenPairs[tokenPairs.length - 1]
+  if (tokenPairs.length === 1) return tokenPairs[0]
+
+  // Defensive handling for duplicate token cookies.
+  // If duplicates resolve to different users, the session is ambiguous and must be rejected.
+  const verified = tokenPairs
+    .map((token) => ({ token, payload: verifyToken(token) }))
+    .filter((entry): entry is { token: string; payload: JWTPayload } => Boolean(entry.payload?.userId))
+
+  if (verified.length === 0) return null
+
+  const userIds = new Set(verified.map((entry) => entry.payload.userId))
+  if (userIds.size > 1) {
+    console.warn('Ambiguous auth cookies detected: multiple token cookies map to different users')
+    return null
+  }
+
+  // Same user across duplicates: use the last one sent.
+  return verified[verified.length - 1].token
 }
 
 export function getTokenFromRequest(req: NextRequest): string | null {

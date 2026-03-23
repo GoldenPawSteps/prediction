@@ -47,14 +47,29 @@ export async function POST(req: NextRequest) {
     })
 
     const token = signToken({ userId: user.id, email: user.email, isAdmin: user.isAdmin })
+    const secureCookie = shouldUseSecureCookies(req)
 
     const response = apiSuccess({ user, token }, 201)
-    // Clear any stale token first to prevent multiple tokens
-    response.cookies.delete('token')
+    // Clear stale variants first to avoid duplicate token cookies switching identities.
+    response.cookies.set('token', '', {
+      httpOnly: true,
+      secure: false,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 0,
+    })
+    response.cookies.set('token', '', {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 0,
+    })
     response.cookies.set('token', token, {
       httpOnly: true,
-      secure: shouldUseSecureCookies(req),
+      secure: secureCookie,
       sameSite: 'lax',
+      path: '/',
       maxAge: 60 * 60 * 24 * 7,
     })
     return response
