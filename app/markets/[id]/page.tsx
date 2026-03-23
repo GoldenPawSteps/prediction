@@ -8,7 +8,7 @@ import { TradePanel } from '@/components/TradePanel'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { useAuth } from '@/context/AuthContext'
-import { formatQualifiedMajorityLabel, getQualifiedMajorityThreshold } from '@/lib/resolution'
+import { formatQualifiedMajorityLabel, getQualifiedMajorityThreshold, getResolutionQuorum, isImmediateResolutionRound } from '@/lib/resolution'
 import { formatCurrency, formatPercent, formatDateTime, getCategoryColor, timeUntil } from '@/lib/utils'
 import toast from 'react-hot-toast'
 
@@ -222,10 +222,13 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
   )
   const validVoteTotal = voteCounts.YES + voteCounts.NO
   const totalVoteCount = validVoteTotal + voteCounts.INVALID
+  const immediateResolutionRound = isImmediateResolutionRound(market.disputeCount)
+  const resolutionQuorum = getResolutionQuorum(market.disputeCount)
   const qualifiedMajorityThreshold = getQualifiedMajorityThreshold(market.disputeCount)
   const qualifiedMajorityFractionLabel = formatQualifiedMajorityLabel(market.disputeCount)
   const nextQualifiedMajorityThreshold = getQualifiedMajorityThreshold(market.disputeCount + 1)
   const nextQualifiedMajorityFractionLabel = formatQualifiedMajorityLabel(market.disputeCount + 1)
+  const nextResolutionQuorum = getResolutionQuorum(market.disputeCount + 1)
   const currentDisputeRoundLabel = market.disputeCount === 0
     ? 'Initial resolution round'
     : `Current round: ${getOrdinalLabel(market.disputeCount)} dispute`
@@ -238,8 +241,14 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
     ? 'YES'
     : 'NO'
   const leadingVoteCount = leadingOutcome ? voteCounts[leadingOutcome] : 0
-  const validMajorityReached = Boolean(totalVoteCount > 0 && leadingOutcome && leadingVoteCount / totalVoteCount > qualifiedMajorityThreshold)
-  const invalidMajorityReached = totalVoteCount > 0 && voteCounts.INVALID / totalVoteCount > qualifiedMajorityThreshold
+  const quorumReached = totalVoteCount >= resolutionQuorum
+  const votesNeededForQuorum = Math.max(0, resolutionQuorum - totalVoteCount)
+  const validMajorityReached = immediateResolutionRound
+    ? Boolean(totalVoteCount > 0 && leadingOutcome)
+    : Boolean(quorumReached && leadingOutcome && leadingVoteCount / totalVoteCount > qualifiedMajorityThreshold)
+  const invalidMajorityReached = immediateResolutionRound
+    ? voteCounts.INVALID > 0
+    : quorumReached && voteCounts.INVALID / totalVoteCount > qualifiedMajorityThreshold
   // Progress as share of ALL votes so INVALID votes visibly dilute YES/NO share
   const invalidProgressPercent = totalVoteCount > 0 ? (voteCounts.INVALID / totalVoteCount) * 100 : 0
   const disputeWindowEndsAt = market.resolutionTime && market.disputeWindowHours
@@ -364,7 +373,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                 )}
                 {market.status === 'DISPUTED' && (
                   <p className="text-sm text-yellow-400 mt-1">
-                    This market is under dispute ({getOrdinalLabel(market.disputeCount)} dispute round). Community re-voting is open — an outcome must exceed a qualified majority of {qualifiedMajorityFractionLabel} to re-resolve it.
+                    This market is under dispute ({getOrdinalLabel(market.disputeCount)} dispute round). Community re-voting is open — it needs at least {resolutionQuorum} votes, and one outcome must exceed {qualifiedMajorityFractionLabel} to re-resolve.
                     {user?.isAdmin && ' Admin override is available below.'}
                   </p>
                 )}
@@ -415,7 +424,11 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                       />
                     </div>
                     <p className="text-xs text-gray-500">
-                      {validMajorityReached
+                      {immediateResolutionRound
+                        ? 'The first vote resolves this market.'
+                        : !quorumReached
+                        ? `Quorum not reached yet. ${votesNeededForQuorum} more vote${votesNeededForQuorum === 1 ? '' : 's'} needed.`
+                        : validMajorityReached
                         ? `${leadingOutcome} has a qualified majority and will auto-resolve.`
                         : invalidMajorityReached
                         ? 'INVALID has a qualified majority and will auto-resolve.'
@@ -429,10 +442,10 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
               <div className="rounded-lg bg-indigo-950/20 border border-indigo-700/30 p-3">
                 <h3 className="text-sm font-semibold text-indigo-300">How Auto-Resolution Works</h3>
                 <p className="text-sm text-gray-400 mt-2">
-                  Auto-resolution requires a <strong className="text-indigo-200">qualified majority</strong> above {qualifiedMajorityFractionLabel} ({qualifiedMajorityPercentLabel}%) of <em>all</em> votes cast
-                  (YES, NO, and INVALID combined) in favour of a single outcome.
-                  {market.disputeCount > 0 ? ` This market is on dispute round ${market.disputeCount}, so the required supermajority has escalated to ${qualifiedMajorityFractionLabel}.` : ''}
-                  There is no minimum quorum, and matching the threshold exactly is not enough. INVALID votes count toward the total and dilute YES/NO shares, so a contentious market needs even more agreement to resolve.
+                  {immediateResolutionRound
+                    ? 'During the initial resolution round, the first vote resolves the market immediately.'
+                    : `This dispute round requires a minimum quorum of ${resolutionQuorum} total votes, and one outcome must exceed ${qualifiedMajorityFractionLabel} (${qualifiedMajorityPercentLabel}%) of all votes cast (YES, NO, and INVALID combined).`}
+                  {!immediateResolutionRound && ' Matching the threshold exactly is not enough.'} INVALID votes count toward the total and dilute YES/NO shares.
                 </p>
               </div>
 
@@ -512,13 +525,15 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                           {currentDisputeRoundLabel}
                         </p>
                         <p className="text-xs text-yellow-200">
-                          Current qualified majority: {qualifiedMajorityFractionLabel} ({qualifiedMajorityPercentLabel}%)
+                          {immediateResolutionRound
+                            ? 'Current rule: first vote resolves.'
+                            : `Current rule: quorum ${resolutionQuorum}, threshold above ${qualifiedMajorityFractionLabel} (${qualifiedMajorityPercentLabel}%).`}
                         </p>
                         <p className="text-xs text-yellow-100 pt-1">
                           {nextDisputeRoundLabel}
                         </p>
                         <p className="text-xs text-yellow-300">
-                          After filing this dispute: {nextQualifiedMajorityFractionLabel} ({nextQualifiedMajorityPercentLabel}%)
+                          After filing this dispute: quorum {nextResolutionQuorum}, threshold above {nextQualifiedMajorityFractionLabel} ({nextQualifiedMajorityPercentLabel}%)
                         </p>
                       </div>
                     </div>

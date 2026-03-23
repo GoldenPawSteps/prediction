@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, apiError, apiSuccess } from '@/lib/api-helpers'
-import { getQualifiedMajorityThreshold } from '@/lib/resolution'
+import { getQualifiedMajorityThreshold, getResolutionQuorum, isImmediateResolutionRound } from '@/lib/resolution'
 import { z } from 'zod'
 
 const voteSchema = z.object({
@@ -73,11 +73,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     let shouldResolve = false
     let majorityOutcome: 'YES' | 'NO' | 'INVALID' | null = null
     const totalVotesCast = votes.reduce((sum, v) => sum + (v._count?.id ?? 0), 0)
+    const resolutionQuorum = getResolutionQuorum(market._count.disputes)
     const qualifiedMajorityThreshold = getQualifiedMajorityThreshold(market._count.disputes)
 
-    // Auto-resolve once at least one vote exists and one outcome strictly exceeds
-    // the qualified majority threshold of ALL votes cast (including INVALID).
-    if (totalVotesCast > 0) {
+    // Initial resolution resolves on the first vote.
+    if (isImmediateResolutionRound(market._count.disputes) && totalVotesCast > 0) {
+      shouldResolve = true
+      majorityOutcome = outcome
+    }
+
+    // Dispute rounds require quorum plus a strict threshold over ALL votes cast,
+    // including INVALID votes.
+    if (!shouldResolve && totalVotesCast >= resolutionQuorum) {
       for (const v of votes) {
         const share = (v._count?.id ?? 0) / totalVotesCast
         if (share > qualifiedMajorityThreshold) {
