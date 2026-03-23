@@ -50,7 +50,10 @@ export async function POST(req: NextRequest) {
     const secureCookie = shouldUseSecureCookies(req)
 
     const response = apiSuccess({ user, token }, 201)
-    // Clear stale variants first to avoid duplicate token cookies switching identities.
+    // Explicitly delete all token cookie variants to prevent duplicate tokens in cookie jar.
+    // This is critical to prevent privilege escalation where an old admin token could be picked up.
+    response.cookies.delete('token')
+    // Also explicitly set both variants with maxAge 0 to ensure browser clears them across all domains/paths.
     response.cookies.set('token', '', {
       httpOnly: true,
       secure: false,
@@ -65,6 +68,7 @@ export async function POST(req: NextRequest) {
       path: '/',
       maxAge: 0,
     })
+    // Now set the new token with appropriate secure flag.
     response.cookies.set('token', token, {
       httpOnly: true,
       secure: secureCookie,

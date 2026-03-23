@@ -39,9 +39,16 @@ export function getTokenFromRequest(req: NextRequest): string | null {
     return authHeader.slice(7)
   }
 
-  // Prefer raw cookie header parsing to handle duplicate token cookies reliably.
-  const cookieToken = getTokenFromCookieHeader(req.headers.get('cookie')) ?? req.cookies.get('token')?.value
-  return cookieToken || null
+  // Parse raw cookie header to detect and reject ambiguous cookies.
+  // If ambiguous cookies detected, return null to fail auth (don't fallback to req.cookies).
+  const cookieToken = getTokenFromCookieHeader(req.headers.get('cookie'))
+  if (cookieToken === null && req.headers.get('cookie')?.includes('token=')) {
+    // Ambiguous or invalid cookies detected - fail auth entirely.
+    return null
+  }
+  
+  // Only use req.cookies.get as fallback if no token= in raw cookie header at all.
+  return cookieToken || req.cookies.get('token')?.value || null
 }
 
 export function getUserFromRequest(req: NextRequest): JWTPayload | null {

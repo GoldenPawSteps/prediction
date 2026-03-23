@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { Badge } from '@/components/ui/Badge'
 import { formatCurrency, formatPercent, formatDateTime, getCategoryColor } from '@/lib/utils'
@@ -51,17 +51,36 @@ export default function PortfolioPage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'positions' | 'history'>('positions')
 
-  useEffect(() => {
+  const fetchPortfolio = useCallback(async () => {
     if (!user) return
-    fetch('/api/portfolio')
-      .then((r) => r.json())
-      .then((data) => {
-        setPositions(data.positions || [])
-        setTrades(data.trades || [])
-        setStats(data.stats || null)
-      })
-      .finally(() => setLoading(false))
+    setLoading(true)
+    try {
+      const res = await fetch('/api/portfolio', { cache: 'no-store' })
+      const data = await res.json()
+      setPositions(data.positions || [])
+      setTrades(data.trades || [])
+      setStats(data.stats || null)
+    } finally {
+      setLoading(false)
+    }
   }, [user])
+
+  useEffect(() => {
+    void fetchPortfolio()
+  }, [fetchPortfolio])
+
+  useEffect(() => {
+    // Refetch portfolio when page comes back into view (e.g., after navigating away and back).
+    // This ensures fresh data after trades that happened on other pages.
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void fetchPortfolio()
+      }
+    }
+
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+  }, [fetchPortfolio])
 
   if (!user) {
     return (
