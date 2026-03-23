@@ -34,6 +34,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         endDate: true,
         resolution: true,
         resolutionTime: true,
+        _count: {
+          select: {
+            disputes: true,
+          },
+        },
       },
     })
 
@@ -67,7 +72,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     let shouldResolve = false
     let majorityOutcome: 'YES' | 'NO' | 'INVALID' | null = null
     const totalVotesCast = votes.reduce((sum, v) => sum + (v._count?.id ?? 0), 0)
-    const qualifiedMajorityThreshold = getQualifiedMajorityThreshold(market.status)
+    const qualifiedMajorityThreshold = getQualifiedMajorityThreshold(market._count.disputes)
 
     // Auto-resolve when quorum is met AND one outcome holds a qualified majority
     // (>= threshold of ALL votes cast, including INVALID)

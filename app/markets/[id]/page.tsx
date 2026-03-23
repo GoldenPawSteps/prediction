@@ -8,7 +8,7 @@ import { TradePanel } from '@/components/TradePanel'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { useAuth } from '@/context/AuthContext'
-import { MIN_RESOLUTION_VOTES, getQualifiedMajorityThreshold } from '@/lib/resolution'
+import { MIN_RESOLUTION_VOTES, formatQualifiedMajorityLabel, getQualifiedMajorityThreshold } from '@/lib/resolution'
 import { formatCurrency, formatPercent, formatDateTime, getCategoryColor, timeUntil } from '@/lib/utils'
 import toast from 'react-hot-toast'
 
@@ -46,6 +46,7 @@ interface Market {
   comments: Array<{ id: string; content: string; createdAt: string; user: { id: string; username: string; avatar: string | null } }>
   creator: { id: string; username: string; avatar: string | null }
   _count: { trades: number }
+  disputeCount: number
   tags: string[]
 }
 
@@ -223,10 +224,17 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
   const totalVoteCount = validVoteTotal + voteCounts.INVALID
   const votesNeededForQuorum = Math.max(0, MIN_RESOLUTION_VOTES - totalVoteCount)
   const quorumReached = totalVoteCount >= MIN_RESOLUTION_VOTES
-  // Qualified majority uses a stricter threshold during disputes.
-  const qualifiedMajorityThreshold = getQualifiedMajorityThreshold(market.status)
+  const qualifiedMajorityThreshold = getQualifiedMajorityThreshold(market.disputeCount)
+  const qualifiedMajorityFractionLabel = formatQualifiedMajorityLabel(market.disputeCount)
+  const nextQualifiedMajorityThreshold = getQualifiedMajorityThreshold(market.disputeCount + 1)
+  const nextQualifiedMajorityFractionLabel = formatQualifiedMajorityLabel(market.disputeCount + 1)
+  const currentDisputeRoundLabel = market.disputeCount === 0
+    ? 'Initial resolution round'
+    : `Current round: ${getOrdinalLabel(market.disputeCount)} dispute`
+  const nextDisputeRoundLabel = `Next round: ${getOrdinalLabel(market.disputeCount + 1)} dispute`
   const qualifiedThresholdCount = totalVoteCount * qualifiedMajorityThreshold
   const qualifiedMajorityPercentLabel = (qualifiedMajorityThreshold * 100).toFixed(1)
+  const nextQualifiedMajorityPercentLabel = (nextQualifiedMajorityThreshold * 100).toFixed(1)
   const leadingOutcome = voteCounts.YES === voteCounts.NO
     ? null
     : voteCounts.YES > voteCounts.NO
@@ -360,7 +368,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                 )}
                 {market.status === 'DISPUTED' && (
                   <p className="text-sm text-yellow-400 mt-1">
-                    This market is under dispute. Community re-voting is open — a qualified majority will re-resolve it.
+                    This market is under dispute ({getOrdinalLabel(market.disputeCount)} dispute round). Community re-voting is open — a qualified majority of {qualifiedMajorityFractionLabel} will re-resolve it.
                     {user?.isAdmin && ' Admin override is available below.'}
                   </p>
                 )}
@@ -417,7 +425,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                         ? `${leadingOutcome} has a qualified majority and will auto-resolve.`
                         : invalidMajorityReached
                         ? 'INVALID has a qualified majority and will auto-resolve.'
-                        : `No outcome has reached the ${qualifiedMajorityPercentLabel}% threshold yet.`}
+                        : `No outcome has reached the ${qualifiedMajorityFractionLabel} (${qualifiedMajorityPercentLabel}%) threshold yet.`}
                     </p>
                   </>
                 )}
@@ -428,9 +436,9 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                 <h3 className="text-sm font-semibold text-indigo-300">How Auto-Resolution Works</h3>
                 <p className="text-sm text-gray-400 mt-2">
                   Auto-resolution requires two conditions to both be true: a <strong className="text-indigo-200">minimum quorum</strong> of {MIN_RESOLUTION_VOTES} total votes,
-                  and a <strong className="text-indigo-200">qualified majority</strong> of {qualifiedMajorityPercentLabel}% of <em>all</em> votes cast
+                  and a <strong className="text-indigo-200">qualified majority</strong> of {qualifiedMajorityFractionLabel} ({qualifiedMajorityPercentLabel}%) of <em>all</em> votes cast
                   (YES, NO, and INVALID combined) in favour of a single outcome.
-                  {market.status === 'DISPUTED' ? ' Disputed markets require a stricter 75.0% supermajority to finalize.' : ''}
+                  {market.disputeCount > 0 ? ` This market is on dispute round ${market.disputeCount}, so the required supermajority has escalated to ${qualifiedMajorityFractionLabel}.` : ''}
                   INVALID votes count toward the total and dilute YES/NO shares, so a contentious market needs even more agreement to resolve.
                 </p>
               </div>
@@ -506,6 +514,20 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                         className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
                       />
                       <p className="text-xs text-gray-500 mt-1">Minimum 20 characters. Be specific about the evidence or criteria.</p>
+                      <div className="mt-2 rounded-md bg-yellow-950/30 border border-yellow-700/30 p-3 space-y-1">
+                        <p className="text-xs text-yellow-100">
+                          {currentDisputeRoundLabel}
+                        </p>
+                        <p className="text-xs text-yellow-200">
+                          Current qualified majority: {qualifiedMajorityFractionLabel} ({qualifiedMajorityPercentLabel}%)
+                        </p>
+                        <p className="text-xs text-yellow-100 pt-1">
+                          {nextDisputeRoundLabel}
+                        </p>
+                        <p className="text-xs text-yellow-300">
+                          After filing this dispute: {nextQualifiedMajorityFractionLabel} ({nextQualifiedMajorityPercentLabel}%)
+                        </p>
+                      </div>
                     </div>
                     <Button variant="outline" size="sm" onClick={handleDispute} loading={resolutionActionLoading}>
                       File Dispute
@@ -643,4 +665,15 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
       </div>
     </div>
   )
+}
+
+function getOrdinalLabel(value: number) {
+  const teenRemainder = value % 100
+  if (teenRemainder >= 11 && teenRemainder <= 13) return `${value}th`
+
+  const remainder = value % 10
+  if (remainder === 1) return `${value}st`
+  if (remainder === 2) return `${value}nd`
+  if (remainder === 3) return `${value}rd`
+  return `${value}th`
 }

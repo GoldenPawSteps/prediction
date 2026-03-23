@@ -43,7 +43,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
           orderBy: { createdAt: 'desc' },
           take: 50,
         },
-        _count: { select: { trades: true } },
+        _count: { select: { trades: true, disputes: true } },
       },
     })
 
@@ -57,7 +57,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       ? { yes: 0.5, no: 0.5 }
       : getMarketProbabilities(market.yesShares, market.noShares, market.liquidityParam)
 
-    return apiSuccess({ ...market, probabilities })
+    return apiSuccess({
+      ...market,
+      probabilities,
+      disputeCount: market._count.disputes,
+    })
   } catch (err) {
     console.error('Get market error:', err)
     return apiError('Internal server error', 500)
