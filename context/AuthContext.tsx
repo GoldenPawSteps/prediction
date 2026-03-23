@@ -36,11 +36,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (res.ok) {
         const data = await res.json()
         setUser(data)
-      } else {
-        setUser(null)
+        return
       }
+
+      // Retry once on auth failures to avoid brief session flicker caused by
+      // transient cookie propagation/race conditions.
+      if (res.status === 401 || res.status === 403) {
+        await new Promise((resolve) => window.setTimeout(resolve, 150))
+        const retry = await fetch('/api/auth/me', { cache: 'no-store' })
+        if (retry.ok) {
+          const data = await retry.json()
+          setUser(data)
+          return
+        }
+
+        setUser(null)
+        return
+      }
+
+      // Keep the current user on non-auth errors (e.g. 5xx/network edge cases).
     } catch {
-      setUser(null)
+      // Do not clear auth state on transient network failures.
     }
   }, [])
 
