@@ -13,21 +13,11 @@ function getTokenFromCookieHeader(cookieHeader: string | null): string | null {
 
   if (tokenPairs.length === 0) return null
 
-  // If single token, return it
-  if (tokenPairs.length === 1) return tokenPairs[0]
-
-  // If multiple tokens, verify each and return the most recent valid one
-  let bestToken: { token: string; iat: number } | null = null
-  for (const token of tokenPairs) {
-    const decoded = verifyToken(token) as any
-    if (decoded && decoded.iat) {
-      if (!bestToken || decoded.iat > bestToken.iat) {
-        bestToken = { token, iat: decoded.iat }
-      }
-    }
-  }
-
-  return bestToken?.token || tokenPairs[tokenPairs.length - 1] || null
+  // Return the last token (most recently sent by browser).
+  // Multiple tokens shouldn't exist, but if they do, always use the last one.
+  // Do NOT pick by iat timestamp — that creates a privilege escalation vulnerability
+  // where a more recent admin token would be selected over a regular user token.
+  return tokenPairs[tokenPairs.length - 1]
 }
 
 export function getTokenFromRequest(req: NextRequest): string | null {
