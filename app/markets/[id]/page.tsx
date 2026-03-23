@@ -24,6 +24,8 @@ interface Market {
   disputeWindowHours?: number
   endDate: string
   totalVolume: number
+  ammVolume: number
+  exchangeVolume: number
   yesShares: number
   noShares: number
   liquidityParam: number
@@ -48,6 +50,23 @@ interface Market {
   _count: { trades: number }
   disputeCount: number
   tags: string[]
+  orders?: Array<{
+    id: string; userId: string; outcome: 'YES' | 'NO'; side: 'BID' | 'ASK'
+    status: 'OPEN' | 'PARTIAL' | 'FILLED' | 'CANCELLED'
+    price: number; initialShares: number; remainingShares: number; createdAt: string
+    user: { id: string; username: string; avatar: string | null }
+  }>
+  orderFills?: Array<{
+    id: string; outcome: 'YES' | 'NO'; price: number; shares: number; createdAt: string
+    makerUser: { id: string; username: string; avatar: string | null }
+    takerUser: { id: string; username: string; avatar: string | null }
+  }>
+  userOrders?: Array<{
+    id: string; userId: string; outcome: 'YES' | 'NO'; side: 'BID' | 'ASK'
+    status: 'OPEN' | 'PARTIAL' | 'FILLED' | 'CANCELLED'
+    orderType?: string
+    price: number; initialShares: number; remainingShares: number; createdAt: string; updatedAt?: string
+  }>
 }
 
 export default function MarketPage({ params }: { params: Promise<{ id: string }> }) {
@@ -341,6 +360,11 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
             <h2 className="text-base font-semibold text-white mb-3">Price History</h2>
             <PriceChart data={market.priceHistory} />
           </div>
+
+          {/* Exchange Order History */}
+          {((market.orderFills && market.orderFills.length > 0) || (market.userOrders && market.userOrders.length > 0)) && (
+            <ExchangeHistoryPanel orderFills={market.orderFills ?? []} userOrders={market.userOrders ?? []} />
+          )}
 
           {/* Description */}
           <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-4">
@@ -656,6 +680,14 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
               <span>Total Volume</span>
               <span className="text-white">{formatCurrency(market.totalVolume)}</span>
             </div>
+            <div className="flex justify-between text-gray-400 pl-3 border-l border-gray-700">
+              <span>AMM Volume</span>
+              <span className="text-white">{formatCurrency(market.ammVolume)}</span>
+            </div>
+            <div className="flex justify-between text-gray-400 pl-3 border-l border-gray-700">
+              <span>Exchange Vol</span>
+              <span className="text-white">{formatCurrency(market.exchangeVolume)}</span>
+            </div>
             <div className="flex justify-between text-gray-400">
               <span>Total Trades</span>
               <span className="text-white">{market._count.trades}</span>
@@ -684,4 +716,164 @@ function getOrdinalLabel(value: number) {
   if (remainder === 2) return `${value}nd`
   if (remainder === 3) return `${value}rd`
   return `${value}th`
+}
+
+type Fill = {
+  id: string; outcome: 'YES' | 'NO'; price: number; shares: number; createdAt: string
+  makerUser: { id: string; username: string; avatar: string | null }
+  takerUser: { id: string; username: string; avatar: string | null }
+}
+
+type UserOrder = {
+  id: string; userId: string; outcome: 'YES' | 'NO'; side: 'BID' | 'ASK'
+  status: 'OPEN' | 'PARTIAL' | 'FILLED' | 'CANCELLED'
+  orderType?: string
+  price: number; initialShares: number; remainingShares: number; createdAt: string; updatedAt?: string
+}
+
+const ORDER_STATUS_COLORS: Record<string, string> = {
+  OPEN: 'text-blue-400',
+  PARTIAL: 'text-yellow-400',
+  FILLED: 'text-green-400',
+  CANCELLED: 'text-gray-500',
+}
+
+function ExchangeHistoryPanel({ orderFills, userOrders }: { orderFills: Fill[]; userOrders: UserOrder[] }) {
+  const [tab, setTab] = useState<'fills' | 'orders'>('fills')
+
+  return (
+    <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-base font-semibold text-white">Exchange History</h2>
+        <div className="inline-flex rounded-lg border border-gray-700 overflow-hidden text-xs">
+          <button
+            onClick={() => setTab('fills')}
+            className={`px-3 py-1.5 font-medium ${tab === 'fills' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`}
+          >
+            Recent Fills
+          </button>
+          {userOrders.length > 0 && (
+            <button
+              onClick={() => setTab('orders')}
+              className={`px-3 py-1.5 font-medium ${tab === 'orders' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`}
+            >
+              My Orders
+            </button>
+          )}
+        </div>
+      </div>
+
+      {tab === 'fills' && (
+        orderFills.length === 0 ? (
+          <p className="text-sm text-gray-500 text-center py-4">No exchange fills yet</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-gray-500 border-b border-gray-700">
+                  <th className="pb-2 text-left font-medium">Time</th>
+                  <th className="pb-2 text-left font-medium">Outcome</th>
+                  <th className="pb-2 text-right font-medium">Price</th>
+                  <th className="pb-2 text-right font-medium">Shares</th>
+                  <th className="pb-2 text-right font-medium">Notional</th>
+                  <th className="pb-2 text-left font-medium pl-4">Maker</th>
+                  <th className="pb-2 text-left font-medium">Taker</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-700/50">
+                {orderFills.map((fill) => (
+                  <tr key={fill.id} className="text-gray-300 hover:bg-gray-700/20 transition-colors">
+                    <td className="py-1.5 text-gray-500">{timeUntil(fill.createdAt)}</td>
+                    <td className="py-1.5">
+                      <span className={`font-medium ${fill.outcome === 'YES' ? 'text-green-400' : 'text-red-400'}`}>
+                        {fill.outcome}
+                      </span>
+                    </td>
+                    <td className="py-1.5 text-right font-mono">{formatPercent(fill.price)}</td>
+                    <td className="py-1.5 text-right font-mono">{fill.shares.toFixed(2)}</td>
+                    <td className="py-1.5 text-right font-mono text-gray-400">{formatCurrency(fill.price * fill.shares)}</td>
+                    <td className="py-1.5 pl-4 text-gray-400">@{fill.makerUser.username}</td>
+                    <td className="py-1.5 text-gray-400">@{fill.takerUser.username}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      )}
+
+      {tab === 'orders' && (
+        <div className="space-y-2">
+          {userOrders.map((order) => {
+            const filledShares = Math.max(0, order.initialShares - order.remainingShares)
+            const fillPct = order.initialShares > 0 ? (filledShares / order.initialShares) * 100 : 0
+            return (
+              <div key={order.id} className="rounded-lg border border-gray-700 bg-gray-900/40 p-3 text-xs space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className={`font-semibold ${order.side === 'BID' ? 'text-green-400' : 'text-red-400'}`}>
+                      {order.side}
+                    </span>
+                    <span className={`font-medium ${order.outcome === 'YES' ? 'text-green-300' : 'text-red-300'}`}>
+                      {order.outcome}
+                    </span>
+                    {order.orderType && order.orderType !== 'LIMIT' && (
+                      <span className="bg-gray-700 text-gray-300 px-1 rounded text-[10px]">{order.orderType}</span>
+                    )}
+                    <span className="text-white font-mono">
+                      {order.orderType === 'MARKET' ? 'MKT' : formatPercent(order.price)}
+                    </span>
+                    <span className="text-gray-400">{order.initialShares.toFixed(2)} shares</span>
+                  </div>
+                  <span className={`font-medium ${ORDER_STATUS_COLORS[order.status]}`}>{order.status}</span>
+                </div>
+
+                {/* Fill progress bar */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-gray-500">
+                    <span>Filled {filledShares.toFixed(2)} / {order.initialShares.toFixed(2)}</span>
+                    <span>{fillPct.toFixed(0)}%</span>
+                  </div>
+                  <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        order.status === 'FILLED' ? 'bg-green-500' : order.status === 'CANCELLED' ? 'bg-gray-500' : 'bg-indigo-500'
+                      }`}
+                      style={{ width: `${fillPct}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Status timeline */}
+                <div className="flex flex-wrap gap-3 text-gray-500 pt-1">
+                  <span className="flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-blue-400 inline-block" />
+                    Placed {timeUntil(order.createdAt)}
+                  </span>
+                  {order.status === 'FILLED' && order.updatedAt && (
+                    <span className="flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-green-400 inline-block" />
+                      Filled {timeUntil(order.updatedAt)}
+                    </span>
+                  )}
+                  {order.status === 'PARTIAL' && (
+                    <span className="flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-yellow-400 inline-block" />
+                      Partial fill
+                    </span>
+                  )}
+                  {order.status === 'CANCELLED' && order.updatedAt && (
+                    <span className="flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-gray-400 inline-block" />
+                      Cancelled {timeUntil(order.updatedAt)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
 }

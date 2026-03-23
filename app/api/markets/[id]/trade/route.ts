@@ -64,7 +64,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         const position = await tx.position.findUnique({
           where: { userId_marketId_outcome: { userId: authUser.userId, marketId, outcome } },
         })
-        if (!position || position.shares < shares) {
+        const openAskReservations = await tx.marketOrder.aggregate({
+          where: {
+            userId: authUser.userId,
+            marketId,
+            outcome,
+            side: 'ASK',
+            status: { in: ['OPEN', 'PARTIAL'] },
+          },
+          _sum: { remainingShares: true },
+        })
+
+        const reservedShares = openAskReservations._sum.remainingShares ?? 0
+        const availableShares = (position?.shares ?? 0) - reservedShares
+
+        if (!position || availableShares < shares) {
           throw new Error('Insufficient shares to sell')
         }
       }
@@ -82,6 +96,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           yesShares: newYesShares,
           noShares: newNoShares,
           totalVolume: { increment: Math.abs(tradeCost) },
+          ammVolume: { increment: Math.abs(tradeCost) },
         },
       })
 

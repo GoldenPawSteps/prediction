@@ -30,6 +30,25 @@ enum TradeOutcome {
   NO
 }
 
+enum OrderSide {
+  BID
+  ASK
+}
+
+enum OrderType {
+  LIMIT
+  MARKET
+  POST_ONLY
+  IOC
+}
+
+enum OrderStatus {
+  OPEN
+  PARTIAL
+  FILLED
+  CANCELLED
+}
+
 model User {
   id                 String    @id @default(cuid())
   email              String    @unique
@@ -49,6 +68,9 @@ model User {
   comments           Comment[]
   resolutionVotes    MarketResolutionVote[]
   disputes           MarketDispute[]
+  marketOrders       MarketOrder[]
+  makerOrderFills    MarketOrderFill[]     @relation("MarketOrderFillMaker")
+  takerOrderFills    MarketOrderFill[]     @relation("MarketOrderFillTaker")
 }
 
 model Market {
@@ -67,6 +89,8 @@ model Market {
   noShares         Float            @default(0)
   liquidityParam   Float            @default(100.0)
   totalVolume      Float            @default(0)
+  ammVolume        Float            @default(0)
+  exchangeVolume   Float            @default(0)
   initialLiquidity Float            @default(100.0)
   disputeWindowHours Int            @default(24)
   tags             String[]         @default([])
@@ -79,6 +103,8 @@ model Market {
   priceHistory     PriceHistory[]
   resolutionVotes  MarketResolutionVote[]
   disputes         MarketDispute[]
+  orders           MarketOrder[]
+  orderFills       MarketOrderFill[]
 }
 
 model Trade {
@@ -154,4 +180,48 @@ model MarketDispute {
   status           String           @default("OPEN")
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
+}
+
+model MarketOrder {
+  id                    String      @id @default(cuid())
+  userId                String
+  user                  User        @relation(fields: [userId], references: [id])
+  marketId              String
+  market                Market      @relation(fields: [marketId], references: [id])
+  outcome               TradeOutcome
+  side                  OrderSide
+  orderType             OrderType   @default(LIMIT)
+  status                OrderStatus @default(OPEN)
+  price                 Float
+  initialShares         Float
+  remainingShares       Float
+  reservedAmount        Float       @default(0)
+  avgEntryPriceSnapshot Float       @default(0)
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  makerFills            MarketOrderFill[] @relation("MarketOrderFillMakerOrder")
+  takerFills            MarketOrderFill[] @relation("MarketOrderFillTakerOrder")
+
+  @@index([marketId, outcome, side, status, price, createdAt])
+  @@index([userId, marketId, status])
+}
+
+model MarketOrderFill {
+  id          String       @id @default(cuid())
+  marketId    String
+  market      Market       @relation(fields: [marketId], references: [id])
+  makerOrderId String
+  makerOrder   MarketOrder  @relation("MarketOrderFillMakerOrder", fields: [makerOrderId], references: [id])
+  takerOrderId String
+  takerOrder   MarketOrder  @relation("MarketOrderFillTakerOrder", fields: [takerOrderId], references: [id])
+  outcome     TradeOutcome
+  price       Float
+  shares      Float
+  makerUserId String
+  makerUser   User         @relation("MarketOrderFillMaker", fields: [makerUserId], references: [id])
+  takerUserId String
+  takerUser   User         @relation("MarketOrderFillTaker", fields: [takerUserId], references: [id])
+  createdAt   DateTime     @default(now())
+
+  @@index([marketId, createdAt])
 }

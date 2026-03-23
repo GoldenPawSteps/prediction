@@ -1,18 +1,50 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { apiError, apiSuccess } from '@/lib/api-helpers'
+import { getUserFromRequest } from '@/lib/api-helpers'
 import { getMarketProbabilities } from '@/lib/lmsr'
 import { closeMarketIfExpired } from '@/lib/market-status'
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
+    const viewer = await getUserFromRequest(_req)
     await closeMarketIfExpired(id)
 
     const market = await prisma.market.findUnique({
       where: { id },
       include: {
         creator: { select: { id: true, username: true, avatar: true } },
+        orders: {
+          where: { status: { in: ['OPEN', 'PARTIAL'] } },
+          select: {
+            id: true,
+            userId: true,
+            outcome: true,
+            side: true,
+            status: true,
+            price: true,
+            initialShares: true,
+            remainingShares: true,
+            createdAt: true,
+            user: { select: { id: true, username: true, avatar: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 100,
+        },
+        orderFills: {
+          select: {
+            id: true,
+            outcome: true,
+            price: true,
+            shares: true,
+            createdAt: true,
+            makerUser: { select: { id: true, username: true, avatar: true } },
+            takerUser: { select: { id: true, username: true, avatar: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+        },
         resolutionVotes: {
           select: {
             userId: true,
@@ -49,6 +81,27 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
     if (!market) return apiError('Market not found', 404)
 
+    const userOrders = viewer
+      ? await prisma.marketOrder.findMany({
+          where: { marketId: id, userId: viewer.userId },
+          select: {
+            id: true,
+            userId: true,
+            outcome: true,
+            side: true,
+            status: true,
+            orderType: true,
+            price: true,
+            initialShares: true,
+            remainingShares: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 30,
+        })
+      : []
+
     const probabilities = market.resolution === 'YES'
       ? { yes: 1, no: 0 }
       : market.resolution === 'NO'
@@ -59,6 +112,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
     return apiSuccess({
       ...market,
+      userOrders,
       probabilities,
       disputeCount: market._count.disputes,
     })
