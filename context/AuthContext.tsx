@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react'
 import toast from 'react-hot-toast'
 
 interface User {
@@ -29,12 +29,24 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const logoutInProgressRef = useRef(false)
 
   const refreshUser = useCallback(async () => {
+    if (logoutInProgressRef.current) {
+      return
+    }
+
     try {
       const res = await fetch('/api/auth/me', { cache: 'no-store' })
+      if (logoutInProgressRef.current) {
+        return
+      }
+
       if (res.ok) {
         const data = await res.json()
+        if (logoutInProgressRef.current) {
+          return
+        }
         setUser(data)
         return
       }
@@ -153,8 +165,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+    if (logoutInProgressRef.current) {
+      return
+    }
+
+    logoutInProgressRef.current = true
     setUser(null)
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+    // Keep refresh blocked briefly so cookie invalidation can settle before
+    // background visibility/interval refreshes run.
+    window.setTimeout(() => {
+      logoutInProgressRef.current = false
+    }, 300)
     toast.success('Logged out')
   }
 

@@ -11,7 +11,7 @@ const tradeSchema = z.object({
 })
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const userOrResponse = requireAuth(req)
+  const userOrResponse = await requireAuth(req)
   if ('status' in userOrResponse && !('userId' in userOrResponse)) {
     return userOrResponse
   }

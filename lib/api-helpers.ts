@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyToken, JWTPayload } from './auth'
 
-function getTokenFromCookieHeader(cookieHeader: string | null): string | null {
+export const AUTH_COOKIE_NAME = 'session_token'
+export const LEGACY_AUTH_COOKIE_NAME = 'token'
+
+function getTokenFromCookieHeader(cookieHeader: string | null, cookieName: string): string | null {
   if (!cookieHeader) return null
 
   const tokenPairs = cookieHeader
     .split(';')
     .map((part) => part.trim())
-    .filter((part) => part.startsWith('token='))
-    .map((part) => part.slice('token='.length))
+    .filter((part) => part.startsWith(`${cookieName}=`))
+    .map((part) => part.slice(`${cookieName}=`.length))
     .filter(Boolean)
 
   if (tokenPairs.length === 0) return null
@@ -39,34 +42,33 @@ export function getTokenFromRequest(req: NextRequest): string | null {
     return authHeader.slice(7)
   }
 
-  // Parse raw cookie header to detect and reject ambiguous cookies.
-  // If ambiguous cookies detected, return null to fail auth (don't fallback to req.cookies).
-  const cookieToken = getTokenFromCookieHeader(req.headers.get('cookie'))
-  if (cookieToken === null && req.headers.get('cookie')?.includes('token=')) {
+  // Only trust the canonical auth cookie name. Legacy cookies are ignored.
+  const cookieHeader = req.headers.get('cookie')
+  const cookieToken = getTokenFromCookieHeader(cookieHeader, AUTH_COOKIE_NAME)
+  if (cookieToken === null && cookieHeader?.includes(`${AUTH_COOKIE_NAME}=`)) {
     // Ambiguous or invalid cookies detected - fail auth entirely.
     return null
   }
-  
-  // Only use req.cookies.get as fallback if no token= in raw cookie header at all.
-  return cookieToken || req.cookies.get('token')?.value || null
+
+  return cookieToken || req.cookies.get(AUTH_COOKIE_NAME)?.value || null
 }
 
-export function getUserFromRequest(req: NextRequest): JWTPayload | null {
+export async function getUserFromRequest(req: NextRequest): Promise<JWTPayload | null> {
   const token = getTokenFromRequest(req)
   if (!token) return null
   return verifyToken(token)
 }
 
-export function requireAuth(req: NextRequest): JWTPayload | NextResponse {
-  const user = getUserFromRequest(req)
+export async function requireAuth(req: NextRequest): Promise<JWTPayload | NextResponse> {
+  const user = await getUserFromRequest(req)
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   return user
 }
 
-export function requireAdmin(req: NextRequest): JWTPayload | NextResponse {
-  const user = getUserFromRequest(req)
+export async function requireAdmin(req: NextRequest): Promise<JWTPayload | NextResponse> {
+  const user = await getUserFromRequest(req)
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }

@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const userOrResponse = requireAuth(req)
+  const userOrResponse = await requireAuth(req)
   if ('status' in userOrResponse && !('userId' in userOrResponse)) {
     return userOrResponse
   }

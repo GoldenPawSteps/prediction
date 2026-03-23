@@ -4,7 +4,7 @@ import { requireAuth, apiError, apiSuccess } from '@/lib/api-helpers'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   // Allow anyone to resolve, no admin check needed (voting drives resolution now)
-  const userOrResponse = requireAuth(req)
+  const userOrResponse = await requireAuth(req)
   if ('status' in userOrResponse && !('userId' in userOrResponse)) {
     return userOrResponse
   }

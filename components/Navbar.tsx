@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/Button'
@@ -9,8 +9,21 @@ import { formatCurrency } from '@/lib/utils'
 
 export function Navbar() {
   const pathname = usePathname()
+  const router = useRouter()
   const { user, logout } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
+
+  const handleLogout = async () => {
+    if (loggingOut) return
+    setLoggingOut(true)
+    try {
+      await logout()
+      router.replace('/auth/login')
+    } finally {
+      setLoggingOut(false)
+    }
+  }
 
   const navLinks = [
     { href: '/', label: 'Markets' },
@@ -64,8 +77,12 @@ export function Navbar() {
                       {user.username[0].toUpperCase()}
                     </div>
                   </Link>
-                  <button onClick={logout} className="text-gray-400 hover:text-white text-sm transition-colors">
-                    Logout
+                  <button
+                    onClick={handleLogout}
+                    disabled={loggingOut}
+                    className="text-gray-400 hover:text-white text-sm transition-colors disabled:opacity-60"
+                  >
+                    {loggingOut ? 'Logging out...' : 'Logout'}
                   </button>
                 </div>
               </>
@@ -112,7 +129,16 @@ export function Navbar() {
             {user ? (
               <>
                 <div className="px-3 py-2 text-sm text-gray-400">Balance: <span className="text-green-400 font-semibold">{formatCurrency(user.balance)}</span></div>
-                <button onClick={() => { logout(); setMobileOpen(false) }} className="w-full text-left px-3 py-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-md">Logout</button>
+                <button
+                  onClick={async () => {
+                    await handleLogout()
+                    setMobileOpen(false)
+                  }}
+                  disabled={loggingOut}
+                  className="w-full text-left px-3 py-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-md disabled:opacity-60"
+                >
+                  {loggingOut ? 'Logging out...' : 'Logout'}
+                </button>
               </>
             ) : (
               <div className="flex gap-2 px-3 pt-2">

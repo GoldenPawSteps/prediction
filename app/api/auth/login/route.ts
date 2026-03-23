@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { comparePassword, signToken } from '@/lib/auth'
-import { apiError, apiSuccess } from '@/lib/api-helpers'
+import { AUTH_COOKIE_NAME, LEGACY_AUTH_COOKIE_NAME, apiError, apiSuccess } from '@/lib/api-helpers'
 import { z } from 'zod'
 
 const loginSchema = z.object({
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { email },
-      select: { id: true, email: true, username: true, passwordHash: true, balance: true, isAdmin: true, avatar: true },
+      select: { id: true, email: true, username: true, passwordHash: true, balance: true, isAdmin: true, avatar: true, sessionVersion: true },
     })
 
     if (!user || !user.passwordHash) {
@@ -44,37 +44,28 @@ export async function POST(req: NextRequest) {
       return apiError('Invalid email or password', 401)
     }
 
-    const token = signToken({ userId: user.id, email: user.email, isAdmin: user.isAdmin })
+    const token = signToken({ userId: user.id, email: user.email, isAdmin: user.isAdmin, sessionVersion: user.sessionVersion })
     const { passwordHash, ...userWithoutPassword } = user
     void passwordHash
     const secureCookie = shouldUseSecureCookies(req)
 
     const response = apiSuccess({ user: userWithoutPassword, token })
-    // Explicitly delete all token cookie variants to prevent duplicate tokens in cookie jar.
-    // This is critical to prevent privilege escalation where an old admin token could be picked up.
-    response.cookies.delete('token')
-    // Also explicitly set both variants with maxAge 0 to ensure browser clears them across all domains/paths.
-    response.cookies.set('token', '', {
-      httpOnly: true,
-      secure: false,
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 0,
-    })
-    response.cookies.set('token', '', {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 0,
-    })
-    // Now set the new token with appropriate secure flag.
-    response.cookies.set('token', token, {
+    // Set the auth cookie once. Setting with a longer maxAge naturally replaces any
+    // existing session_token cookie in the browser.
+    response.cookies.set(AUTH_COOKIE_NAME, token, {
       httpOnly: true,
       secure: secureCookie,
       sameSite: 'lax',
       path: '/',
       maxAge: 60 * 60 * 24 * 7,
+    })
+    // Best-effort cleanup for the legacy cookie name.
+    response.cookies.set(LEGACY_AUTH_COOKIE_NAME, '', {
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 0,
+      expires: new Date(0),
     })
     return response
   } catch (err) {

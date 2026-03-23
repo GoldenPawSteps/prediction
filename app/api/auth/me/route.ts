@@ -4,7 +4,7 @@ import { requireAuth } from '@/lib/api-helpers'
 import { apiError, apiSuccess } from '@/lib/api-helpers'
 
 export async function GET(req: NextRequest) {
-  const userOrResponse = requireAuth(req)
+  const userOrResponse = await requireAuth(req)
   if ('status' in userOrResponse && !('userId' in userOrResponse)) {
     return userOrResponse
   }
