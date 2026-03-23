@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { MarketCard } from '@/components/MarketCard'
 import { Input } from '@/components/ui/Input'
 
@@ -143,7 +144,7 @@ export default function HomePage() {
         <div className="text-center py-16 text-gray-500">
           <div className="text-5xl mb-4">🔍</div>
           <p className="text-lg">No markets found.</p>
-          <p className="text-sm mt-1">Try different filters or <a href="/markets/create" className="text-indigo-400 hover:underline">create one</a>.</p>
+          <p className="text-sm mt-1">Try different filters or <Link href="/markets/create" className="text-indigo-400 hover:underline">create one</Link>.</p>
         </div>
       ) : (
         <>

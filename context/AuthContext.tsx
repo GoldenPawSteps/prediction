@@ -73,7 +73,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    refreshUser().finally(() => setLoading(false))
+    let mounted = true
+
+    const initializeAuth = async () => {
+      await refreshUser()
+      if (mounted) {
+        setLoading(false)
+      }
+    }
+
+    void initializeAuth()
+
+    return () => {
+      mounted = false
+    }
   }, [refreshUser])
 
   useEffect(() => {

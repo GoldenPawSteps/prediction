@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server'
+import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, apiError, apiSuccess } from '@/lib/api-helpers'
-import { lmsrTradeCost, getMarketProbabilities, lmsrYesPrice, lmsrNoPrice } from '@/lib/lmsr'
+import { lmsrTradeCost, getMarketProbabilities } from '@/lib/lmsr'
 import { z } from 'zod'
 
 const tradeSchema = z.object({
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const { outcome, type, shares } = parsed.data
 
-    const result = await prisma.$transaction(async (tx: any) => {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const market = await tx.market.findUnique({ where: { id: marketId } })
       if (!market) throw new Error('Market not found')
       if (market.status !== 'OPEN') throw new Error('Market is not open for trading')

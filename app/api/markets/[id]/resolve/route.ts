@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, apiError, apiSuccess } from '@/lib/api-helpers'
 
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const isReResolution = market.status === 'DISPUTED'
 
     // Resolve the market and calculate payouts
-    const settlement = await prisma.$transaction(async (tx: any) => {
+    const settlement = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const reversedSettlementTrades = await reversePreviousSettlementIfNeeded(
         tx,
         marketId,
@@ -178,7 +179,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 async function reversePreviousSettlementIfNeeded(
-  tx: any,
+  tx: Prisma.TransactionClient,
   marketId: string,
   isReResolution: boolean,
   previousResolutionTime: Date | null

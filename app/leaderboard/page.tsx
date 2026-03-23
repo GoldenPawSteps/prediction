@@ -25,7 +25,6 @@ export default function LeaderboardPage() {
   const [sortBy, setSortBy] = useState('profit')
 
   useEffect(() => {
-    setLoading(true)
     fetch(`/api/leaderboard?sortBy=${sortBy}`)
       .then((r) => r.json())
       .then((data) => setEntries(data))
@@ -43,7 +42,10 @@ export default function LeaderboardPage() {
           {SORT_OPTIONS.map((opt) => (
             <button
               key={opt.value}
-              onClick={() => setSortBy(opt.value)}
+              onClick={() => {
+                setLoading(true)
+                setSortBy(opt.value)
+              }}
               className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
                 sortBy === opt.value ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'
               }`}

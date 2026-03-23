@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server'
+import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, apiError, apiSuccess } from '@/lib/api-helpers'
-import { MIN_RESOLUTION_VOTES, getQualifiedMajorityThreshold } from '@/lib/resolution'
+import { getQualifiedMajorityThreshold } from '@/lib/resolution'
 import { z } from 'zod'
 
 const voteSchema = z.object({
@@ -74,12 +75,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const totalVotesCast = votes.reduce((sum, v) => sum + (v._count?.id ?? 0), 0)
     const qualifiedMajorityThreshold = getQualifiedMajorityThreshold(market._count.disputes)
 
-    // Auto-resolve when quorum is met AND one outcome holds a qualified majority
-    // (>= threshold of ALL votes cast, including INVALID)
-    if (totalVotesCast >= MIN_RESOLUTION_VOTES) {
+    // Auto-resolve once at least one vote exists and one outcome strictly exceeds
+    // the qualified majority threshold of ALL votes cast (including INVALID).
+    if (totalVotesCast > 0) {
       for (const v of votes) {
         const share = (v._count?.id ?? 0) / totalVotesCast
-        if (share >= qualifiedMajorityThreshold) {
+        if (share > qualifiedMajorityThreshold) {
           shouldResolve = true
           majorityOutcome = v.outcome as 'YES' | 'NO' | 'INVALID'
           break
@@ -136,7 +137,7 @@ async function runResolution(
 
   if (!market) return
 
-  await prisma.$transaction(async (tx: any) => {
+  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     await reversePreviousSettlementIfNeeded(
       tx,
       marketId,
@@ -244,7 +245,7 @@ async function runResolution(
 }
 
 async function reversePreviousSettlementIfNeeded(
-  tx: any,
+  tx: Prisma.TransactionClient,
   marketId: string,
   isReResolution: boolean,
   previousResolutionTime: Date | null

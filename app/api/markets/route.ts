@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/api-helpers'
 import { apiError, apiSuccess } from '@/lib/api-helpers'
@@ -90,13 +91,13 @@ export async function POST(req: NextRequest) {
     if (!user) return apiError('User not found', 404)
     if (user.balance < initialLiquidity) return apiError('Insufficient balance')
 
-    const createMarketInTransaction = async (tx: any, includeDisputeWindowHours: boolean) => {
+    const createMarketInTransaction = async (tx: Prisma.TransactionClient, includeDisputeWindowHours: boolean) => {
       await tx.user.update({
         where: { id: authUser.userId },
         data: { balance: { decrement: initialLiquidity } },
       })
 
-      const marketData: Record<string, unknown> = {
+      const baseMarketData: Prisma.MarketUncheckedCreateInput = {
         title,
         description,
         category,
@@ -108,9 +109,9 @@ export async function POST(req: NextRequest) {
         tags,
       }
 
-      if (includeDisputeWindowHours) {
-        marketData.disputeWindowHours = disputeWindowHours
-      }
+      const marketData = includeDisputeWindowHours
+        ? ({ ...baseMarketData, disputeWindowHours } as Prisma.MarketUncheckedCreateInput)
+        : baseMarketData
 
       const m = await tx.market.create({ data: marketData })
 
@@ -123,11 +124,11 @@ export async function POST(req: NextRequest) {
 
     let market
     try {
-      market = await prisma.$transaction(async (tx: any) => createMarketInTransaction(tx, true))
+      market = await prisma.$transaction(async (tx: Prisma.TransactionClient) => createMarketInTransaction(tx, true))
     } catch (err) {
       if (!isUnknownDisputeWindowFieldError(err)) throw err
       console.warn('Falling back to default dispute window due to stale Prisma client. Run `npx prisma generate` and restart the dev server.')
-      market = await prisma.$transaction(async (tx: any) => createMarketInTransaction(tx, false))
+      market = await prisma.$transaction(async (tx: Prisma.TransactionClient) => createMarketInTransaction(tx, false))
     }
 
     return apiSuccess({ market }, 201)
