@@ -11,6 +11,7 @@ enum MarketStatus {
   CLOSED
   RESOLVED
   INVALID
+  DISPUTED
 }
 
 enum ResolutionOutcome {
@@ -30,21 +31,23 @@ enum TradeOutcome {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  username      String    @unique
-  passwordHash  String?
-  avatar        String?
-  bio           String?
-  balance       Float     @default(1000.0)
-  isAdmin       Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                 String    @id @default(cuid())
+  email              String    @unique
+  username           String    @unique
+  passwordHash       String?
+  avatar             String?
+  bio                String?
+  balance            Float     @default(1000.0)
+  isAdmin            Boolean   @default(false)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  trades        Trade[]
-  positions     Position[]
-  markets       Market[]
-  comments      Comment[]
+  trades             Trade[]
+  positions          Position[]
+  markets            Market[]
+  comments           Comment[]
+  resolutionVotes    MarketResolutionVote[]
+  disputes           MarketDispute[]
 }
 
 model Market {
@@ -55,6 +58,7 @@ model Market {
   status           MarketStatus     @default(OPEN)
   resolution       ResolutionOutcome?
   resolutionSource String?
+  resolutionTime   DateTime?
   endDate          DateTime
   creatorId        String
   creator          User             @relation(fields: [creatorId], references: [id])
@@ -63,6 +67,7 @@ model Market {
   liquidityParam   Float            @default(100.0)
   totalVolume      Float            @default(0)
   initialLiquidity Float            @default(100.0)
+  disputeWindowHours Int            @default(24)
   tags             String[]         @default([])
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
@@ -71,6 +76,8 @@ model Market {
   positions        Position[]
   comments         Comment[]
   priceHistory     PriceHistory[]
+  resolutionVotes  MarketResolutionVote[]
+  disputes         MarketDispute[]
 }
 
 model Trade {
@@ -121,4 +128,29 @@ model PriceHistory {
   noPrice   Float
   volume    Float    @default(0)
   timestamp DateTime @default(now())
+}
+
+model MarketResolutionVote {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id])
+  marketId  String
+  market    Market           @relation(fields: [marketId], references: [id])
+  outcome   ResolutionOutcome
+  createdAt DateTime         @default(now())
+
+  @@unique([userId, marketId])
+}
+
+model MarketDispute {
+  id               String           @id @default(cuid())
+  userId           String
+  user             User             @relation(fields: [userId], references: [id])
+  marketId         String
+  market           Market           @relation(fields: [marketId], references: [id])
+  proposedOutcome  ResolutionOutcome
+  reason           String
+  status           String           @default("OPEN")
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 }

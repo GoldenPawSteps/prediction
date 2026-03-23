@@ -31,6 +31,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       const market = await tx.market.findUnique({ where: { id: marketId } })
       if (!market) throw new Error('Market not found')
       if (market.status !== 'OPEN') throw new Error('Market is not open for trading')
+      if (new Date(market.endDate) <= new Date()) {
+        throw new Error('Market has expired and is no longer accepting trades')
+      }
 
       const user = await tx.user.findUnique({ where: { id: authUser.userId } })
       if (!user) throw new Error('User not found')

@@ -7,6 +7,9 @@ import { Input } from '@/components/ui/Input'
 const CATEGORIES = ['All', 'Politics', 'Crypto', 'Sports', 'Tech', 'Entertainment', 'Science', 'Finance', 'Other']
 const STATUSES = [
   { value: 'OPEN', label: 'Open' },
+  { value: 'CLOSED', label: 'Closed' },
+  { value: 'DISPUTED', label: 'Disputed' },
+  { value: 'INVALID', label: 'Invalid' },
   { value: 'RESOLVED', label: 'Resolved' },
   { value: 'all', label: 'All' },
 ]

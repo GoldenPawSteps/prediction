@@ -9,6 +9,16 @@ import toast from 'react-hot-toast'
 
 const CATEGORIES = ['Politics', 'Crypto', 'Sports', 'Tech', 'Entertainment', 'Science', 'Finance', 'Other']
 
+// Convert local date to datetime-local format string
+function getLocalDateTimeString(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day}T${hours}:${minutes}`
+}
+
 export default function CreateMarketPage() {
   const router = useRouter()
   const { user, optimisticUpdateBalance } = useAuth()
@@ -20,6 +30,7 @@ export default function CreateMarketPage() {
     endDate: '',
     resolutionSource: '',
     initialLiquidity: 100,
+    disputeWindowHours: 24,
     tags: '',
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -33,6 +44,7 @@ export default function CreateMarketPage() {
     if (!form.resolutionSource) errs.resolutionSource = 'Resolution source URL is required'
     else if (!form.resolutionSource.startsWith('http')) errs.resolutionSource = 'Must be a valid URL'
     if (form.initialLiquidity < 10 || form.initialLiquidity > 10000) errs.initialLiquidity = 'Liquidity must be between $10 and $10,000'
+    if (form.disputeWindowHours < 1 || form.disputeWindowHours > 720) errs.disputeWindowHours = 'Dispute window must be between 1 and 720 hours'
     setErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -143,7 +155,7 @@ export default function CreateMarketPage() {
               type="datetime-local"
               value={form.endDate}
               onChange={(e) => setForm({ ...form, endDate: e.target.value })}
-              min={new Date().toISOString().slice(0, 16)}
+              min={getLocalDateTimeString(new Date())}
               className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
             {errors.endDate && <p className="text-red-400 text-xs mt-1">{errors.endDate}</p>}
@@ -182,6 +194,25 @@ export default function CreateMarketPage() {
           {errors.initialLiquidity && <p className="text-red-400 text-xs mt-1">{errors.initialLiquidity}</p>}
           <p className="text-gray-500 text-xs mt-1">
             Your balance: ${user.balance.toFixed(2)} | Higher liquidity = less price impact per trade
+          </p>
+        </div>
+
+        {/* Dispute Window */}
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-1">
+            Dispute Window (hours) <span className="text-red-400">*</span>
+          </label>
+          <input
+            type="number"
+            min="1"
+            max="720"
+            value={form.disputeWindowHours}
+            onChange={(e) => setForm({ ...form, disputeWindowHours: Number(e.target.value) })}
+            className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+          {errors.disputeWindowHours && <p className="text-red-400 text-xs mt-1">{errors.disputeWindowHours}</p>}
+          <p className="text-gray-500 text-xs mt-1">
+            Time window for disputing resolution (1-720 hours, default: 24). Users can file disputes within this period after resolution.
           </p>
         </div>
 

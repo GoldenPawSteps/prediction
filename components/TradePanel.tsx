@@ -11,6 +11,7 @@ import { formatCurrency, formatPercent } from '@/lib/utils'
 interface Market {
   id: string
   status: string
+  endDate: string
   yesShares: number
   noShares: number
   liquidityParam: number
@@ -30,6 +31,7 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
   const [loading, setLoading] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [preview, setPreview] = useState<{ cost: number; price: number } | null>(null)
+  const isExpired = new Date(market.endDate) <= new Date()
 
   const currentPrice = selectedOutcome === 'YES' ? market.probabilities.yes : market.probabilities.no
 
@@ -74,10 +76,12 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
     }
   }
 
-  if (market.status !== 'OPEN') {
+  if (market.status !== 'OPEN' || isExpired) {
     return (
       <div className="bg-gray-800/50 rounded-xl p-4 text-center text-gray-400">
-        This market is {market.status.toLowerCase()} and no longer accepting trades.
+        {isExpired
+          ? 'This market has expired and is no longer accepting trades.'
+          : `This market is ${market.status.toLowerCase()} and no longer accepting trades.`}
       </div>
     )
   }
