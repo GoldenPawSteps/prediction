@@ -5,6 +5,7 @@ import { useAuth } from '@/context/AuthContext'
 import { Badge } from '@/components/ui/Badge'
 import { formatCurrency, formatPercent, formatDateTime, getCategoryColor } from '@/lib/utils'
 import Link from 'next/link'
+import { useT } from '@/context/I18nContext'
 
 interface Position {
   id: string
@@ -44,6 +45,7 @@ interface Stats {
 }
 
 export default function PortfolioPage() {
+  const t = useT('portfolio')
   const { user } = useAuth()
   const [positions, setPositions] = useState<Position[]>([])
   const [trades, setTrades] = useState<Trade[]>([])
@@ -85,8 +87,8 @@ export default function PortfolioPage() {
   if (!user) {
     return (
       <div className="text-center py-16">
-        <p className="text-gray-600 dark:text-gray-400 mb-4">Please log in to view your portfolio.</p>
-        <a href="/auth/login" className="text-indigo-400 hover:underline">Log in →</a>
+        <p className="text-gray-600 dark:text-gray-400 mb-4">{t('loginPrompt')}</p>
+        <a href="/auth/login" className="text-indigo-400 hover:underline">{t('loginLink')}</a>
       </div>
     )
   }
@@ -102,28 +104,28 @@ export default function PortfolioPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Portfolio</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('title')}</h1>
         <p className="text-gray-600 dark:text-gray-400 mt-1">@{user.username}</p>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4">
-          <p className="text-gray-500 dark:text-gray-500 text-xs">Balance</p>
+          <p className="text-gray-500 dark:text-gray-500 text-xs">{t('balance')}</p>
           <p className="text-xl font-bold text-gray-900 dark:text-white mt-1">{formatCurrency(user.balance)}</p>
         </div>
         <div className="bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4">
-          <p className="text-gray-500 dark:text-gray-500 text-xs">Portfolio Value</p>
+          <p className="text-gray-500 dark:text-gray-500 text-xs">{t('portfolioValue')}</p>
           <p className="text-xl font-bold text-gray-900 dark:text-white mt-1">{formatCurrency(stats?.totalValue || 0)}</p>
         </div>
         <div className="bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4">
-          <p className="text-gray-500 dark:text-gray-500 text-xs">Unrealized P&L</p>
+          <p className="text-gray-500 dark:text-gray-500 text-xs">{t('unrealizedPnl')}</p>
           <p className={`text-xl font-bold mt-1 ${(stats?.totalUnrealizedPnl || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
             {formatCurrency(stats?.totalUnrealizedPnl || 0)}
           </p>
         </div>
         <div className="bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4">
-          <p className="text-gray-500 dark:text-gray-500 text-xs">Total P&L</p>
+          <p className="text-gray-500 dark:text-gray-500 text-xs">{t('totalPnl')}</p>
           <p className={`text-xl font-bold mt-1 ${totalPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
             {formatCurrency(totalPnl)}
           </p>
@@ -142,7 +144,7 @@ export default function PortfolioPage() {
                 : 'text-gray-600 dark:text-gray-400 border-transparent hover:text-gray-900 dark:hover:text-white'
             }`}
           >
-            {tab === 'positions' ? `Open Positions (${positions.length})` : 'Trade History'}
+            {tab === 'positions' ? `${t('openPositions')} (${positions.length})` : t('tradeHistory')}
           </button>
         ))}
       </div>
@@ -152,8 +154,8 @@ export default function PortfolioPage() {
         positions.length === 0 ? (
           <div className="text-center py-12 text-gray-500 dark:text-gray-500">
             <div className="text-4xl mb-3">📊</div>
-            <p>No open positions yet.</p>
-            <Link href="/" className="text-indigo-400 hover:underline text-sm mt-2 block">Browse markets →</Link>
+            <p>{t('noPositions')}</p>
+            <Link href="/" className="text-indigo-400 hover:underline text-sm mt-2 block">{t('browseMarkets')}</Link>
           </div>
         ) : (
           <div className="space-y-3">
@@ -172,20 +174,20 @@ export default function PortfolioPage() {
                       <p className={`font-semibold ${p.unrealizedPnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                         {p.unrealizedPnl >= 0 ? '+' : ''}{formatCurrency(p.unrealizedPnl)}
                       </p>
-                      <p className="text-gray-500 dark:text-gray-500 text-xs mt-0.5">Unrealized P&L</p>
+                      <p className="text-gray-500 dark:text-gray-500 text-xs mt-0.5">{t('unrealizedPnlLabel')}</p>
                     </div>
                   </div>
                   <div className="grid grid-cols-3 gap-3 mt-3 text-xs text-gray-500 dark:text-gray-500">
                     <div>
-                      <p>Shares</p>
+                      <p>{t('shares')}</p>
                       <p className="text-gray-700 dark:text-gray-300 font-medium">{p.shares.toFixed(2)}</p>
                     </div>
                     <div>
-                      <p>Avg. Entry</p>
+                      <p>{t('avgEntry')}</p>
                       <p className="text-gray-700 dark:text-gray-300 font-medium">{formatPercent(p.avgEntryPrice)}</p>
                     </div>
                     <div>
-                      <p>Current</p>
+                      <p>{t('current')}</p>
                       <p className="text-gray-700 dark:text-gray-300 font-medium">{formatPercent(p.currentPrice)}</p>
                     </div>
                   </div>
@@ -201,19 +203,19 @@ export default function PortfolioPage() {
         trades.length === 0 ? (
           <div className="text-center py-12 text-gray-500 dark:text-gray-500">
             <div className="text-4xl mb-3">📜</div>
-            <p>No trades yet.</p>
+            <p>{t('noTrades')}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-gray-500 text-left border-b border-gray-800">
-                  <th className="pb-2 font-medium">Market</th>
-                  <th className="pb-2 font-medium">Type</th>
-                  <th className="pb-2 font-medium">Shares</th>
-                  <th className="pb-2 font-medium">Price</th>
-                  <th className="pb-2 font-medium">Total</th>
-                  <th className="pb-2 font-medium">Date</th>
+                  <th className="pb-2 font-medium">{t('market')}</th>
+                  <th className="pb-2 font-medium">{t('type')}</th>
+                  <th className="pb-2 font-medium">{t('shares')}</th>
+                  <th className="pb-2 font-medium">{t('price')}</th>
+                  <th className="pb-2 font-medium">{t('total')}</th>
+                  <th className="pb-2 font-medium">{t('date')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-800">

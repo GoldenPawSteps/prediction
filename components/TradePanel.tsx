@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
+import { useT } from '@/context/I18nContext'
 import { formatCurrency, formatPercent, timeUntil } from '@/lib/utils'
 
 type OrderSide = 'BID' | 'ASK'
@@ -89,6 +90,8 @@ async function readApiPayload(res: Response): Promise<{ error?: string; [key: st
 }
 
 export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
+  const t = useT('tradePanel')
+  const tCommon = useT('common')
   const { user, refreshUser } = useAuth()
   const [mode, setMode] = useState<'AMM' | 'EXCHANGE'>('AMM')
   const [selectedOutcome, setSelectedOutcome] = useState<'YES' | 'NO'>('YES')
@@ -125,7 +128,7 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
   const handlePreview = async () => {
     const sharesNum = parseFloat(shares)
     if (!sharesNum || sharesNum <= 0) {
-      toast.error('Enter a valid share amount')
+      toast.error(t('errorInvalidShares'))
       return
     }
     // Approximate cost: actual LMSR cost may differ slightly due to market mechanics
@@ -135,9 +138,9 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
   }
 
   const handleTrade = async () => {
-    if (!user) { toast.error('Please log in'); return }
+    if (!user) { toast.error(t('errorPleaseLogin')); return }
     const sharesNum = parseFloat(shares)
-    if (!sharesNum || sharesNum <= 0) { toast.error('Enter a valid share amount'); return }
+    if (!sharesNum || sharesNum <= 0) { toast.error(t('errorInvalidShares')); return }
 
     setLoading(true)
     try {
@@ -148,16 +151,20 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
       })
       const data = await readApiPayload(res)
       if (res.ok) {
-        toast.success(`${tradeType === 'BUY' ? 'Bought' : 'Sold'} ${sharesNum} ${selectedOutcome} shares!`)
+        toast.success(t('toastTradeSuccess', {
+          action: tradeType === 'BUY' ? t('buy') : t('sell'),
+          shares: sharesNum,
+          outcome: selectedOutcome,
+        }))
         setShares('')
         setConfirmOpen(false)
         await refreshUser()
         onTradeComplete()
       } else {
-        toast.error(data.error || 'Trade failed')
+        toast.error(data.error || t('errorTradeFailed'))
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Network error')
+      toast.error(err instanceof Error ? err.message : t('errorNetwork'))
     } finally {
       setLoading(false)
     }
@@ -165,7 +172,7 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
 
   const handlePlaceOrder = async () => {
     if (!user) {
-      toast.error('Please log in')
+      toast.error(t('errorPleaseLogin'))
       return
     }
 
@@ -173,22 +180,22 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
     const quantity = parseFloat(orderShares)
 
     if (!price || price <= 0 || price >= 1) {
-      toast.error('Price must be between 0 and 1')
+      toast.error(t('errorPriceRange'))
       return
     }
     if (!quantity || quantity <= 0) {
-      toast.error('Enter a valid share amount')
+      toast.error(t('errorInvalidShares'))
       return
     }
     if (orderType === 'GTD') {
       if (!gtdExpiresAt) {
-        toast.error('Choose a good-till date/time for GTD orders')
+        toast.error(t('errorChooseGtd'))
         return
       }
 
       const expiry = new Date(gtdExpiresAt)
       if (Number.isNaN(expiry.getTime()) || expiry <= new Date()) {
-        toast.error('GTD expiration must be in the future')
+        toast.error(t('errorGtdFuture'))
         return
       }
     }
@@ -210,16 +217,20 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
       const data = await readApiPayload(res)
       if (res.ok) {
         const filled = Number(data?.filledShares ?? 0)
-        toast.success(`Order placed${filled > 0 ? ` (${filled.toFixed(2)} shares matched)` : ''}`)
+        toast.success(
+          filled > 0
+            ? t('toastOrderPlacedMatched', { filled: filled.toFixed(2) })
+            : t('toastOrderPlaced')
+        )
         setOrderShares('')
         if (orderType === 'GTD') setGtdExpiresAt('')
         await refreshUser()
         onTradeComplete()
       } else {
-        toast.error(data.error || 'Failed to place order')
+        toast.error(data.error || t('errorPlaceOrderFailed'))
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Network error')
+      toast.error(err instanceof Error ? err.message : t('errorNetwork'))
     } finally {
       setOrderLoading(false)
     }
@@ -237,14 +248,14 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
       })
       const data = await readApiPayload(res)
       if (res.ok) {
-        toast.success('Order cancelled')
+        toast.success(t('toastOrderCancelled'))
         await refreshUser()
         onTradeComplete()
       } else {
-        toast.error(data.error || 'Failed to cancel order')
+        toast.error(data.error || t('errorCancelOrderFailed'))
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Network error')
+      toast.error(err instanceof Error ? err.message : t('errorNetwork'))
     } finally {
       setOrderLoading(false)
     }
@@ -254,8 +265,8 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
     return (
       <div className="bg-gray-100 dark:bg-gray-800/50 rounded-xl p-4 text-center text-gray-600 dark:text-gray-400">
         {isExpired
-          ? 'This market has expired and is no longer accepting trades.'
-          : `This market is ${market.status.toLowerCase()} and no longer accepting trades.`}
+          ? t('marketExpired')
+          : t('marketClosed', { status: market.status.toLowerCase() })}
       </div>
     )
   }
@@ -263,8 +274,8 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
   if (!user) {
     return (
       <div className="bg-gray-100 dark:bg-gray-800/50 rounded-xl p-4 text-center">
-        <p className="text-gray-600 dark:text-gray-400 mb-3">Sign in to trade on this market</p>
-        <Link href="/auth/login" className="text-indigo-400 hover:text-indigo-300 font-medium">Log in -&gt;</Link>
+        <p className="text-gray-600 dark:text-gray-400 mb-3">{t('loginToTrade')}</p>
+        <Link href="/auth/login" className="text-indigo-400 hover:text-indigo-300 font-medium">{t('loginLink')}</Link>
       </div>
     )
   }
@@ -273,19 +284,19 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
     <>
       <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4 space-y-4">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="font-semibold text-gray-900 dark:text-white">Place Trade</h3>
+          <h3 className="font-semibold text-gray-900 dark:text-white">{t('placeTrade')}</h3>
           <div className="inline-flex rounded-lg border border-gray-300 dark:border-gray-700 overflow-hidden">
             <button
               onClick={() => setMode('AMM')}
               className={`px-3 py-1.5 text-xs font-medium ${mode === 'AMM' ? 'bg-indigo-600 text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
             >
-              AMM
+              {t('amm')}
             </button>
             <button
               onClick={() => setMode('EXCHANGE')}
               className={`px-3 py-1.5 text-xs font-medium ${mode === 'EXCHANGE' ? 'bg-indigo-600 text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
             >
-              Exchange
+              {t('exchange')}
             </button>
           </div>
         </div>
@@ -299,7 +310,7 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
                   tradeType === 'BUY' ? 'bg-indigo-600 text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                 }`}
               >
-                Buy
+                {t('buy')}
               </button>
               <button
                 onClick={() => setTradeType('SELL')}
@@ -307,7 +318,7 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
                   tradeType === 'SELL' ? 'bg-indigo-600 text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                 }`}
               >
-                Sell
+                {t('sell')}
               </button>
             </div>
 
@@ -336,25 +347,25 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
 
             <div>
               <Input
-                label="Number of Shares"
+                label={t('sharesLabel')}
                 type="number"
                 min="0.01"
                 step="0.01"
                 placeholder="0.00"
                 value={shares}
                 onChange={(e) => setShares(e.target.value)}
-                hint={`Balance: ${formatCurrency(user.balance)}`}
+                hint={t('balanceHint', { amount: formatCurrency(user.balance) })}
               />
             </div>
 
             {shares && parseFloat(shares) > 0 && (
               <div className="bg-gray-100/50 dark:bg-gray-700/50 rounded-lg p-3 text-sm space-y-1">
                 <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                  <span>Est. Cost</span>
+                  <span>{t('estCost')}</span>
                   <span className="text-gray-900 dark:text-white">{formatCurrency(parseFloat(shares) * currentPrice)}</span>
                 </div>
                 <div className="flex justify-between text-gray-600 dark:text-gray-400">
-                  <span>Avg. Price</span>
+                  <span>{t('avgPrice')}</span>
                   <span className="text-gray-900 dark:text-white">{formatPercent(currentPrice)}</span>
                 </div>
               </div>
@@ -366,7 +377,7 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
               disabled={!shares || parseFloat(shares) <= 0}
               variant={selectedOutcome === 'YES' ? 'primary' : 'danger'}
             >
-              {tradeType} {selectedOutcome} Shares
+              {tradeType} {selectedOutcome} {t('shares')}
             </Button>
           </>
         ) : (
@@ -396,11 +407,11 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
 
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="bg-gray-50 dark:bg-gray-900/60 rounded-lg p-2 border border-gray-200 dark:border-gray-700">
-                <div className="text-gray-500">Best Bid</div>
+                <div className="text-gray-500">{t('bestBid')}</div>
                 <div className="text-green-400 font-semibold">{bestBid !== null ? formatPercent(bestBid) : '-'}</div>
               </div>
               <div className="bg-gray-50 dark:bg-gray-900/60 rounded-lg p-2 border border-gray-200 dark:border-gray-700">
-                <div className="text-gray-500">Best Ask</div>
+                <div className="text-gray-500">{t('bestAsk')}</div>
                 <div className="text-red-400 font-semibold">{bestAsk !== null ? formatPercent(bestAsk) : '-'}</div>
               </div>
             </div>
@@ -412,7 +423,7 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
                   orderSide === 'BID' ? 'bg-green-600 text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                 }`}
               >
-                Bid (Buy)
+                {t('bidBuy')}
               </button>
               <button
                 onClick={() => setOrderSide('ASK')}
@@ -420,13 +431,13 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
                   orderSide === 'ASK' ? 'bg-red-600 text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                 }`}
               >
-                Ask (Sell)
+                {t('askSell')}
               </button>
             </div>
 
             {/* Order type selector */}
             <div className="space-y-1">
-              <div className="text-xs text-gray-600 dark:text-gray-400 font-medium">Order Type</div>
+              <div className="text-xs text-gray-600 dark:text-gray-400 font-medium">{t('orderType')}</div>
               <div className="grid grid-cols-4 gap-1">
                 {(['GTC', 'GTD', 'FOK', 'FAK'] as OrderType[]).map((t) => (
                   <button
@@ -441,16 +452,16 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
                 ))}
               </div>
               <div className="text-xs text-gray-500">
-                {orderType === 'GTC' && 'Good till cancelled. Rests on the book until filled or manually cancelled.'}
-                {orderType === 'GTD' && 'Good till date. Rests on the book until the time you set or until it fills.'}
-                {orderType === 'FOK' && 'Fill or kill. Must fill completely right now or it is rejected.'}
-                {orderType === 'FAK' && 'Fill and kill. Takes what is available now and cancels the remainder.'}
+                {orderType === 'GTC' && t('gtcHint')}
+                {orderType === 'GTD' && t('gtdHint')}
+                {orderType === 'FOK' && t('fokHint')}
+                {orderType === 'FAK' && t('fakHint')}
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
               <Input
-                label="Price"
+                label={t('pricePerShare')}
                 type="number"
                 min="0.01"
                 max="0.99"
@@ -460,20 +471,20 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
                 onChange={(e) => setOrderPrice(e.target.value)}
               />
               <Input
-                label="Shares"
+                label={t('shares')}
                 type="number"
                 min="0.01"
                 step="0.01"
                 placeholder="0.00"
                 value={orderShares}
                 onChange={(e) => setOrderShares(e.target.value)}
-                hint={orderSide === 'BID' ? `Reserve: ${formatCurrency((parseFloat(orderPrice) || 0) * (parseFloat(orderShares) || 0))}` : undefined}
+                hint={orderSide === 'BID' ? t('reserveHint', { amount: formatCurrency((parseFloat(orderPrice) || 0) * (parseFloat(orderShares) || 0)) }) : undefined}
               />
             </div>
 
             {orderType === 'GTD' && (
               <Input
-                label="Good Till"
+                label={t('goodTillLabel')}
                 type="datetime-local"
                 value={gtdExpiresAt}
                 onChange={(e) => setGtdExpiresAt(e.target.value)}
@@ -493,14 +504,14 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
 
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div className="bg-gray-50 dark:bg-gray-900/60 rounded-lg p-3 border border-gray-200 dark:border-gray-700 space-y-1 max-h-36 overflow-y-auto">
-                <div className="text-green-400 font-semibold mb-1">Bids</div>
-                {bids.length === 0 ? <div className="text-gray-500">No bids</div> : bids.slice(0, 8).map((order) => (
+                <div className="text-green-400 font-semibold mb-1">{t('bids')}</div>
+                {bids.length === 0 ? <div className="text-gray-500">{t('noBids')}</div> : bids.slice(0, 8).map((order) => (
                   <div key={order.id} className="flex items-start justify-between gap-2 text-gray-700 dark:text-gray-300">
                     <div className="flex flex-col">
                       <span>{order.remainingShares.toFixed(2)}</span>
                       {order.orderType === 'GTD' && order.expiresAt && (
                         <span className="text-[10px] text-indigo-300" title={new Date(order.expiresAt).toLocaleString()}>
-                          GTD · {timeUntil(order.expiresAt)}
+                          {t('gtdLabel', { time: timeUntil(order.expiresAt) })}
                         </span>
                       )}
                     </div>
@@ -509,14 +520,14 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
                 ))}
               </div>
               <div className="bg-gray-50 dark:bg-gray-900/60 rounded-lg p-3 border border-gray-200 dark:border-gray-700 space-y-1 max-h-36 overflow-y-auto">
-                <div className="text-red-400 font-semibold mb-1">Asks</div>
-                {asks.length === 0 ? <div className="text-gray-500">No asks</div> : asks.slice(0, 8).map((order) => (
+                <div className="text-red-400 font-semibold mb-1">{t('asks')}</div>
+                {asks.length === 0 ? <div className="text-gray-500">{t('noAsks')}</div> : asks.slice(0, 8).map((order) => (
                   <div key={order.id} className="flex items-start justify-between gap-2 text-gray-700 dark:text-gray-300">
                     <div className="flex flex-col">
                       <span>{order.remainingShares.toFixed(2)}</span>
                       {order.orderType === 'GTD' && order.expiresAt && (
                         <span className="text-[10px] text-indigo-300" title={new Date(order.expiresAt).toLocaleString()}>
-                          GTD · {timeUntil(order.expiresAt)}
+                          {t('gtdLabel', { time: timeUntil(order.expiresAt) })}
                         </span>
                       )}
                     </div>
@@ -528,13 +539,13 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
 
             {myOrders.length > 0 && (
               <div className="bg-gray-50 dark:bg-gray-900/60 rounded-lg p-3 border border-gray-200 dark:border-gray-700 space-y-2">
-                <div className="text-xs text-gray-600 dark:text-gray-400">Your Open Orders</div>
+                <div className="text-xs text-gray-600 dark:text-gray-400">{t('openOrders')}</div>
                 {myOrders.slice(0, 6).map((order) => (
                   <div key={order.id} className="flex items-center justify-between gap-2 text-xs">
                     <span className="text-gray-700 dark:text-gray-300">
                       {order.side} {order.outcome} {order.remainingShares.toFixed(2)}/{order.initialShares.toFixed(2)} @ {formatPercent(order.price)}
                       {order.orderType === 'GTD' && order.expiresAt && (
-                        <span className="text-indigo-300"> · GTD {timeUntil(order.expiresAt)}</span>
+                        <span className="text-indigo-300"> · {t('gtdLabel', { time: timeUntil(order.expiresAt) })}</span>
                       )}
                     </span>
                     <button
@@ -542,7 +553,7 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
                       onClick={() => handleCancelOrder(order.id)}
                       disabled={orderLoading}
                     >
-                      Cancel
+                      {t('cancelBtn')}
                     </button>
                   </div>
                 ))}
@@ -551,7 +562,7 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
 
             {myOrderHistory.length > 0 && (
               <div className="bg-gray-50 dark:bg-gray-900/60 rounded-lg p-3 border border-gray-200 dark:border-gray-700 space-y-2">
-                <div className="text-xs text-gray-600 dark:text-gray-400">Your Recent Orders</div>
+                <div className="text-xs text-gray-600 dark:text-gray-400">{t('recentOrders')}</div>
                 {myOrderHistory.map((order) => {
                   const filledShares = Math.max(0, Number(order.filledShares ?? 0))
                   const statusTone = order.status === 'FILLED'
@@ -575,11 +586,11 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
                         <span className={statusTone}>{order.status}</span>
                       </div>
                       <div className="mt-1 text-gray-500">
-                        Filled {filledShares.toFixed(2)} / {order.initialShares.toFixed(2)}
+                        {t('filledLabel', { filled: filledShares.toFixed(2), total: order.initialShares.toFixed(2) })}
                       </div>
                       {order.orderType === 'GTD' && order.expiresAt && (
                         <div className="mt-1 text-gray-500">
-                          Expires {new Date(order.expiresAt).toLocaleString()}
+                          {t('expiresLabel', { date: new Date(order.expiresAt).toLocaleString() })}
                         </div>
                       )}
                     </div>
@@ -589,9 +600,9 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
             )}
 
               <div className="bg-gray-50 dark:bg-gray-900/60 rounded-lg p-3 border border-gray-200 dark:border-gray-700 space-y-2">
-                <div className="text-xs text-gray-600 dark:text-gray-400">Recent Fills ({selectedOutcome})</div>
+                <div className="text-xs text-gray-600 dark:text-gray-400">{t('recentFills', { outcome: selectedOutcome })}</div>
               {recentFills.length === 0 ? (
-                <div className="text-xs text-gray-500">No recent fills</div>
+                <div className="text-xs text-gray-500">{t('noRecentFills')}</div>
               ) : (
                 recentFills.slice(0, 6).map((fill) => (
                   <div key={fill.id} className="flex items-center justify-between gap-2 text-xs text-gray-700 dark:text-gray-300">
@@ -609,38 +620,38 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
         )}
       </div>
 
-      <Modal isOpen={confirmOpen && mode === 'AMM'} onClose={() => setConfirmOpen(false)} title="Confirm Trade">
+      <Modal isOpen={confirmOpen && mode === 'AMM'} onClose={() => setConfirmOpen(false)} title={t('confirmTitle')}>
         <div className="space-y-4">
           <div className="bg-gray-100 dark:bg-gray-700/50 rounded-lg p-4 space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-600 dark:text-gray-400">Action</span>
+              <span className="text-gray-600 dark:text-gray-400">{t('action')}</span>
               <span className="text-gray-900 dark:text-white font-medium">{tradeType} {selectedOutcome}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600 dark:text-gray-400">Shares</span>
+              <span className="text-gray-600 dark:text-gray-400">{t('shares')}</span>
               <span className="text-gray-900 dark:text-white font-medium">{shares}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600 dark:text-gray-400">Price per Share</span>
+              <span className="text-gray-600 dark:text-gray-400">{t('pricePerShare')}</span>
               <span className="text-gray-900 dark:text-white font-medium">{preview && formatPercent(preview.price)}</span>
             </div>
             <div className="flex justify-between border-t border-gray-300 dark:border-gray-600 pt-2">
-              <span className="text-gray-600 dark:text-gray-400">Est. {tradeType === 'BUY' ? 'Cost' : 'Proceeds'}</span>
+              <span className="text-gray-600 dark:text-gray-400">{tradeType === 'BUY' ? t('estCost') : t('estProceeds')}</span>
               <span className="text-gray-900 dark:text-white font-bold">{preview && formatCurrency(preview.cost)}</span>
             </div>
           </div>
           <p className="text-xs text-gray-500">
-            Prices may change slightly due to LMSR market mechanics.
+            {t('priceWarning')}
           </p>
           <div className="flex gap-2">
-            <Button variant="outline" className="flex-1" onClick={() => setConfirmOpen(false)}>Cancel</Button>
+            <Button variant="outline" className="flex-1" onClick={() => setConfirmOpen(false)}>{tCommon('cancel')}</Button>
             <Button
               className="flex-1"
               onClick={handleTrade}
               loading={loading}
               variant={selectedOutcome === 'YES' ? 'primary' : 'danger'}
             >
-              Confirm {tradeType}
+              {t('confirmBtn', { type: tradeType })}
             </Button>
           </div>
         </div>

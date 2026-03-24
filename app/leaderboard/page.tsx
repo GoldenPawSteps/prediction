@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { formatCurrency } from '@/lib/utils'
+import { useT } from '@/context/I18nContext'
 
 interface LeaderboardEntry {
   id: string
@@ -13,16 +14,17 @@ interface LeaderboardEntry {
   totalTrades: number
 }
 
-const SORT_OPTIONS = [
-  { value: 'profit', label: 'Total Profit' },
-  { value: 'roi', label: 'Best ROI' },
-  { value: 'trades', label: 'Most Active' },
-]
-
 export default function LeaderboardPage() {
+  const t = useT('leaderboard')
   const [entries, setEntries] = useState<LeaderboardEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [sortBy, setSortBy] = useState('profit')
+
+  const sortOptions = [
+    { value: 'profit', label: t('sortByProfit') },
+    { value: 'roi', label: t('sortByRoi') },
+    { value: 'trades', label: t('sortByTrades') },
+  ]
 
   useEffect(() => {
     fetch(`/api/leaderboard?sortBy=${sortBy}`)
@@ -35,11 +37,11 @@ export default function LeaderboardPage() {
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Leaderboard</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">Top traders on Predictify</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('title')}</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">{t('subtitle')}</p>
         </div>
         <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-          {SORT_OPTIONS.map((opt) => (
+          {sortOptions.map((opt) => (
             <button
               key={opt.value}
               onClick={() => {
@@ -63,7 +65,7 @@ export default function LeaderboardPage() {
       ) : entries.length === 0 ? (
         <div className="text-center py-16 text-gray-500 dark:text-gray-500">
           <div className="text-4xl mb-3">🏆</div>
-          <p>No traders yet. Be the first!</p>
+          <p>{t('noTraders')} {t('noTradersHint')}</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -92,7 +94,7 @@ export default function LeaderboardPage() {
               {/* Name */}
               <div className="flex-1 min-w-0">
                 <p className="text-gray-900 dark:text-white font-medium">@{entry.username}</p>
-                <p className="text-gray-500 dark:text-gray-500 text-xs">{entry.totalTrades} trades</p>
+                <p className="text-gray-500 dark:text-gray-500 text-xs">{t('tradesCount', { count: entry.totalTrades })}</p>
               </div>
 
               {/* Stats */}
@@ -101,7 +103,7 @@ export default function LeaderboardPage() {
                   {entry.totalRealizedPnl >= 0 ? '+' : ''}{formatCurrency(entry.totalRealizedPnl)}
                 </p>
                 <p className={`text-xs ${entry.roi >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                  ROI: {entry.roi >= 0 ? '+' : ''}{entry.roi.toFixed(1)}%
+                  {t('roi')}: {entry.roi >= 0 ? '+' : ''}{entry.roi.toFixed(1)}%
                 </p>
               </div>
             </div>

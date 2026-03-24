@@ -4,14 +4,17 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
+import { useT } from '@/context/I18nContext'
 import { Button } from '@/components/ui/Button'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { formatCurrency } from '@/lib/utils'
 
 export function Navbar() {
   const pathname = usePathname()
   const router = useRouter()
   const { user, logout } = useAuth()
+  const t = useT('nav')
   const [mobileOpen, setMobileOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
 
@@ -27,10 +30,10 @@ export function Navbar() {
   }
 
   const navLinks = [
-    { href: '/', label: 'Markets' },
-    { href: '/leaderboard', label: 'Leaderboard' },
-    ...(user ? [{ href: '/portfolio', label: 'Portfolio' }] : []),
-    ...(user?.isAdmin ? [{ href: '/admin', label: 'Admin' }] : []),
+    { href: '/', label: t('markets') },
+    { href: '/leaderboard', label: t('leaderboard') },
+    ...(user ? [{ href: '/portfolio', label: t('portfolio') }] : []),
+    ...(user?.isAdmin ? [{ href: '/admin', label: t('admin') }] : []),
   ]
 
   return (
@@ -64,6 +67,7 @@ export function Navbar() {
 
           {/* User Actions */}
           <div className="hidden md:flex items-center gap-3">
+            <LanguageSwitcher />
             <ThemeToggle />
             {user ? (
               <>
@@ -71,7 +75,7 @@ export function Navbar() {
                   <span className="text-green-400 font-semibold">{formatCurrency(user.balance)}</span>
                 </div>
                 <Link href="/markets/create">
-                  <Button size="sm">+ Create Market</Button>
+                  <Button size="sm">{t('createMarket')}</Button>
                 </Link>
                 <div className="flex items-center gap-2">
                   <Link href="/profile" className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors">
@@ -84,17 +88,17 @@ export function Navbar() {
                     disabled={loggingOut}
                     className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-sm transition-colors disabled:opacity-60"
                   >
-                    {loggingOut ? 'Logging out...' : 'Logout'}
+                    {loggingOut ? t('loggingOut') : t('logout')}
                   </button>
                 </div>
               </>
             ) : (
               <>
                 <Link href="/auth/login">
-                  <Button variant="ghost" size="sm">Log in</Button>
+                  <Button variant="ghost" size="sm">{t('login')}</Button>
                 </Link>
                 <Link href="/auth/register">
-                  <Button size="sm">Sign up</Button>
+                  <Button size="sm">{t('register')}</Button>
                 </Link>
               </>
             )}
@@ -118,8 +122,9 @@ export function Navbar() {
         {/* Mobile Menu */}
         {mobileOpen && (
           <div className="md:hidden pb-4 space-y-1">
-            <div className="px-3 py-2">
-              <ThemeToggle className="w-full justify-center" />
+            <div className="px-3 py-2 flex gap-2">
+              <LanguageSwitcher className="flex-1 justify-center" />
+              <ThemeToggle className="flex-1 justify-center" />
             </div>
             {navLinks.map((link) => (
               <Link
@@ -133,7 +138,7 @@ export function Navbar() {
             ))}
             {user ? (
               <>
-                <div className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400">Balance: <span className="text-green-400 font-semibold">{formatCurrency(user.balance)}</span></div>
+                <div className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400">{t('balance')}: <span className="text-green-400 font-semibold">{formatCurrency(user.balance)}</span></div>
                 <button
                   onClick={async () => {
                     await handleLogout()
@@ -142,13 +147,13 @@ export function Navbar() {
                   disabled={loggingOut}
                   className="w-full text-left px-3 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md disabled:opacity-60"
                 >
-                  {loggingOut ? 'Logging out...' : 'Logout'}
+                  {loggingOut ? t('loggingOut') : t('logout')}
                 </button>
               </>
             ) : (
               <div className="flex gap-2 px-3 pt-2">
-                <Link href="/auth/login" onClick={() => setMobileOpen(false)}><Button variant="ghost" size="sm">Log in</Button></Link>
-                <Link href="/auth/register" onClick={() => setMobileOpen(false)}><Button size="sm">Sign up</Button></Link>
+                <Link href="/auth/login" onClick={() => setMobileOpen(false)}><Button variant="ghost" size="sm">{t('login')}</Button></Link>
+                <Link href="/auth/register" onClick={() => setMobileOpen(false)}><Button size="sm">{t('register')}</Button></Link>
               </div>
             )}
           </div>

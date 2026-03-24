@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { formatCurrency, formatPercent, timeUntil, getCategoryColor } from '@/lib/utils'
 import { Badge } from '@/components/ui/Badge'
+import { useT } from '@/context/I18nContext'
 
 interface Market {
   id: string
@@ -19,6 +20,8 @@ interface MarketCardProps {
 }
 
 export function MarketCard({ market }: MarketCardProps) {
+  const tCard = useT('marketCard')
+  const tCommon = useT('common')
   const yesProb = market.probabilities.yes
   const noProb = market.probabilities.no
   const isExpired = new Date(market.endDate) < new Date()
@@ -32,7 +35,7 @@ export function MarketCard({ market }: MarketCardProps) {
             {market.category}
           </span>
           <span className={`text-xs ${isExpired ? 'text-red-400' : 'text-gray-500'}`}>
-            {isExpired ? 'Expired' : timeUntil(market.endDate)}
+            {isExpired ? tCard('expired') : timeUntil(market.endDate)}
           </span>
         </div>
 
@@ -57,8 +60,8 @@ export function MarketCard({ market }: MarketCardProps) {
 
         {/* Stats */}
         <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-500">
-          <span>Vol: <span className="text-gray-700 dark:text-gray-400">{formatCurrency(market.totalVolume)}</span></span>
-          <span>{market._count?.trades || 0} trades</span>
+          <span>{tCard('vol')}: <span className="text-gray-700 dark:text-gray-400">{formatCurrency(market.totalVolume)}</span></span>
+          <span>{market._count?.trades || 0} {tCommon('trades')}</span>
           {market.status !== 'OPEN' && (
             <Badge variant={market.status === 'RESOLVED' ? 'info' : market.status === 'INVALID' ? 'danger' : 'warning'}>
               {market.status}

@@ -8,6 +8,7 @@ import { TradePanel } from '@/components/TradePanel'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { useAuth } from '@/context/AuthContext'
+import { useT } from '@/context/I18nContext'
 import { formatQualifiedMajorityLabel, getQualifiedMajorityThreshold, getResolutionQuorum, isImmediateResolutionRound } from '@/lib/resolution'
 import { formatCurrency, formatPercent, formatDateTime, getCategoryColor, timeUntil } from '@/lib/utils'
 import toast from 'react-hot-toast'
@@ -70,6 +71,7 @@ interface Market {
 }
 
 export default function MarketPage({ params }: { params: Promise<{ id: string }> }) {
+  const t = useT('marketDetail')
   const { id } = use(params)
   const { user, refreshUser } = useAuth()
   const [market, setMarket] = useState<Market | null>(null)
@@ -109,13 +111,13 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
       if (res.ok) {
         setComment('')
         fetchMarket()
-        toast.success('Comment posted!')
+        toast.success(t('commentPosted'))
       } else {
         const data = await res.json()
-        toast.error(data.error || 'Failed to post comment')
+        toast.error(data.error || t('commentPostFailed'))
       }
     } catch {
-      toast.error('Network error')
+      toast.error(t('networkError'))
     } finally {
       setSubmittingComment(false)
     }
@@ -123,7 +125,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
 
   const handleVote = async (outcome: 'YES' | 'NO' | 'INVALID') => {
     if (!user) {
-      toast.error('Please log in to vote on resolution')
+      toast.error(t('loginToVote'))
       return
     }
 
@@ -139,17 +141,17 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
 
       if (res.ok) {
         if (data.autoResolved && data.majorityOutcome) {
-          toast.success(`Vote recorded. Market auto-resolved as ${data.majorityOutcome}.`)
+          toast.success(t('voteRecordedAutoResolved', { outcome: data.majorityOutcome }))
           await refreshUser()
         } else {
-          toast.success(`Vote recorded for ${outcome}`)
+          toast.success(t('voteRecordedFor', { outcome }))
         }
         await fetchMarket()
       } else {
-        toast.error(data.error || 'Vote failed')
+        toast.error(data.error || t('voteFailed'))
       }
     } catch {
-      toast.error('Network error')
+      toast.error(t('networkError'))
     } finally {
       setResolutionActionLoading(false)
     }
@@ -167,14 +169,14 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
       })
       const data = await res.json()
       if (res.ok) {
-        toast.success(`Market resolved as ${outcome}`)
+        toast.success(t('marketResolvedAs', { outcome }))
         await refreshUser()
         await fetchMarket()
       } else {
-        toast.error(data.error || 'Resolution failed')
+        toast.error(data.error || t('resolutionFailed'))
       }
     } catch {
-      toast.error('Network error')
+      toast.error(t('networkError'))
     } finally {
       setResolutionActionLoading(false)
     }
@@ -182,11 +184,11 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
 
   const handleDispute = async () => {
     if (!user) {
-      toast.error('Please log in to file a dispute')
+      toast.error(t('loginToDispute'))
       return
     }
     if (disputeReason.trim().length < 20) {
-      toast.error('Dispute reason must be at least 20 characters')
+      toast.error(t('disputeReasonMin'))
       return
     }
 
@@ -201,14 +203,14 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
       const data = await res.json()
 
       if (res.ok) {
-        toast.success(data.message || 'Dispute filed successfully')
+        toast.success(data.message || t('disputeFiledSuccessfully'))
         setDisputeReason('')
         await fetchMarket()
       } else {
-        toast.error(data.error || 'Dispute failed')
+        toast.error(data.error || t('disputeFailed'))
       }
     } catch {
-      toast.error('Network error')
+      toast.error(t('networkError'))
     } finally {
       setResolutionActionLoading(false)
     }
@@ -281,23 +283,23 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
       id: `vote-${vote.userId}-${vote.createdAt}`,
       createdAt: vote.createdAt,
       tone: vote.outcome === 'YES' ? 'green' : vote.outcome === 'NO' ? 'red' : 'gray',
-      title: `@${vote.user.username} voted ${vote.outcome}`,
-      description: 'Resolution vote recorded.',
+      title: t('activityVoteTitle', { username: vote.user.username, outcome: vote.outcome }),
+      description: t('activityVoteDescription'),
     })),
     ...(market.resolution && market.resolutionTime
       ? [{
           id: `resolution-${market.resolutionTime}`,
           createdAt: market.resolutionTime,
           tone: 'indigo',
-          title: `Market resolved as ${market.resolution}`,
-          description: 'The market outcome was finalized and settlements were processed.',
+          title: t('activityResolvedTitle', { outcome: market.resolution }),
+          description: t('activityResolvedDescription'),
         }]
       : []),
     ...market.disputes.map((dispute) => ({
       id: `dispute-${dispute.id}`,
       createdAt: dispute.createdAt,
       tone: 'yellow',
-      title: `@${dispute.user.username} disputed with ${dispute.proposedOutcome}`,
+      title: t('activityDisputeTitle', { username: dispute.user.username, outcome: dispute.proposedOutcome }),
       description: dispute.reason,
     })),
   ].sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
@@ -384,21 +386,24 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
           {(votingOpen || market.status === 'RESOLVED' || market.status === 'DISPUTED') && (
             <div className="bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4 space-y-4">
               <div>
-                <h2 className="text-base font-semibold text-gray-900 dark:text-white">Resolution Center</h2>
+                <h2 className="text-base font-semibold text-gray-900 dark:text-white">{t('resolutionCenter')}</h2>
                 {votingOpen && (
                   <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    Trading is closed. Community voting is now open to resolve this market.
+                    {t('tradingClosedVotingOpen')}
                   </p>
                 )}
                 {market.status === 'RESOLVED' && disputeWindowOpen && disputeWindowEndsAt && (
                   <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    Resolved as {market.resolution}. Disputes remain open until {formatDateTime(disputeWindowEndsAt.toISOString())}.
+                    {t('resolvedAsDisputesOpenUntil', {
+                      outcome: market.resolution || 'INVALID',
+                      date: formatDateTime(disputeWindowEndsAt.toISOString()),
+                    })}
                   </p>
                 )}
                 {market.status === 'DISPUTED' && (
                   <p className="text-sm text-yellow-400 mt-1">
-                    This market is under dispute ({getOrdinalLabel(market.disputeCount)} dispute round). Community re-voting is open — it needs at least {resolutionQuorum} votes, and one outcome must exceed {qualifiedMajorityFractionLabel} to re-resolve.
-                    {user?.isAdmin && ' Admin override is available below.'}
+                    {t('underDisputeRound', { round: getOrdinalLabel(market.disputeCount), quorum: resolutionQuorum, threshold: qualifiedMajorityFractionLabel })}
+                    {user?.isAdmin && ` ${t('adminOverrideAvailable')}`}
                   </p>
                 )}
               </div>
@@ -475,7 +480,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
 
               {myVote && (
                 <p className="text-sm text-indigo-300">
-                  Your current vote: <span className="font-semibold">{myVote}</span>
+                  {t('yourCurrentVote')} <span className="font-semibold">{myVote}</span>
                 </p>
               )}
 
@@ -483,36 +488,36 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                 user ? (
                   <div className="flex flex-wrap gap-2">
                     <Button variant="primary" size="sm" onClick={() => handleVote('YES')} loading={resolutionActionLoading}>
-                      Vote YES
+                      {t('voteYes')}
                     </Button>
                     <Button variant="danger" size="sm" onClick={() => handleVote('NO')} loading={resolutionActionLoading}>
-                      Vote NO
+                      {t('voteNo')}
                     </Button>
                     <Button variant="secondary" size="sm" onClick={() => handleVote('INVALID')} loading={resolutionActionLoading}>
-                      Vote INVALID
+                      {t('voteInvalid')}
                     </Button>
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Log in to vote on the outcome once a market has ended.</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{t('loginToVoteAfterEnd')}</p>
                 )
               )}
 
               {user?.isAdmin && market.status === 'DISPUTED' && (
                 <div className="border-t border-yellow-700/40 pt-4 space-y-3">
                   <div className="rounded-lg bg-yellow-900/20 border border-yellow-700/40 p-3">
-                    <h3 className="text-sm font-semibold text-yellow-300 mb-1">Admin Override</h3>
+                    <h3 className="text-sm font-semibold text-yellow-300 mb-1">{t('adminOverrideTitle')}</h3>
                     <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
-                      Force-resolve this disputed market with a specific outcome, bypassing community voting.
+                      {t('adminOverrideDescription')}
                     </p>
                     <div className="flex flex-wrap gap-2">
                       <Button variant="primary" size="sm" onClick={() => handleAdminResolve('YES')} loading={resolutionActionLoading}>
-                        Resolve YES
+                        {t('resolveYes')}
                       </Button>
                       <Button variant="danger" size="sm" onClick={() => handleAdminResolve('NO')} loading={resolutionActionLoading}>
-                        Resolve NO
+                        {t('resolveNo')}
                       </Button>
                       <Button variant="secondary" size="sm" onClick={() => handleAdminResolve('INVALID')} loading={resolutionActionLoading}>
-                        Resolve INVALID
+                        {t('resolveInvalid')}
                       </Button>
                     </div>
                   </div>
@@ -523,7 +528,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                 user ? (
                   <div className="space-y-3 border-t border-gray-200 dark:border-gray-700 pt-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Dispute Proposed Outcome</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('disputeProposedOutcome')}</label>
                       <select
                         value={disputeOutcome}
                         onChange={(e) => setDisputeOutcome(e.target.value as 'YES' | 'NO' | 'INVALID')}
@@ -535,15 +540,15 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Dispute Reason</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('disputeReason')}</label>
                       <textarea
                         value={disputeReason}
                         onChange={(e) => setDisputeReason(e.target.value)}
                         rows={4}
-                        placeholder="Explain why the current resolution is incorrect and provide supporting context..."
+                        placeholder={t('disputeReasonPlaceholder')}
                         className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
                       />
-                      <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Minimum 20 characters. Be specific about the evidence or criteria.</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">{t('disputeMinimumHint')}</p>
                       <div className="mt-2 rounded-md bg-yellow-950/30 border border-yellow-700/30 p-3 space-y-1">
                         <p className="text-xs text-yellow-100">
                           {currentDisputeRoundLabel}
@@ -562,23 +567,23 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                       </div>
                     </div>
                     <Button variant="outline" size="sm" onClick={handleDispute} loading={resolutionActionLoading}>
-                      File Dispute
+                      {t('fileDispute')}
                     </Button>
                   </div>
                 ) : (
                   <p className="text-sm text-gray-600 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 pt-4">
-                    Log in to file a dispute while the dispute window is open.
+                    {t('loginToDisputeOpenWindow')}
                   </p>
                 )
               )}
 
               {market.disputes.length > 0 && (
                 <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-2">
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Recent Disputes</h3>
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t('recentDisputes')}</h3>
                   {market.disputes.map((dispute) => (
                     <div key={dispute.id} className="rounded-lg bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700/60 p-3 text-sm">
                       <div className="flex items-center justify-between gap-3">
-                        <span className="text-gray-700 dark:text-gray-300">Proposed: <span className="font-semibold text-gray-900 dark:text-white">{dispute.proposedOutcome}</span></span>
+                        <span className="text-gray-700 dark:text-gray-300">{t('proposed')}: <span className="font-semibold text-gray-900 dark:text-white">{dispute.proposedOutcome}</span></span>
                         <span className="text-xs text-gray-500 dark:text-gray-500">{timeUntil(dispute.createdAt)}</span>
                       </div>
                       <p className="text-gray-600 dark:text-gray-400 mt-2">{dispute.reason}</p>
@@ -589,7 +594,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
 
               {resolutionActivity.length > 0 && (
                 <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-3">
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Resolution Activity</h3>
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t('resolutionActivity')}</h3>
                   <div className="space-y-3">
                     {resolutionActivity.map((item) => (
                       <div key={item.id} className="flex gap-3">
@@ -630,7 +635,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
           {/* Comments */}
           <div className="bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4">
             <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-4">
-              Discussion ({market.comments.length})
+              {t('discussion')} ({market.comments.length})
             </h2>
 
             {user && (
@@ -639,15 +644,15 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleComment() }}
-                  placeholder="Share your thoughts..."
+                  placeholder={t('shareThoughts')}
                   className="flex-1 px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
-                <Button size="sm" onClick={handleComment} loading={submittingComment}>Post</Button>
+                <Button size="sm" onClick={handleComment} loading={submittingComment}>{t('post')}</Button>
               </div>
             )}
 
             {market.comments.length === 0 ? (
-              <p className="text-gray-500 dark:text-gray-500 text-sm text-center py-4">No comments yet. Be the first!</p>
+              <p className="text-gray-500 dark:text-gray-500 text-sm text-center py-4">{t('noCommentsYet')}</p>
             ) : (
               <div className="space-y-3">
                 {market.comments.map((c) => (

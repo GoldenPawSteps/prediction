@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { formatCurrency, formatPercent, formatDate } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
+import { useT } from '@/context/I18nContext'
 
 interface Market {
   id: string
@@ -19,6 +20,7 @@ interface Market {
 }
 
 export default function AdminPage() {
+  const t = useT('admin')
   const { user, refreshUser } = useAuth()
   const [markets, setMarkets] = useState<Market[]>([])
   const [loading, setLoading] = useState(true)
@@ -45,17 +47,17 @@ export default function AdminPage() {
       if (res.ok) {
         const refunded = data?.settlement?.refundedToCreator ?? 0
         if (refunded > 0) {
-          toast.success(`Resolved as ${outcome}. Returned ${formatCurrency(refunded)} to creator.`)
+          toast.success(t('toastResolvedRefunded', { outcome, amount: formatCurrency(refunded) }))
         } else {
-          toast.success(`Resolved as ${outcome}`)
+          toast.success(t('toastResolved', { outcome }))
         }
         setMarkets((prev) => prev.map((m) => m.id === marketId ? { ...m, status: 'RESOLVED' } : m))
         await refreshUser()
       } else {
-        toast.error(data.error || 'Failed')
+        toast.error(data.error || t('toastFailed'))
       }
     } catch {
-      toast.error('Network error')
+      toast.error(t('toastNetworkError'))
     } finally {
       setResolving(null)
     }
@@ -64,7 +66,7 @@ export default function AdminPage() {
   if (!user?.isAdmin) {
     return (
       <div className="text-center py-16">
-        <p className="text-gray-400">You need admin access to view this page.</p>
+        <p className="text-gray-400">{t('accessDenied')}</p>
       </div>
     )
   }
@@ -72,8 +74,8 @@ export default function AdminPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Admin Dashboard</h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-1">Manage and resolve prediction markets</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('title')}</h1>
+        <p className="text-gray-600 dark:text-gray-400 mt-1">{t('subtitle')}</p>
       </div>
 
       {loading ? (
@@ -89,10 +91,10 @@ export default function AdminPage() {
                   </Link>
                   <div className="flex gap-3 mt-1 text-xs text-gray-500">
                     <span>{market.category}</span>
-                    <span>Vol: {formatCurrency(market.totalVolume)}</span>
-                    <span>{market._count.trades} trades</span>
-                    <span>YES: {formatPercent(market.probabilities.yes)}</span>
-                    <span>Ends: {formatDate(market.endDate)}</span>
+                    <span>{t('vol')}: {formatCurrency(market.totalVolume)}</span>
+                    <span>{market._count.trades} {t('trades')}</span>
+                    <span>{t('yes')}: {formatPercent(market.probabilities.yes)}</span>
+                    <span>{t('ends')}: {formatDate(market.endDate)}</span>
                     <span className={`font-medium ${
                       market.status === 'OPEN' ? 'text-green-400' :
                       market.status === 'RESOLVED' ? 'text-blue-400' : 'text-gray-400'
@@ -106,19 +108,19 @@ export default function AdminPage() {
                       variant="primary"
                       loading={resolving === market.id + 'YES'}
                       onClick={() => handleResolve(market.id, 'YES')}
-                    >YES</Button>
+                    >{t('yes')}</Button>
                     <Button
                       size="sm"
                       variant="danger"
                       loading={resolving === market.id + 'NO'}
                       onClick={() => handleResolve(market.id, 'NO')}
-                    >NO</Button>
+                    >{t('no')}</Button>
                     <Button
                       size="sm"
                       variant="secondary"
                       loading={resolving === market.id + 'INVALID'}
                       onClick={() => handleResolve(market.id, 'INVALID')}
-                    >Invalid</Button>
+                    >{t('invalid')}</Button>
                   </div>
                 )}
               </div>
