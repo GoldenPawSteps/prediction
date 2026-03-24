@@ -21,10 +21,37 @@ interface Market {
 
 export default function AdminPage() {
   const t = useT('admin')
+  const tCategories = useT('categories')
+  const tStatus = useT('status')
   const { user, refreshUser } = useAuth()
   const [markets, setMarkets] = useState<Market[]>([])
   const [loading, setLoading] = useState(true)
   const [resolving, setResolving] = useState<string | null>(null)
+
+  const translateCategory = (category: string) => {
+    switch (category) {
+      case 'Politics': return tCategories('politics')
+      case 'Crypto': return tCategories('crypto')
+      case 'Sports': return tCategories('sports')
+      case 'Tech': return tCategories('tech')
+      case 'Entertainment': return tCategories('entertainment')
+      case 'Science': return tCategories('science')
+      case 'Finance': return tCategories('finance')
+      case 'Other': return tCategories('other')
+      default: return category
+    }
+  }
+
+  const translateStatus = (status: string) => {
+    switch (status) {
+      case 'OPEN': return tStatus('open')
+      case 'CLOSED': return tStatus('closed')
+      case 'DISPUTED': return tStatus('disputed')
+      case 'INVALID': return tStatus('invalid')
+      case 'RESOLVED': return tStatus('resolved')
+      default: return status
+    }
+  }
 
   useEffect(() => {
     if (!user?.isAdmin) return
@@ -90,7 +117,7 @@ export default function AdminPage() {
                     {market.title}
                   </Link>
                   <div className="flex gap-3 mt-1 text-xs text-gray-500">
-                    <span>{market.category}</span>
+                    <span>{translateCategory(market.category)}</span>
                     <span>{t('vol')}: {formatCurrency(market.totalVolume)}</span>
                     <span>{market._count.trades} {t('trades')}</span>
                     <span>{t('yes')}: {formatPercent(market.probabilities.yes)}</span>
@@ -98,7 +125,7 @@ export default function AdminPage() {
                     <span className={`font-medium ${
                       market.status === 'OPEN' ? 'text-green-400' :
                       market.status === 'RESOLVED' ? 'text-blue-400' : 'text-gray-400'
-                    }`}>{market.status}</span>
+                    }`}>{translateStatus(market.status)}</span>
                   </div>
                 </div>
                 {market.status === 'OPEN' && (

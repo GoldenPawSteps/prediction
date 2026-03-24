@@ -211,6 +211,50 @@ export interface Messages {
     shareThoughts: string
     post: string
     noCommentsYet: string
+    createdBy: string
+    currentProbability: string
+    priceHistoryTitle: string
+    aboutThisMarket: string
+    resolutionSourceLabel: string
+    leadingOutcome: string
+    invalidHasMajority: string
+    leadingOutcomeVotes: string
+    noOutcomeMajorityYet: string
+    noVotesYet: string
+    qualifiedMajorityThresholdTooltip: string
+    firstVoteResolvesMarket: string
+    quorumNotReachedYet: string
+    outcomeWillAutoResolve: string
+    invalidWillAutoResolve: string
+    noOutcomeExceededThresholdYet: string
+    totalVotesCast: string
+    howAutoResolutionWorks: string
+    initialRoundFirstVoteRule: string
+    disputeRoundThresholdRule: string
+    exactThresholdNotEnough: string
+    invalidVotesDiluteShares: string
+    currentRuleFirstVoteResolves: string
+    currentRuleQuorumThreshold: string
+    afterDisputeFiledRule: string
+    marketStatsTitle: string
+    totalVolumeLabel: string
+    ammVolumeLabel: string
+    exchangeVolumeLabel: string
+    totalTradesLabel: string
+    endDateLabel: string
+    statusLabel: string
+    outcomeLabel: string
+    notionalLabel: string
+    makerLabel: string
+    takerLabel: string
+    orderStatusOpen: string
+    orderStatusPartial: string
+    orderStatusFilled: string
+    orderStatusCancelled: string
+    placedLabel: string
+    filledAtLabel: string
+    partialFillLabel: string
+    cancelledLabel: string
   }
   tradePanel: {
     placeTrade: string

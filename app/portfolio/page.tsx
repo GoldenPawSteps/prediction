@@ -46,6 +46,9 @@ interface Stats {
 
 export default function PortfolioPage() {
   const t = useT('portfolio')
+  const tCategories = useT('categories')
+  const tAdmin = useT('admin')
+  const tTradePanel = useT('tradePanel')
   const { user } = useAuth()
   const [positions, setPositions] = useState<Position[]>([])
   const [trades, setTrades] = useState<Trade[]>([])
@@ -100,6 +103,37 @@ export default function PortfolioPage() {
   }
 
   const totalPnl = (stats?.totalRealizedPnl || 0) + (stats?.totalUnrealizedPnl || 0)
+
+  const translateCategory = (category: string) => {
+    switch (category) {
+      case 'Politics': return tCategories('politics')
+      case 'Crypto': return tCategories('crypto')
+      case 'Sports': return tCategories('sports')
+      case 'Tech': return tCategories('tech')
+      case 'Entertainment': return tCategories('entertainment')
+      case 'Science': return tCategories('science')
+      case 'Finance': return tCategories('finance')
+      case 'Other': return tCategories('other')
+      default: return category
+    }
+  }
+
+  const translateOutcome = (outcome: string) => {
+    switch (outcome) {
+      case 'YES': return tAdmin('yes')
+      case 'NO': return tAdmin('no')
+      case 'INVALID': return tAdmin('invalid')
+      default: return outcome
+    }
+  }
+
+  const translateTradeType = (type: string) => {
+    switch (type) {
+      case 'BUY': return tTradePanel('buy')
+      case 'SELL': return tTradePanel('sell')
+      default: return type
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -165,8 +199,8 @@ export default function PortfolioPage() {
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className={`text-xs px-1.5 py-0.5 rounded ${getCategoryColor(p.market.category)}`}>{p.market.category}</span>
-                        <Badge variant={p.outcome === 'YES' ? 'success' : 'danger'}>{p.outcome}</Badge>
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${getCategoryColor(p.market.category)}`}>{translateCategory(p.market.category)}</span>
+                        <Badge variant={p.outcome === 'YES' ? 'success' : 'danger'}>{translateOutcome(p.outcome)}</Badge>
                       </div>
                       <p className="text-gray-900 dark:text-white font-medium text-sm line-clamp-1">{p.market.title}</p>
                     </div>
@@ -230,7 +264,7 @@ export default function PortfolioPage() {
                       <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
                         t.type === 'BUY' ? 'bg-green-900/50 text-green-300' : 'bg-red-900/50 text-red-300'
                       }`}>
-                        {t.type} {t.outcome}
+                        {translateTradeType(t.type)} {translateOutcome(t.outcome)}
                       </span>
                     </td>
                     <td className="py-2">{t.shares.toFixed(2)}</td>

@@ -8,10 +8,31 @@ import { TradePanel } from '@/components/TradePanel'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { useAuth } from '@/context/AuthContext'
-import { useT } from '@/context/I18nContext'
+import { useI18n, useT } from '@/context/I18nContext'
 import { formatQualifiedMajorityLabel, getQualifiedMajorityThreshold, getResolutionQuorum, isImmediateResolutionRound } from '@/lib/resolution'
-import { formatCurrency, formatPercent, formatDateTime, getCategoryColor, timeUntil } from '@/lib/utils'
+import { formatCurrency, formatPercent, formatDateTime, getCategoryColor } from '@/lib/utils'
 import toast from 'react-hot-toast'
+
+function formatRelativeTime(date: string | Date, locale: string): string {
+  const target = new Date(date).getTime()
+  const diffMs = target - Date.now()
+  const absMs = Math.abs(diffMs)
+
+  const minute = 60 * 1000
+  const hour = 60 * minute
+  const day = 24 * hour
+  const month = 30 * day
+  const year = 365 * day
+
+  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'always' })
+
+  if (absMs < minute) return rtf.format(Math.round(diffMs / 1000), 'second')
+  if (absMs < hour) return rtf.format(Math.round(diffMs / minute), 'minute')
+  if (absMs < day) return rtf.format(Math.round(diffMs / hour), 'hour')
+  if (absMs < month) return rtf.format(Math.round(diffMs / day), 'day')
+  if (absMs < year) return rtf.format(Math.round(diffMs / month), 'month')
+  return rtf.format(Math.round(diffMs / year), 'year')
+}
 
 interface Market {
   id: string
@@ -71,7 +92,13 @@ interface Market {
 }
 
 export default function MarketPage({ params }: { params: Promise<{ id: string }> }) {
+  const { locale } = useI18n()
   const t = useT('marketDetail')
+  const tCategories = useT('categories')
+  const tStatus = useT('status')
+  const tAdmin = useT('admin')
+  const tCard = useT('marketCard')
+  const tCommon = useT('common')
   const { id } = use(params)
   const { user, refreshUser } = useAuth()
   const [market, setMarket] = useState<Market | null>(null)
@@ -81,6 +108,40 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
   const [resolutionActionLoading, setResolutionActionLoading] = useState(false)
   const [disputeReason, setDisputeReason] = useState('')
   const [disputeOutcome, setDisputeOutcome] = useState<'YES' | 'NO' | 'INVALID'>('YES')
+
+  const translateCategory = (category: string) => {
+    switch (category) {
+      case 'Politics': return tCategories('politics')
+      case 'Crypto': return tCategories('crypto')
+      case 'Sports': return tCategories('sports')
+      case 'Tech': return tCategories('tech')
+      case 'Entertainment': return tCategories('entertainment')
+      case 'Science': return tCategories('science')
+      case 'Finance': return tCategories('finance')
+      case 'Other': return tCategories('other')
+      default: return category
+    }
+  }
+
+  const translateStatus = (status: string) => {
+    switch (status) {
+      case 'OPEN': return tStatus('open')
+      case 'CLOSED': return tStatus('closed')
+      case 'DISPUTED': return tStatus('disputed')
+      case 'INVALID': return tStatus('invalid')
+      case 'RESOLVED': return tStatus('resolved')
+      default: return status
+    }
+  }
+
+  const translateOutcome = (outcome: string) => {
+    switch (outcome) {
+      case 'YES': return tAdmin('yes')
+      case 'NO': return tAdmin('no')
+      case 'INVALID': return tAdmin('invalid')
+      default: return outcome
+    }
+  }
 
   const fetchMarket = useCallback(async () => {
     try {
@@ -141,10 +202,10 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
 
       if (res.ok) {
         if (data.autoResolved && data.majorityOutcome) {
-          toast.success(t('voteRecordedAutoResolved', { outcome: data.majorityOutcome }))
+          toast.success(t('voteRecordedAutoResolved', { outcome: translateOutcome(data.majorityOutcome) }))
           await refreshUser()
         } else {
-          toast.success(t('voteRecordedFor', { outcome }))
+          toast.success(t('voteRecordedFor', { outcome: translateOutcome(outcome) }))
         }
         await fetchMarket()
       } else {
@@ -169,7 +230,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
       })
       const data = await res.json()
       if (res.ok) {
-        toast.success(t('marketResolvedAs', { outcome }))
+        toast.success(t('marketResolvedAs', { outcome: translateOutcome(outcome) }))
         await refreshUser()
         await fetchMarket()
       } else {
@@ -283,7 +344,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
       id: `vote-${vote.userId}-${vote.createdAt}`,
       createdAt: vote.createdAt,
       tone: vote.outcome === 'YES' ? 'green' : vote.outcome === 'NO' ? 'red' : 'gray',
-      title: t('activityVoteTitle', { username: vote.user.username, outcome: vote.outcome }),
+      title: t('activityVoteTitle', { username: vote.user.username, outcome: translateOutcome(vote.outcome) }),
       description: t('activityVoteDescription'),
     })),
     ...(market.resolution && market.resolutionTime
@@ -291,7 +352,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
           id: `resolution-${market.resolutionTime}`,
           createdAt: market.resolutionTime,
           tone: 'indigo',
-          title: t('activityResolvedTitle', { outcome: market.resolution }),
+          title: t('activityResolvedTitle', { outcome: translateOutcome(market.resolution) }),
           description: t('activityResolvedDescription'),
         }]
       : []),
@@ -299,7 +360,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
       id: `dispute-${dispute.id}`,
       createdAt: dispute.createdAt,
       tone: 'yellow',
-      title: t('activityDisputeTitle', { username: dispute.user.username, outcome: dispute.proposedOutcome }),
+      title: t('activityDisputeTitle', { username: dispute.user.username, outcome: translateOutcome(dispute.proposedOutcome) }),
       description: dispute.reason,
     })),
   ].sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
@@ -310,11 +371,11 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
       <div>
         <div className="flex flex-wrap items-center gap-2 mb-2">
           <span className={`text-xs px-2 py-0.5 rounded font-medium ${getCategoryColor(market.category)}`}>
-            {market.category}
+            {translateCategory(market.category)}
           </span>
           {market.status !== 'OPEN' && (
             <Badge variant={market.status === 'RESOLVED' ? 'info' : market.status === 'INVALID' ? 'danger' : 'warning'}>
-              {market.status} {market.resolution ? `(${market.resolution})` : ''}
+              {translateStatus(market.status)} {market.resolution ? `(${translateOutcome(market.resolution)})` : ''}
             </Badge>
           )}
           {market.tags.map((tag) => (
@@ -323,10 +384,10 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
         </div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{market.title}</h1>
         <div className="flex flex-wrap gap-4 mt-2 text-sm text-gray-500 dark:text-gray-500">
-          <span>By <span className="text-gray-600 dark:text-gray-400">@{market.creator.username}</span></span>
-          <span>Ends {isExpired ? 'ended' : ''} {formatDateTime(market.endDate)}</span>
-          <span>{market._count.trades} trades</span>
-          <span>Vol: {formatCurrency(market.totalVolume)}</span>
+          <span>{t('createdBy')}: <span className="text-gray-600 dark:text-gray-400">@{market.creator.username}</span></span>
+          <span>{tAdmin('ends')}: {formatDateTime(market.endDate)} {isExpired ? `(${tCard('expired')})` : ''}</span>
+          <span>{market._count.trades} {tCommon('trades')}</span>
+          <span>{tCard('vol')}: {formatCurrency(market.totalVolume)}</span>
         </div>
       </div>
 
@@ -337,16 +398,16 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
           {/* Probability Card */}
           <div className="bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Current Probability</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t('currentProbability')}</h2>
             </div>
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div className="bg-green-900/30 border border-green-700/30 rounded-lg p-3 text-center">
                 <div className="text-3xl font-bold text-green-400">{formatPercent(market.probabilities.yes)}</div>
-                <div className="text-sm text-green-600 mt-1">YES</div>
+                <div className="text-sm text-green-600 mt-1">{tAdmin('yes')}</div>
               </div>
               <div className="bg-red-900/30 border border-red-700/30 rounded-lg p-3 text-center">
                 <div className="text-3xl font-bold text-red-400">{formatPercent(market.probabilities.no)}</div>
-                <div className="text-sm text-red-600 mt-1">NO</div>
+                <div className="text-sm text-red-600 mt-1">{tAdmin('no')}</div>
               </div>
             </div>
             <div className="h-2 bg-gray-300 dark:bg-gray-700 rounded-full overflow-hidden">
@@ -359,7 +420,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
 
           {/* Price Chart */}
           <div className="bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4">
-            <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-3">Price History</h2>
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-3">{t('priceHistoryTitle')}</h2>
             <PriceChart data={market.priceHistory} />
           </div>
 
@@ -370,11 +431,11 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
 
           {/* Description */}
           <div className="bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4">
-            <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-2">About this Market</h2>
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-2">{t('aboutThisMarket')}</h2>
             <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed whitespace-pre-wrap">{market.description}</p>
             {market.resolutionSource && (
               <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                <span className="text-xs text-gray-500 dark:text-gray-500">Resolution source: </span>
+                <span className="text-xs text-gray-500 dark:text-gray-500">{t('resolutionSourceLabel')}: </span>
                 <a href={market.resolutionSource} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-400 hover:underline break-all">
                   {market.resolutionSource}
                 </a>
@@ -395,7 +456,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                 {market.status === 'RESOLVED' && disputeWindowOpen && disputeWindowEndsAt && (
                   <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                     {t('resolvedAsDisputesOpenUntil', {
-                      outcome: market.resolution || 'INVALID',
+                      outcome: translateOutcome(market.resolution || 'INVALID'),
                       date: formatDateTime(disputeWindowEndsAt.toISOString()),
                     })}
                   </p>
@@ -410,30 +471,35 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
 
               <div className="grid grid-cols-3 gap-2 text-sm">
                 <div className="rounded-lg bg-green-900/20 border border-green-700/30 p-3 text-center">
-                  <div className="text-green-400 font-semibold">YES</div>
+                  <div className="text-green-400 font-semibold">{tAdmin('yes')}</div>
                   <div className="text-gray-900 dark:text-white text-lg font-bold">{voteCounts.YES}</div>
                 </div>
                 <div className="rounded-lg bg-red-900/20 border border-red-700/30 p-3 text-center">
-                  <div className="text-red-400 font-semibold">NO</div>
+                  <div className="text-red-400 font-semibold">{tAdmin('no')}</div>
                   <div className="text-gray-900 dark:text-white text-lg font-bold">{voteCounts.NO}</div>
                 </div>
                 <div className="rounded-lg bg-gray-200 dark:bg-gray-700/40 border border-gray-300 dark:border-gray-600/40 p-3 text-center">
-                  <div className="text-gray-700 dark:text-gray-300 font-semibold">INVALID</div>
+                  <div className="text-gray-700 dark:text-gray-300 font-semibold">{tAdmin('invalid')}</div>
                   <div className="text-gray-900 dark:text-white text-lg font-bold">{voteCounts.INVALID}</div>
                 </div>
               </div>
 
               <div className="rounded-lg bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700/60 p-3 space-y-2">
                 <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">Leading outcome</span>
+                  <span className="text-gray-600 dark:text-gray-400">{t('leadingOutcome')}</span>
                   <span className="text-gray-900 dark:text-white font-medium">
                     {invalidMajorityReached
-                      ? `INVALID has qualified majority (${voteCounts.INVALID}/${totalVoteCount})`
+                      ? t('invalidHasMajority', { invalid: voteCounts.INVALID, total: totalVoteCount })
                       : leadingOutcome
-                      ? `${leadingOutcome} leads — ${leadingVoteCount}/${totalVoteCount} votes (${totalVoteCount > 0 ? Math.round(leadingVoteCount / totalVoteCount * 100) : 0}%)`
+                      ? t('leadingOutcomeVotes', {
+                          outcome: translateOutcome(leadingOutcome),
+                          leading: leadingVoteCount,
+                          total: totalVoteCount,
+                          percent: totalVoteCount > 0 ? Math.round(leadingVoteCount / totalVoteCount * 100) : 0,
+                        })
                       : totalVoteCount > 0
-                      ? 'No outcome has a qualified majority yet'
-                      : 'No votes yet'}
+                      ? t('noOutcomeMajorityYet')
+                      : t('noVotesYet')}
                   </span>
                 </div>
                 {totalVoteCount > 0 && (
@@ -449,32 +515,42 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                       <div
                         className="absolute top-0 w-0.5 h-3 bg-yellow-400 -translate-y-1"
                         style={{ left: `${qualifiedMajorityThreshold * 100}%` }}
-                        title={`Qualified majority threshold (${qualifiedMajorityPercentLabel}%)`}
+                        title={t('qualifiedMajorityThresholdTooltip', { percent: qualifiedMajorityPercentLabel })}
                       />
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-500">
                       {immediateResolutionRound
-                        ? 'The first vote resolves this market.'
+                        ? t('firstVoteResolvesMarket')
                         : !quorumReached
-                        ? `Quorum not reached yet. ${votesNeededForQuorum} more vote${votesNeededForQuorum === 1 ? '' : 's'} needed.`
+                        ? t('quorumNotReachedYet', { count: votesNeededForQuorum })
                         : validMajorityReached
-                        ? `${leadingOutcome} has a qualified majority and will auto-resolve.`
+                        ? t('outcomeWillAutoResolve', { outcome: translateOutcome(leadingOutcome || 'INVALID') })
                         : invalidMajorityReached
-                        ? 'INVALID has a qualified majority and will auto-resolve.'
-                        : `No outcome has exceeded the ${qualifiedMajorityFractionLabel} (${qualifiedMajorityPercentLabel}%) threshold yet.`}
+                        ? t('invalidWillAutoResolve')
+                        : t('noOutcomeExceededThresholdYet', {
+                            threshold: qualifiedMajorityFractionLabel,
+                            percent: qualifiedMajorityPercentLabel,
+                          })}
                     </p>
                   </>
                 )}
-                <p className="text-xs text-gray-500 dark:text-gray-500">Total votes cast: {totalVoteCount}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-500">{t('totalVotesCast', { count: totalVoteCount })}</p>
               </div>
 
               <div className="rounded-lg bg-indigo-950/20 border border-indigo-700/30 p-3">
-                <h3 className="text-sm font-semibold text-indigo-300">How Auto-Resolution Works</h3>
+                <h3 className="text-sm font-semibold text-indigo-300">{t('howAutoResolutionWorks')}</h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
                   {immediateResolutionRound
-                    ? 'During the initial resolution round, the first vote resolves the market immediately.'
-                    : `This dispute round requires a minimum quorum of ${resolutionQuorum} total votes, and one outcome must exceed ${qualifiedMajorityFractionLabel} (${qualifiedMajorityPercentLabel}%) of all votes cast (YES, NO, and INVALID combined).`}
-                  {!immediateResolutionRound && ' Matching the threshold exactly is not enough.'} INVALID votes count toward the total and dilute YES/NO shares.
+                    ? t('initialRoundFirstVoteRule')
+                    : t('disputeRoundThresholdRule', {
+                        quorum: resolutionQuorum,
+                        threshold: qualifiedMajorityFractionLabel,
+                        percent: qualifiedMajorityPercentLabel,
+                        yes: tAdmin('yes'),
+                        no: tAdmin('no'),
+                        invalid: tAdmin('invalid'),
+                      })}
+                  {!immediateResolutionRound && ` ${t('exactThresholdNotEnough')}`} {t('invalidVotesDiluteShares', { yes: tAdmin('yes'), no: tAdmin('no') })}
                 </p>
               </div>
 
@@ -534,9 +610,9 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                         onChange={(e) => setDisputeOutcome(e.target.value as 'YES' | 'NO' | 'INVALID')}
                         className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       >
-                        <option value="YES">YES</option>
-                        <option value="NO">NO</option>
-                        <option value="INVALID">INVALID</option>
+                        <option value="YES">{tAdmin('yes')}</option>
+                        <option value="NO">{tAdmin('no')}</option>
+                        <option value="INVALID">{tAdmin('invalid')}</option>
                       </select>
                     </div>
                     <div>
@@ -555,14 +631,22 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                         </p>
                         <p className="text-xs text-yellow-200">
                           {immediateResolutionRound
-                            ? 'Current rule: first vote resolves.'
-                            : `Current rule: quorum ${resolutionQuorum}, threshold above ${qualifiedMajorityFractionLabel} (${qualifiedMajorityPercentLabel}%).`}
+                            ? t('currentRuleFirstVoteResolves')
+                            : t('currentRuleQuorumThreshold', {
+                                quorum: resolutionQuorum,
+                                threshold: qualifiedMajorityFractionLabel,
+                                percent: qualifiedMajorityPercentLabel,
+                              })}
                         </p>
                         <p className="text-xs text-yellow-100 pt-1">
                           {nextDisputeRoundLabel}
                         </p>
                         <p className="text-xs text-yellow-300">
-                          After filing this dispute: quorum {nextResolutionQuorum}, threshold above {nextQualifiedMajorityFractionLabel} ({nextQualifiedMajorityPercentLabel}%)
+                          {t('afterDisputeFiledRule', {
+                            quorum: nextResolutionQuorum,
+                            threshold: nextQualifiedMajorityFractionLabel,
+                            percent: nextQualifiedMajorityPercentLabel,
+                          })}
                         </p>
                       </div>
                     </div>
@@ -583,8 +667,8 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                   {market.disputes.map((dispute) => (
                     <div key={dispute.id} className="rounded-lg bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700/60 p-3 text-sm">
                       <div className="flex items-center justify-between gap-3">
-                        <span className="text-gray-700 dark:text-gray-300">{t('proposed')}: <span className="font-semibold text-gray-900 dark:text-white">{dispute.proposedOutcome}</span></span>
-                        <span className="text-xs text-gray-500 dark:text-gray-500">{timeUntil(dispute.createdAt)}</span>
+                        <span className="text-gray-700 dark:text-gray-300">{t('proposed')}: <span className="font-semibold text-gray-900 dark:text-white">{translateOutcome(dispute.proposedOutcome)}</span></span>
+                        <span className="text-xs text-gray-500 dark:text-gray-500">{formatRelativeTime(dispute.createdAt, locale)}</span>
                       </div>
                       <p className="text-gray-600 dark:text-gray-400 mt-2">{dispute.reason}</p>
                     </div>
@@ -618,7 +702,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                           <div className="flex items-start justify-between gap-3">
                             <p className="text-sm font-medium text-gray-900 dark:text-white">{item.title}</p>
                             <div className="text-right text-xs text-gray-500 dark:text-gray-500 shrink-0">
-                              <div>{timeUntil(item.createdAt)}</div>
+                              <div>{formatRelativeTime(item.createdAt, locale)}</div>
                               <div>{formatDateTime(item.createdAt)}</div>
                             </div>
                           </div>
@@ -663,7 +747,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                     <div>
                       <div className="flex items-baseline gap-2">
                         <span className="text-sm font-medium text-gray-900 dark:text-white">@{c.user.username}</span>
-                        <span className="text-xs text-gray-500 dark:text-gray-500">{timeUntil(c.createdAt)}</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-500">{formatRelativeTime(c.createdAt, locale)}</span>
                       </div>
                       <p className="text-sm text-gray-700 dark:text-gray-300 mt-0.5">{c.content}</p>
                     </div>
@@ -680,30 +764,30 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
 
           {/* Market Stats */}
           <div className="bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4 text-sm space-y-3">
-            <h3 className="font-semibold text-gray-900 dark:text-white">Market Stats</h3>
+            <h3 className="font-semibold text-gray-900 dark:text-white">{t('marketStatsTitle')}</h3>
             <div className="flex justify-between text-gray-600 dark:text-gray-400">
-              <span>Total Volume</span>
+              <span>{t('totalVolumeLabel')}</span>
               <span className="text-gray-900 dark:text-white">{formatCurrency(market.totalVolume)}</span>
             </div>
             <div className="flex justify-between text-gray-600 dark:text-gray-400 pl-3 border-l border-gray-300 dark:border-gray-700">
-              <span>AMM Volume</span>
+              <span>{t('ammVolumeLabel')}</span>
               <span className="text-gray-900 dark:text-white">{formatCurrency(market.ammVolume)}</span>
             </div>
             <div className="flex justify-between text-gray-600 dark:text-gray-400 pl-3 border-l border-gray-300 dark:border-gray-700">
-              <span>Exchange Vol</span>
+              <span>{t('exchangeVolumeLabel')}</span>
               <span className="text-gray-900 dark:text-white">{formatCurrency(market.exchangeVolume)}</span>
             </div>
             <div className="flex justify-between text-gray-600 dark:text-gray-400">
-              <span>Total Trades</span>
+              <span>{t('totalTradesLabel')}</span>
               <span className="text-gray-900 dark:text-white">{market._count.trades}</span>
             </div>
             <div className="flex justify-between text-gray-600 dark:text-gray-400">
-              <span>End Date</span>
+              <span>{t('endDateLabel')}</span>
               <span className="text-gray-900 dark:text-white">{formatDateTime(market.endDate)}</span>
             </div>
             <div className="flex justify-between text-gray-600 dark:text-gray-400">
-              <span>Status</span>
-              <span className="text-gray-900 dark:text-white">{market.status}</span>
+              <span>{t('statusLabel')}</span>
+              <span className="text-gray-900 dark:text-white">{translateStatus(market.status)}</span>
             </div>
           </div>
         </div>
@@ -745,24 +829,42 @@ const ORDER_STATUS_COLORS: Record<string, string> = {
 
 function ExchangeHistoryPanel({ orderFills, userOrders }: { orderFills: Fill[]; userOrders: UserOrder[] }) {
   const [tab, setTab] = useState<'fills' | 'orders'>('fills')
+  const { locale } = useI18n()
+  const t = useT('marketDetail')
+  const tAdmin = useT('admin')
+  const tTradePanel = useT('tradePanel')
+  const tPortfolio = useT('portfolio')
+
+  const translateOutcome = (outcome: 'YES' | 'NO' | 'INVALID') => {
+    if (outcome === 'YES') return tAdmin('yes')
+    if (outcome === 'NO') return tAdmin('no')
+    return tAdmin('invalid')
+  }
+
+  const translateOrderStatus = (status: UserOrder['status']) => {
+    if (status === 'OPEN') return t('orderStatusOpen')
+    if (status === 'PARTIAL') return t('orderStatusPartial')
+    if (status === 'FILLED') return t('orderStatusFilled')
+    return t('orderStatusCancelled')
+  }
 
   return (
     <div className="bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-base font-semibold text-gray-900 dark:text-white">Exchange History</h2>
+        <h2 className="text-base font-semibold text-gray-900 dark:text-white">{t('exchangeHistoryTitle')}</h2>
         <div className="inline-flex rounded-lg border border-gray-300 dark:border-gray-700 overflow-hidden text-xs">
           <button
             onClick={() => setTab('fills')}
             className={`px-3 py-1.5 font-medium ${tab === 'fills' ? 'bg-indigo-600 text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
           >
-            Recent Fills
+            {tTradePanel('recentFills', { outcome: `${tAdmin('yes')}/${tAdmin('no')}` })}
           </button>
           {userOrders.length > 0 && (
             <button
               onClick={() => setTab('orders')}
               className={`px-3 py-1.5 font-medium ${tab === 'orders' ? 'bg-indigo-600 text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
             >
-              My Orders
+              {tTradePanel('openOrders')}
             </button>
           )}
         </div>
@@ -770,28 +872,28 @@ function ExchangeHistoryPanel({ orderFills, userOrders }: { orderFills: Fill[]; 
 
       {tab === 'fills' && (
         orderFills.length === 0 ? (
-          <p className="text-sm text-gray-500 dark:text-gray-500 text-center py-4">No exchange fills yet</p>
+          <p className="text-sm text-gray-500 dark:text-gray-500 text-center py-4">{tTradePanel('noRecentFills')}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-gray-500 dark:text-gray-500 border-b border-gray-300 dark:border-gray-700">
-                  <th className="pb-2 text-left font-medium">Time</th>
-                  <th className="pb-2 text-left font-medium">Outcome</th>
-                  <th className="pb-2 text-right font-medium">Price</th>
-                  <th className="pb-2 text-right font-medium">Shares</th>
-                  <th className="pb-2 text-right font-medium">Notional</th>
-                  <th className="pb-2 text-left font-medium pl-4">Maker</th>
-                  <th className="pb-2 text-left font-medium">Taker</th>
+                  <th className="pb-2 text-left font-medium">{tPortfolio('date')}</th>
+                  <th className="pb-2 text-left font-medium">{t('outcomeLabel')}</th>
+                  <th className="pb-2 text-right font-medium">{tPortfolio('price')}</th>
+                  <th className="pb-2 text-right font-medium">{tPortfolio('shares')}</th>
+                  <th className="pb-2 text-right font-medium">{t('notionalLabel')}</th>
+                  <th className="pb-2 text-left font-medium pl-4">{t('makerLabel')}</th>
+                  <th className="pb-2 text-left font-medium">{t('takerLabel')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-300 dark:divide-gray-700/50">
                 {orderFills.map((fill) => (
                   <tr key={fill.id} className="text-gray-700 dark:text-gray-300 hover:bg-gray-200/70 dark:hover:bg-gray-700/20 transition-colors">
-                    <td className="py-1.5 text-gray-500 dark:text-gray-500">{timeUntil(fill.createdAt)}</td>
+                    <td className="py-1.5 text-gray-500 dark:text-gray-500">{formatRelativeTime(fill.createdAt, locale)}</td>
                     <td className="py-1.5">
                       <span className={`font-medium ${fill.outcome === 'YES' ? 'text-green-400' : 'text-red-400'}`}>
-                        {fill.outcome}
+                        {translateOutcome(fill.outcome)}
                       </span>
                     </td>
                     <td className="py-1.5 text-right font-mono">{formatPercent(fill.price)}</td>
@@ -817,10 +919,10 @@ function ExchangeHistoryPanel({ orderFills, userOrders }: { orderFills: Fill[]; 
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <span className={`font-semibold ${order.side === 'BID' ? 'text-green-400' : 'text-red-400'}`}>
-                      {order.side}
+                      {order.side === 'BID' ? tTradePanel('bidBuy') : tTradePanel('askSell')}
                     </span>
                     <span className={`font-medium ${order.outcome === 'YES' ? 'text-green-300' : 'text-red-300'}`}>
-                      {order.outcome}
+                      {translateOutcome(order.outcome)}
                     </span>
                     {order.orderType && order.orderType !== 'GTC' && (
                       <span className="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded text-[10px]">{order.orderType}</span>
@@ -828,15 +930,15 @@ function ExchangeHistoryPanel({ orderFills, userOrders }: { orderFills: Fill[]; 
                     <span className="text-gray-900 dark:text-white font-mono">
                       {formatPercent(order.price)}
                     </span>
-                    <span className="text-gray-600 dark:text-gray-400">{order.initialShares.toFixed(2)} shares</span>
+                    <span className="text-gray-600 dark:text-gray-400">{order.initialShares.toFixed(2)} {tPortfolio('shares').toLowerCase()}</span>
                   </div>
-                  <span className={`font-medium ${ORDER_STATUS_COLORS[order.status]}`}>{order.status}</span>
+                  <span className={`font-medium ${ORDER_STATUS_COLORS[order.status]}`}>{translateOrderStatus(order.status)}</span>
                 </div>
 
                 {/* Fill progress bar */}
                 <div className="space-y-1">
                   <div className="flex justify-between text-gray-500 dark:text-gray-500">
-                    <span>Filled {filledShares.toFixed(2)} / {order.initialShares.toFixed(2)}</span>
+                    <span>{tTradePanel('filledLabel', { filled: filledShares.toFixed(2), total: order.initialShares.toFixed(2) })}</span>
                     <span>{fillPct.toFixed(0)}%</span>
                   </div>
                   <div className="h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full overflow-hidden">
@@ -853,30 +955,30 @@ function ExchangeHistoryPanel({ orderFills, userOrders }: { orderFills: Fill[]; 
                 <div className="flex flex-wrap gap-3 text-gray-500 dark:text-gray-500 pt-1">
                   <span className="flex items-center gap-1">
                     <span className="h-1.5 w-1.5 rounded-full bg-blue-400 inline-block" />
-                    Placed {timeUntil(order.createdAt)}
+                    {t('placedLabel')} {formatRelativeTime(order.createdAt, locale)}
                   </span>
                   {order.orderType === 'GTD' && order.expiresAt && (
                     <span className="flex items-center gap-1">
                       <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 inline-block" />
-                      Expires {formatDateTime(order.expiresAt)}
+                      {tTradePanel('expiresLabel', { date: formatDateTime(order.expiresAt) })}
                     </span>
                   )}
                   {order.status === 'FILLED' && order.updatedAt && (
                     <span className="flex items-center gap-1">
                       <span className="h-1.5 w-1.5 rounded-full bg-green-400 inline-block" />
-                      Filled {timeUntil(order.updatedAt)}
+                      {t('filledAtLabel')} {formatRelativeTime(order.updatedAt, locale)}
                     </span>
                   )}
                   {order.status === 'PARTIAL' && (
                     <span className="flex items-center gap-1">
                       <span className="h-1.5 w-1.5 rounded-full bg-yellow-400 inline-block" />
-                      Partial fill
+                      {t('partialFillLabel')}
                     </span>
                   )}
                   {order.status === 'CANCELLED' && order.updatedAt && (
                     <span className="flex items-center gap-1">
                       <span className="h-1.5 w-1.5 rounded-full bg-gray-400 inline-block" />
-                      Cancelled {timeUntil(order.updatedAt)}
+                      {t('cancelledLabel')} {formatRelativeTime(order.updatedAt, locale)}
                     </span>
                   )}
                 </div>
