@@ -320,6 +320,7 @@ export interface Messages {
   }
   common: {
     loading: string
+    back: string
     cancel: string
     confirm: string
     trades: string

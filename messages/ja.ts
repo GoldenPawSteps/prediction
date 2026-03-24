@@ -322,6 +322,7 @@ export const ja: Messages = {
   },
   common: {
     loading: '読み込み中...',
+    back: '戻る',
     cancel: 'キャンセル',
     confirm: '確認',
     trades: 'トレード',

@@ -322,6 +322,7 @@ export const zh: Messages = {
   },
   common: {
     loading: '加载中...',
+    back: '返回',
     cancel: '取消',
     confirm: '确认',
     trades: '笔交易',

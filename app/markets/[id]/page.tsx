@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { use } from 'react'
-import { notFound } from 'next/navigation'
+import { notFound, useRouter } from 'next/navigation'
 import { PriceChart } from '@/components/PriceChart'
 import { TradePanel } from '@/components/TradePanel'
 import { Badge } from '@/components/ui/Badge'
@@ -92,6 +92,7 @@ interface Market {
 }
 
 export default function MarketPage({ params }: { params: Promise<{ id: string }> }) {
+  const router = useRouter()
   const { locale } = useI18n()
   const t = useT('marketDetail')
   const tCategories = useT('categories')
@@ -367,6 +368,19 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
 
   return (
     <div className="space-y-6">
+      <div>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => {
+            if (window.history.length > 1) router.back()
+            else router.push('/')
+          }}
+        >
+          ← {tCommon('back')}
+        </Button>
+      </div>
+
       {/* Header */}
       <div>
         <div className="flex flex-wrap items-center gap-2 mb-2">

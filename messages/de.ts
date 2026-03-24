@@ -322,6 +322,7 @@ export const de: Messages = {
   },
   common: {
     loading: 'Lädt...',
+    back: 'Zurück',
     cancel: 'Abbrechen',
     confirm: 'Bestätigen',
     trades: 'Trades',
