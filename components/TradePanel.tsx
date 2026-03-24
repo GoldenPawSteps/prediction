@@ -252,7 +252,7 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
 
   if (market.status !== 'OPEN' || isExpired) {
     return (
-      <div className="bg-gray-800/50 rounded-xl p-4 text-center text-gray-400">
+      <div className="bg-gray-100 dark:bg-gray-800/50 rounded-xl p-4 text-center text-gray-600 dark:text-gray-400">
         {isExpired
           ? 'This market has expired and is no longer accepting trades.'
           : `This market is ${market.status.toLowerCase()} and no longer accepting trades.`}
@@ -262,8 +262,8 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
 
   if (!user) {
     return (
-      <div className="bg-gray-800/50 rounded-xl p-4 text-center">
-        <p className="text-gray-400 mb-3">Sign in to trade on this market</p>
+      <div className="bg-gray-100 dark:bg-gray-800/50 rounded-xl p-4 text-center">
+        <p className="text-gray-600 dark:text-gray-400 mb-3">Sign in to trade on this market</p>
         <Link href="/auth/login" className="text-indigo-400 hover:text-indigo-300 font-medium">Log in -&gt;</Link>
       </div>
     )
@@ -271,19 +271,19 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
 
   return (
     <>
-      <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-4 space-y-4">
+      <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4 space-y-4">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="font-semibold text-white">Place Trade</h3>
-          <div className="inline-flex rounded-lg border border-gray-700 overflow-hidden">
+          <h3 className="font-semibold text-gray-900 dark:text-white">Place Trade</h3>
+          <div className="inline-flex rounded-lg border border-gray-300 dark:border-gray-700 overflow-hidden">
             <button
               onClick={() => setMode('AMM')}
-              className={`px-3 py-1.5 text-xs font-medium ${mode === 'AMM' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`}
+              className={`px-3 py-1.5 text-xs font-medium ${mode === 'AMM' ? 'bg-indigo-600 text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
             >
               AMM
             </button>
             <button
               onClick={() => setMode('EXCHANGE')}
-              className={`px-3 py-1.5 text-xs font-medium ${mode === 'EXCHANGE' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`}
+              className={`px-3 py-1.5 text-xs font-medium ${mode === 'EXCHANGE' ? 'bg-indigo-600 text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
             >
               Exchange
             </button>
@@ -292,11 +292,11 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
 
         {mode === 'AMM' ? (
           <>
-            <div className="flex rounded-lg overflow-hidden border border-gray-700">
+            <div className="flex rounded-lg overflow-hidden border border-gray-300 dark:border-gray-700">
               <button
                 onClick={() => setTradeType('BUY')}
                 className={`flex-1 py-2 text-sm font-medium transition-colors ${
-                  tradeType === 'BUY' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'
+                  tradeType === 'BUY' ? 'bg-indigo-600 text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                 }`}
               >
                 Buy
@@ -304,7 +304,7 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
               <button
                 onClick={() => setTradeType('SELL')}
                 className={`flex-1 py-2 text-sm font-medium transition-colors ${
-                  tradeType === 'SELL' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'
+                  tradeType === 'SELL' ? 'bg-indigo-600 text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                 }`}
               >
                 Sell
@@ -317,7 +317,7 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
                 className={`py-3 rounded-lg font-semibold text-sm transition-all ${
                   selectedOutcome === 'YES'
                     ? 'bg-green-600 text-white ring-2 ring-green-500'
-                    : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
                 }`}
               >
                 YES <span className="block text-xs font-normal">{formatPercent(market.probabilities.yes)}</span>
@@ -327,7 +327,7 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
                 className={`py-3 rounded-lg font-semibold text-sm transition-all ${
                   selectedOutcome === 'NO'
                     ? 'bg-red-600 text-white ring-2 ring-red-500'
-                    : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
                 }`}
               >
                 NO <span className="block text-xs font-normal">{formatPercent(market.probabilities.no)}</span>
@@ -348,14 +348,14 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
             </div>
 
             {shares && parseFloat(shares) > 0 && (
-              <div className="bg-gray-700/50 rounded-lg p-3 text-sm space-y-1">
-                <div className="flex justify-between text-gray-400">
+              <div className="bg-gray-100/50 dark:bg-gray-700/50 rounded-lg p-3 text-sm space-y-1">
+                <div className="flex justify-between text-gray-600 dark:text-gray-400">
                   <span>Est. Cost</span>
-                  <span className="text-white">{formatCurrency(parseFloat(shares) * currentPrice)}</span>
+                  <span className="text-gray-900 dark:text-white">{formatCurrency(parseFloat(shares) * currentPrice)}</span>
                 </div>
-                <div className="flex justify-between text-gray-400">
+                <div className="flex justify-between text-gray-600 dark:text-gray-400">
                   <span>Avg. Price</span>
-                  <span className="text-white">{formatPercent(currentPrice)}</span>
+                  <span className="text-gray-900 dark:text-white">{formatPercent(currentPrice)}</span>
                 </div>
               </div>
             )}
@@ -377,7 +377,7 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
                 className={`py-2 rounded-lg font-semibold text-sm transition-all ${
                   selectedOutcome === 'YES'
                     ? 'bg-green-600 text-white ring-2 ring-green-500'
-                    : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
                 }`}
               >
                 YES
@@ -387,7 +387,7 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
                 className={`py-2 rounded-lg font-semibold text-sm transition-all ${
                   selectedOutcome === 'NO'
                     ? 'bg-red-600 text-white ring-2 ring-red-500'
-                    : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                    : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600'
                 }`}
               >
                 NO
@@ -395,21 +395,21 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
             </div>
 
             <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="bg-gray-900/60 rounded-lg p-2 border border-gray-700">
+              <div className="bg-gray-50 dark:bg-gray-900/60 rounded-lg p-2 border border-gray-200 dark:border-gray-700">
                 <div className="text-gray-500">Best Bid</div>
                 <div className="text-green-400 font-semibold">{bestBid !== null ? formatPercent(bestBid) : '-'}</div>
               </div>
-              <div className="bg-gray-900/60 rounded-lg p-2 border border-gray-700">
+              <div className="bg-gray-50 dark:bg-gray-900/60 rounded-lg p-2 border border-gray-200 dark:border-gray-700">
                 <div className="text-gray-500">Best Ask</div>
                 <div className="text-red-400 font-semibold">{bestAsk !== null ? formatPercent(bestAsk) : '-'}</div>
               </div>
             </div>
 
-            <div className="flex rounded-lg overflow-hidden border border-gray-700">
+            <div className="flex rounded-lg overflow-hidden border border-gray-300 dark:border-gray-700">
               <button
                 onClick={() => setOrderSide('BID')}
                 className={`flex-1 py-2 text-sm font-medium transition-colors ${
-                  orderSide === 'BID' ? 'bg-green-600 text-white' : 'text-gray-400 hover:text-white'
+                  orderSide === 'BID' ? 'bg-green-600 text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                 }`}
               >
                 Bid (Buy)
@@ -417,7 +417,7 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
               <button
                 onClick={() => setOrderSide('ASK')}
                 className={`flex-1 py-2 text-sm font-medium transition-colors ${
-                  orderSide === 'ASK' ? 'bg-red-600 text-white' : 'text-gray-400 hover:text-white'
+                  orderSide === 'ASK' ? 'bg-red-600 text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                 }`}
               >
                 Ask (Sell)
@@ -426,14 +426,14 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
 
             {/* Order type selector */}
             <div className="space-y-1">
-              <div className="text-xs text-gray-400 font-medium">Order Type</div>
+              <div className="text-xs text-gray-600 dark:text-gray-400 font-medium">Order Type</div>
               <div className="grid grid-cols-4 gap-1">
                 {(['GTC', 'GTD', 'FOK', 'FAK'] as OrderType[]).map((t) => (
                   <button
                     key={t}
                     onClick={() => setOrderType(t)}
                     className={`py-1.5 rounded text-xs font-medium transition-colors ${
-                      orderType === t ? 'bg-indigo-600 text-white' : 'bg-gray-700 text-gray-400 hover:text-white'
+                      orderType === t ? 'bg-indigo-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
                     }`}
                   >
                     {t}
@@ -492,10 +492,10 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
             </Button>
 
             <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="bg-gray-900/60 rounded-lg p-3 border border-gray-700 space-y-1 max-h-36 overflow-y-auto">
+              <div className="bg-gray-50 dark:bg-gray-900/60 rounded-lg p-3 border border-gray-200 dark:border-gray-700 space-y-1 max-h-36 overflow-y-auto">
                 <div className="text-green-400 font-semibold mb-1">Bids</div>
                 {bids.length === 0 ? <div className="text-gray-500">No bids</div> : bids.slice(0, 8).map((order) => (
-                  <div key={order.id} className="flex items-start justify-between gap-2 text-gray-300">
+                  <div key={order.id} className="flex items-start justify-between gap-2 text-gray-700 dark:text-gray-300">
                     <div className="flex flex-col">
                       <span>{order.remainingShares.toFixed(2)}</span>
                       {order.orderType === 'GTD' && order.expiresAt && (
@@ -508,10 +508,10 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
                   </div>
                 ))}
               </div>
-              <div className="bg-gray-900/60 rounded-lg p-3 border border-gray-700 space-y-1 max-h-36 overflow-y-auto">
+              <div className="bg-gray-50 dark:bg-gray-900/60 rounded-lg p-3 border border-gray-200 dark:border-gray-700 space-y-1 max-h-36 overflow-y-auto">
                 <div className="text-red-400 font-semibold mb-1">Asks</div>
                 {asks.length === 0 ? <div className="text-gray-500">No asks</div> : asks.slice(0, 8).map((order) => (
-                  <div key={order.id} className="flex items-start justify-between gap-2 text-gray-300">
+                  <div key={order.id} className="flex items-start justify-between gap-2 text-gray-700 dark:text-gray-300">
                     <div className="flex flex-col">
                       <span>{order.remainingShares.toFixed(2)}</span>
                       {order.orderType === 'GTD' && order.expiresAt && (
@@ -527,11 +527,11 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
             </div>
 
             {myOrders.length > 0 && (
-              <div className="bg-gray-900/60 rounded-lg p-3 border border-gray-700 space-y-2">
-                <div className="text-xs text-gray-400">Your Open Orders</div>
+              <div className="bg-gray-50 dark:bg-gray-900/60 rounded-lg p-3 border border-gray-200 dark:border-gray-700 space-y-2">
+                <div className="text-xs text-gray-600 dark:text-gray-400">Your Open Orders</div>
                 {myOrders.slice(0, 6).map((order) => (
                   <div key={order.id} className="flex items-center justify-between gap-2 text-xs">
-                    <span className="text-gray-300">
+                    <span className="text-gray-700 dark:text-gray-300">
                       {order.side} {order.outcome} {order.remainingShares.toFixed(2)}/{order.initialShares.toFixed(2)} @ {formatPercent(order.price)}
                       {order.orderType === 'GTD' && order.expiresAt && (
                         <span className="text-indigo-300"> · GTD {timeUntil(order.expiresAt)}</span>
@@ -550,8 +550,8 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
             )}
 
             {myOrderHistory.length > 0 && (
-              <div className="bg-gray-900/60 rounded-lg p-3 border border-gray-700 space-y-2">
-                <div className="text-xs text-gray-400">Your Recent Orders</div>
+              <div className="bg-gray-50 dark:bg-gray-900/60 rounded-lg p-3 border border-gray-200 dark:border-gray-700 space-y-2">
+                <div className="text-xs text-gray-600 dark:text-gray-400">Your Recent Orders</div>
                 {myOrderHistory.map((order) => {
                   const filledShares = Math.max(0, Number(order.filledShares ?? 0))
                   const statusTone = order.status === 'FILLED'
@@ -563,9 +563,9 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
                     : 'text-blue-400'
 
                   return (
-                    <div key={`history-${order.id}`} className="rounded-md bg-gray-800/70 border border-gray-700 px-2 py-1.5 text-xs">
+                    <div key={`history-${order.id}`} className="rounded-md bg-gray-100 dark:bg-gray-800/70 border border-gray-200 dark:border-gray-700 px-2 py-1.5 text-xs">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-gray-300 flex items-center gap-1">
+                        <span className="text-gray-700 dark:text-gray-300 flex items-center gap-1">
                           {order.side} {order.outcome}{' '}
                           {order.orderType && order.orderType !== 'GTC' && (
                             <span className="bg-gray-700 text-gray-300 px-1 rounded text-[10px]">{order.orderType}</span>
@@ -588,13 +588,13 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
               </div>
             )}
 
-            <div className="bg-gray-900/60 rounded-lg p-3 border border-gray-700 space-y-2">
-              <div className="text-xs text-gray-400">Recent Fills ({selectedOutcome})</div>
+              <div className="bg-gray-50 dark:bg-gray-900/60 rounded-lg p-3 border border-gray-200 dark:border-gray-700 space-y-2">
+                <div className="text-xs text-gray-600 dark:text-gray-400">Recent Fills ({selectedOutcome})</div>
               {recentFills.length === 0 ? (
                 <div className="text-xs text-gray-500">No recent fills</div>
               ) : (
                 recentFills.slice(0, 6).map((fill) => (
-                  <div key={fill.id} className="flex items-center justify-between gap-2 text-xs text-gray-300">
+                  <div key={fill.id} className="flex items-center justify-between gap-2 text-xs text-gray-700 dark:text-gray-300">
                     <span>
                       {fill.shares.toFixed(2)} @ {formatPercent(fill.price)}
                     </span>
@@ -611,22 +611,22 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
 
       <Modal isOpen={confirmOpen && mode === 'AMM'} onClose={() => setConfirmOpen(false)} title="Confirm Trade">
         <div className="space-y-4">
-          <div className="bg-gray-700/50 rounded-lg p-4 space-y-2 text-sm">
+          <div className="bg-gray-100 dark:bg-gray-700/50 rounded-lg p-4 space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-400">Action</span>
-              <span className="text-white font-medium">{tradeType} {selectedOutcome}</span>
+              <span className="text-gray-600 dark:text-gray-400">Action</span>
+              <span className="text-gray-900 dark:text-white font-medium">{tradeType} {selectedOutcome}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-400">Shares</span>
-              <span className="text-white font-medium">{shares}</span>
+              <span className="text-gray-600 dark:text-gray-400">Shares</span>
+              <span className="text-gray-900 dark:text-white font-medium">{shares}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-400">Price per Share</span>
-              <span className="text-white font-medium">{preview && formatPercent(preview.price)}</span>
+              <span className="text-gray-600 dark:text-gray-400">Price per Share</span>
+              <span className="text-gray-900 dark:text-white font-medium">{preview && formatPercent(preview.price)}</span>
             </div>
-            <div className="flex justify-between border-t border-gray-600 pt-2">
-              <span className="text-gray-400">Est. {tradeType === 'BUY' ? 'Cost' : 'Proceeds'}</span>
-              <span className="text-white font-bold">{preview && formatCurrency(preview.cost)}</span>
+            <div className="flex justify-between border-t border-gray-300 dark:border-gray-600 pt-2">
+              <span className="text-gray-600 dark:text-gray-400">Est. {tradeType === 'BUY' ? 'Cost' : 'Proceeds'}</span>
+              <span className="text-gray-900 dark:text-white font-bold">{preview && formatCurrency(preview.cost)}</span>
             </div>
           </div>
           <p className="text-xs text-gray-500">

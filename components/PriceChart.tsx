@@ -39,8 +39,8 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
     const tooltipLabel = payload[0]?.payload?.timeLabel ?? String(label ?? '')
 
     return (
-      <div className="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm shadow-xl">
-        <p className="text-gray-400 mb-1">{tooltipLabel}</p>
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-sm shadow-xl">
+        <p className="text-gray-600 dark:text-gray-400 mb-1">{tooltipLabel}</p>
         {payload.map((p) => (
           <p key={p.name} style={{ color: p.color }} className="font-semibold">
             {p.name}: {(p.value * 100).toFixed(1)}%

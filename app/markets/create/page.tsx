@@ -85,7 +85,7 @@ export default function CreateMarketPage() {
   if (!user) {
     return (
       <div className="text-center py-16">
-        <p className="text-gray-400 mb-4">Please log in to create a market.</p>
+        <p className="text-gray-600 dark:text-gray-400 mb-4">Please log in to create a market.</p>
         <a href="/auth/login" className="text-indigo-400 hover:underline">Log in →</a>
       </div>
     )
@@ -94,35 +94,35 @@ export default function CreateMarketPage() {
   return (
     <div className="max-w-2xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white">Create Prediction Market</h1>
-        <p className="text-gray-400 mt-1">Create a market for others to trade on.</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Create Prediction Market</h1>
+        <p className="text-gray-600 dark:text-gray-400 mt-1">Create a market for others to trade on.</p>
       </div>
 
       {/* Risk Warning */}
-      <div className="bg-yellow-900/20 border border-yellow-700/30 rounded-xl p-4 mb-6 text-sm text-yellow-200">
+      <div className="bg-yellow-100 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700/30 rounded-xl p-4 mb-6 text-sm text-yellow-900 dark:text-yellow-200">
         ⚠️ <strong>Risk Warning:</strong> Prediction markets involve financial risk. Only use funds you can afford to lose.
         Your initial liquidity of <strong>${form.initialLiquidity}</strong> will be locked until market resolution.
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-5">
+      <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6 space-y-5">
         {/* Title */}
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Market Question <span className="text-red-400">*</span>
           </label>
           <input
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
             placeholder="Will Bitcoin exceed $100,000 by Dec 31, 2026?"
-            className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
           {errors.title && <p className="text-red-400 text-xs mt-1">{errors.title}</p>}
-          <p className="text-gray-500 text-xs mt-1">{form.title.length}/200 characters</p>
+          <p className="text-gray-500 dark:text-gray-500 text-xs mt-1">{form.title.length}/200 characters</p>
         </div>
 
         {/* Description */}
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Description <span className="text-red-400">*</span>
           </label>
           <textarea
@@ -130,7 +130,7 @@ export default function CreateMarketPage() {
             onChange={(e) => setForm({ ...form, description: e.target.value })}
             placeholder="Describe the market, resolution criteria, and any relevant context..."
             rows={4}
-            className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
           />
           {errors.description && <p className="text-red-400 text-xs mt-1">{errors.description}</p>}
         </div>
@@ -138,17 +138,17 @@ export default function CreateMarketPage() {
         {/* Category & End Date */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Category</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
             <select
               value={form.category}
               onChange={(e) => setForm({ ...form, category: e.target.value })}
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
               {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               End Date <span className="text-red-400">*</span>
             </label>
             <input
@@ -156,7 +156,7 @@ export default function CreateMarketPage() {
               value={form.endDate}
               onChange={(e) => setForm({ ...form, endDate: e.target.value })}
               min={getLocalDateTimeString(new Date())}
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
             {errors.endDate && <p className="text-red-400 text-xs mt-1">{errors.endDate}</p>}
           </div>
@@ -164,7 +164,7 @@ export default function CreateMarketPage() {
 
         {/* Resolution Source */}
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Resolution Source URL <span className="text-red-400">*</span>
           </label>
           <input
@@ -172,15 +172,15 @@ export default function CreateMarketPage() {
             value={form.resolutionSource}
             onChange={(e) => setForm({ ...form, resolutionSource: e.target.value })}
             placeholder="https://example.com/news/article"
-            className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
           {errors.resolutionSource && <p className="text-red-400 text-xs mt-1">{errors.resolutionSource}</p>}
-          <p className="text-gray-500 text-xs mt-1">Where will the outcome be determined?</p>
+          <p className="text-gray-500 dark:text-gray-500 text-xs mt-1">Where will the outcome be determined?</p>
         </div>
 
         {/* Initial Liquidity */}
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Initial Liquidity ($) <span className="text-red-400">*</span>
           </label>
           <input
@@ -189,17 +189,17 @@ export default function CreateMarketPage() {
             max="10000"
             value={form.initialLiquidity}
             onChange={(e) => setForm({ ...form, initialLiquidity: Number(e.target.value) })}
-            className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
           {errors.initialLiquidity && <p className="text-red-400 text-xs mt-1">{errors.initialLiquidity}</p>}
-          <p className="text-gray-500 text-xs mt-1">
+          <p className="text-gray-500 dark:text-gray-500 text-xs mt-1">
             Your balance: ${user.balance.toFixed(2)} | Higher liquidity = less price impact per trade
           </p>
         </div>
 
         {/* Dispute Window */}
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Dispute Window (hours) <span className="text-red-400">*</span>
           </label>
           <input
@@ -208,10 +208,10 @@ export default function CreateMarketPage() {
             max="720"
             value={form.disputeWindowHours}
             onChange={(e) => setForm({ ...form, disputeWindowHours: Number(e.target.value) })}
-            className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
           {errors.disputeWindowHours && <p className="text-red-400 text-xs mt-1">{errors.disputeWindowHours}</p>}
-          <p className="text-gray-500 text-xs mt-1">
+          <p className="text-gray-500 dark:text-gray-500 text-xs mt-1">
             Time window for disputing resolution (1-720 hours, default: 24). Users can file disputes within this period after resolution.
           </p>
         </div>

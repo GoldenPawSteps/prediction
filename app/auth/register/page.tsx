@@ -37,11 +37,11 @@ export default function RegisterPage() {
         <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-4">
           <span className="text-white font-bold text-lg">P</span>
         </div>
-        <h1 className="text-2xl font-bold text-white">Create an account</h1>
-        <p className="text-gray-400 mt-1">Start trading on Predictify today</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Create an account</h1>
+        <p className="text-gray-600 dark:text-gray-400 mt-1">Start trading on Predictify today</p>
       </div>
 
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
             id="email"
@@ -77,11 +77,11 @@ export default function RegisterPage() {
           </Button>
         </form>
 
-        <p className="mt-4 text-center text-sm text-gray-500">
+        <p className="mt-4 text-center text-sm text-gray-600 dark:text-gray-500">
           You&apos;ll start with <span className="text-green-400 font-semibold">$1,000</span> in play money!
         </p>
 
-        <div className="mt-4 text-center text-sm text-gray-500">
+        <div className="mt-4 text-center text-sm text-gray-600 dark:text-gray-500">
           Already have an account?{' '}
           <Link href="/auth/login" className="text-indigo-400 hover:underline">
             Sign in

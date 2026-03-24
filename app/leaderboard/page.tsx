@@ -35,10 +35,10 @@ export default function LeaderboardPage() {
     <div className="max-w-3xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Leaderboard</h1>
-          <p className="text-gray-400 mt-1">Top traders on Predictify</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Leaderboard</h1>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">Top traders on Predictify</p>
         </div>
-        <div className="flex gap-1 bg-gray-800 rounded-lg p-1">
+        <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
           {SORT_OPTIONS.map((opt) => (
             <button
               key={opt.value}
@@ -47,7 +47,7 @@ export default function LeaderboardPage() {
                 setSortBy(opt.value)
               }}
               className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-                sortBy === opt.value ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'
+                sortBy === opt.value ? 'bg-indigo-600 text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
               }`}
             >
               {opt.label}
@@ -58,10 +58,10 @@ export default function LeaderboardPage() {
 
       {loading ? (
         <div className="space-y-3">
-          {[1,2,3,4,5].map(i => <div key={i} className="h-16 bg-gray-800 rounded-xl animate-pulse" />)}
+          {[1,2,3,4,5].map(i => <div key={i} className="h-16 bg-gray-200 dark:bg-gray-800 rounded-xl animate-pulse" />)}
         </div>
       ) : entries.length === 0 ? (
-        <div className="text-center py-16 text-gray-500">
+        <div className="text-center py-16 text-gray-500 dark:text-gray-500">
           <div className="text-4xl mb-3">🏆</div>
           <p>No traders yet. Be the first!</p>
         </div>
@@ -74,13 +74,13 @@ export default function LeaderboardPage() {
                 index === 0 ? 'bg-yellow-900/20 border-yellow-700/30' :
                 index === 1 ? 'bg-gray-400/10 border-gray-600/30' :
                 index === 2 ? 'bg-orange-900/15 border-orange-700/20' :
-                'bg-gray-800/50 border-gray-700/50'
+                'bg-gray-100 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700/50'
               }`}
             >
               {/* Rank */}
               <div className="w-8 text-center font-bold">
                 {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : (
-                  <span className="text-gray-400 text-sm">#{index + 1}</span>
+                  <span className="text-gray-600 dark:text-gray-400 text-sm">#{index + 1}</span>
                 )}
               </div>
 
@@ -91,8 +91,8 @@ export default function LeaderboardPage() {
 
               {/* Name */}
               <div className="flex-1 min-w-0">
-                <p className="text-white font-medium">@{entry.username}</p>
-                <p className="text-gray-500 text-xs">{entry.totalTrades} trades</p>
+                <p className="text-gray-900 dark:text-white font-medium">@{entry.username}</p>
+                <p className="text-gray-500 dark:text-gray-500 text-xs">{entry.totalTrades} trades</p>
               </div>
 
               {/* Stats */}

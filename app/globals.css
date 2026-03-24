@@ -9,17 +9,34 @@
 
 @layer base {
   :root {
+    color-scheme: light;
+    --app-bg: #f8fafc;
+    --app-text: #0f172a;
+    --scroll-thumb: #94a3b8;
+    --toast-bg: #ffffff;
+    --toast-fg: #0f172a;
+    --toast-border: #e2e8f0;
+  }
+
+  .dark {
     color-scheme: dark;
+    --app-bg: var(--color-gray-950);
+    --app-text: rgb(243 244 246);
+    --scroll-thumb: #374151;
+    --toast-bg: #1f2937;
+    --toast-fg: #f9fafb;
+    --toast-border: #374151;
   }
 
   body {
-    background-color: var(--color-gray-950);
-    color: rgb(243 244 246);
+    background-color: var(--app-bg);
+    color: var(--app-text);
+    transition: background-color 150ms ease, color 150ms ease;
   }
 
   * {
     scrollbar-width: thin;
-    scrollbar-color: #374151 transparent;
+    scrollbar-color: var(--scroll-thumb) transparent;
   }
 
   *::-webkit-scrollbar {
@@ -31,7 +48,90 @@
   }
 
   *::-webkit-scrollbar-thumb {
-    background-color: #374151;
+    background-color: var(--scroll-thumb);
     border-radius: 3px;
+  }
+}
+
+@layer utilities {
+  :root:not(.dark) .bg-gray-900 {
+    background-color: rgb(255 255 255);
+  }
+
+  :root:not(.dark) .bg-gray-900\/95 {
+    background-color: rgb(255 255 255 / 0.95);
+  }
+
+  :root:not(.dark) .bg-gray-900\/60 {
+    background-color: rgb(248 250 252 / 0.95);
+  }
+
+  :root:not(.dark) .bg-gray-800 {
+    background-color: rgb(241 245 249);
+  }
+
+  :root:not(.dark) .bg-gray-800\/70,
+  :root:not(.dark) .bg-gray-800\/50 {
+    background-color: rgb(241 245 249 / 0.8);
+  }
+
+  :root:not(.dark) .bg-gray-700,
+  :root:not(.dark) .bg-gray-700\/50,
+  :root:not(.dark) .bg-gray-700\/40 {
+    background-color: rgb(226 232 240);
+  }
+
+  :root:not(.dark) .text-white {
+    color: rgb(15 23 42);
+  }
+
+  :root:not(.dark) .bg-indigo-600.text-white,
+  :root:not(.dark) .bg-indigo-500.text-white,
+  :root:not(.dark) .bg-green-600.text-white,
+  :root:not(.dark) .bg-red-600.text-white,
+  :root:not(.dark) .bg-red-500.text-white,
+  :root:not(.dark) .bg-indigo-600 .text-white,
+  :root:not(.dark) .bg-indigo-500 .text-white,
+  :root:not(.dark) .bg-green-600 .text-white,
+  :root:not(.dark) .bg-red-600 .text-white,
+  :root:not(.dark) .bg-red-500 .text-white {
+    color: rgb(255 255 255);
+  }
+
+  :root:not(.dark) .text-gray-400 {
+    color: rgb(71 85 105);
+  }
+
+  :root:not(.dark) .text-gray-300 {
+    color: rgb(51 65 85);
+  }
+
+  :root:not(.dark) .text-gray-500 {
+    color: rgb(100 116 139);
+  }
+
+  :root:not(.dark) .border-gray-800 {
+    border-color: rgb(226 232 240);
+  }
+
+  :root:not(.dark) .border-gray-700,
+  :root:not(.dark) .border-gray-700\/60,
+  :root:not(.dark) .border-gray-700\/50,
+  :root:not(.dark) .border-gray-600,
+  :root:not(.dark) .border-gray-600\/40 {
+    border-color: rgb(203 213 225);
+  }
+
+  :root:not(.dark) .hover\:bg-gray-800:hover {
+    background-color: rgb(226 232 240);
+  }
+
+  :root:not(.dark) .hover\:bg-gray-700:hover,
+  :root:not(.dark) .hover\:bg-gray-600:hover {
+    background-color: rgb(203 213 225);
+  }
+
+  :root:not(.dark) .hover\:text-white:hover {
+    color: rgb(15 23 42);
   }
 }

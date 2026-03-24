@@ -217,11 +217,11 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
   if (loading) {
     return (
       <div className="animate-pulse space-y-4">
-        <div className="h-8 bg-gray-800 rounded w-3/4" />
-        <div className="h-4 bg-gray-800 rounded w-1/2" />
+        <div className="h-8 bg-gray-200 dark:bg-gray-800 rounded w-3/4" />
+        <div className="h-4 bg-gray-200 dark:bg-gray-800 rounded w-1/2" />
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-          <div className="lg:col-span-2 h-96 bg-gray-800 rounded-xl" />
-          <div className="h-64 bg-gray-800 rounded-xl" />
+          <div className="lg:col-span-2 h-96 bg-gray-200 dark:bg-gray-800 rounded-xl" />
+          <div className="h-64 bg-gray-200 dark:bg-gray-800 rounded-xl" />
         </div>
       </div>
     )
@@ -316,12 +316,12 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
             </Badge>
           )}
           {market.tags.map((tag) => (
-            <span key={tag} className="text-xs bg-gray-800 text-gray-400 px-2 py-0.5 rounded">#{tag}</span>
+            <span key={tag} className="text-xs bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-2 py-0.5 rounded">#{tag}</span>
           ))}
         </div>
-        <h1 className="text-2xl font-bold text-white">{market.title}</h1>
-        <div className="flex flex-wrap gap-4 mt-2 text-sm text-gray-500">
-          <span>By <span className="text-gray-400">@{market.creator.username}</span></span>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{market.title}</h1>
+        <div className="flex flex-wrap gap-4 mt-2 text-sm text-gray-500 dark:text-gray-500">
+          <span>By <span className="text-gray-600 dark:text-gray-400">@{market.creator.username}</span></span>
           <span>Ends {isExpired ? 'ended' : ''} {formatDateTime(market.endDate)}</span>
           <span>{market._count.trades} trades</span>
           <span>Vol: {formatCurrency(market.totalVolume)}</span>
@@ -333,9 +333,9 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
         {/* Left Column */}
         <div className="lg:col-span-2 space-y-6">
           {/* Probability Card */}
-          <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-4">
+          <div className="bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-semibold text-white">Current Probability</h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Current Probability</h2>
             </div>
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div className="bg-green-900/30 border border-green-700/30 rounded-lg p-3 text-center">
@@ -347,7 +347,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                 <div className="text-sm text-red-600 mt-1">NO</div>
               </div>
             </div>
-            <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+            <div className="h-2 bg-gray-300 dark:bg-gray-700 rounded-full overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full transition-all duration-500"
                 style={{ width: `${market.probabilities.yes * 100}%` }}
@@ -356,8 +356,8 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
           </div>
 
           {/* Price Chart */}
-          <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-4">
-            <h2 className="text-base font-semibold text-white mb-3">Price History</h2>
+          <div className="bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4">
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-3">Price History</h2>
             <PriceChart data={market.priceHistory} />
           </div>
 
@@ -367,12 +367,12 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
           )}
 
           {/* Description */}
-          <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-4">
-            <h2 className="text-base font-semibold text-white mb-2">About this Market</h2>
-            <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap">{market.description}</p>
+          <div className="bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4">
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-2">About this Market</h2>
+            <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed whitespace-pre-wrap">{market.description}</p>
             {market.resolutionSource && (
-              <div className="mt-3 pt-3 border-t border-gray-700">
-                <span className="text-xs text-gray-500">Resolution source: </span>
+              <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                <span className="text-xs text-gray-500 dark:text-gray-500">Resolution source: </span>
                 <a href={market.resolutionSource} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-400 hover:underline break-all">
                   {market.resolutionSource}
                 </a>
@@ -382,16 +382,16 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
 
           {/* Resolution Center */}
           {(votingOpen || market.status === 'RESOLVED' || market.status === 'DISPUTED') && (
-            <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-4 space-y-4">
+            <div className="bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4 space-y-4">
               <div>
-                <h2 className="text-base font-semibold text-white">Resolution Center</h2>
+                <h2 className="text-base font-semibold text-gray-900 dark:text-white">Resolution Center</h2>
                 {votingOpen && (
-                  <p className="text-sm text-gray-400 mt-1">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                     Trading is closed. Community voting is now open to resolve this market.
                   </p>
                 )}
                 {market.status === 'RESOLVED' && disputeWindowOpen && disputeWindowEndsAt && (
-                  <p className="text-sm text-gray-400 mt-1">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                     Resolved as {market.resolution}. Disputes remain open until {formatDateTime(disputeWindowEndsAt.toISOString())}.
                   </p>
                 )}
@@ -406,22 +406,22 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
               <div className="grid grid-cols-3 gap-2 text-sm">
                 <div className="rounded-lg bg-green-900/20 border border-green-700/30 p-3 text-center">
                   <div className="text-green-400 font-semibold">YES</div>
-                  <div className="text-white text-lg font-bold">{voteCounts.YES}</div>
+                  <div className="text-gray-900 dark:text-white text-lg font-bold">{voteCounts.YES}</div>
                 </div>
                 <div className="rounded-lg bg-red-900/20 border border-red-700/30 p-3 text-center">
                   <div className="text-red-400 font-semibold">NO</div>
-                  <div className="text-white text-lg font-bold">{voteCounts.NO}</div>
+                  <div className="text-gray-900 dark:text-white text-lg font-bold">{voteCounts.NO}</div>
                 </div>
-                <div className="rounded-lg bg-gray-700/40 border border-gray-600/40 p-3 text-center">
-                  <div className="text-gray-300 font-semibold">INVALID</div>
-                  <div className="text-white text-lg font-bold">{voteCounts.INVALID}</div>
+                <div className="rounded-lg bg-gray-200 dark:bg-gray-700/40 border border-gray-300 dark:border-gray-600/40 p-3 text-center">
+                  <div className="text-gray-700 dark:text-gray-300 font-semibold">INVALID</div>
+                  <div className="text-gray-900 dark:text-white text-lg font-bold">{voteCounts.INVALID}</div>
                 </div>
               </div>
 
-              <div className="rounded-lg bg-gray-900/60 border border-gray-700/60 p-3 space-y-2">
+              <div className="rounded-lg bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700/60 p-3 space-y-2">
                 <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-gray-400">Leading outcome</span>
-                  <span className="text-white font-medium">
+                  <span className="text-gray-600 dark:text-gray-400">Leading outcome</span>
+                  <span className="text-gray-900 dark:text-white font-medium">
                     {invalidMajorityReached
                       ? `INVALID has qualified majority (${voteCounts.INVALID}/${totalVoteCount})`
                       : leadingOutcome
@@ -434,7 +434,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                 {totalVoteCount > 0 && (
                   <>
                     {/* Stacked progress bar: YES | NO | INVALID */}
-                    <div className="h-3 bg-gray-700 rounded-full overflow-hidden flex">
+                    <div className="h-3 bg-gray-300 dark:bg-gray-700 rounded-full overflow-hidden flex">
                       <div className="h-full bg-green-500 transition-all duration-500" style={{ width: `${totalVoteCount > 0 ? (voteCounts.YES / totalVoteCount) * 100 : 0}%` }} />
                       <div className="h-full bg-red-500 transition-all duration-500" style={{ width: `${totalVoteCount > 0 ? (voteCounts.NO / totalVoteCount) * 100 : 0}%` }} />
                       <div className="h-full bg-gray-400 transition-all duration-500" style={{ width: `${invalidProgressPercent}%` }} />
@@ -447,7 +447,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                         title={`Qualified majority threshold (${qualifiedMajorityPercentLabel}%)`}
                       />
                     </div>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-gray-500 dark:text-gray-500">
                       {immediateResolutionRound
                         ? 'The first vote resolves this market.'
                         : !quorumReached
@@ -460,12 +460,12 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                     </p>
                   </>
                 )}
-                <p className="text-xs text-gray-500">Total votes cast: {totalVoteCount}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-500">Total votes cast: {totalVoteCount}</p>
               </div>
 
               <div className="rounded-lg bg-indigo-950/20 border border-indigo-700/30 p-3">
                 <h3 className="text-sm font-semibold text-indigo-300">How Auto-Resolution Works</h3>
-                <p className="text-sm text-gray-400 mt-2">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
                   {immediateResolutionRound
                     ? 'During the initial resolution round, the first vote resolves the market immediately.'
                     : `This dispute round requires a minimum quorum of ${resolutionQuorum} total votes, and one outcome must exceed ${qualifiedMajorityFractionLabel} (${qualifiedMajorityPercentLabel}%) of all votes cast (YES, NO, and INVALID combined).`}
@@ -493,7 +493,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                     </Button>
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-400">Log in to vote on the outcome once a market has ended.</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Log in to vote on the outcome once a market has ended.</p>
                 )
               )}
 
@@ -501,7 +501,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                 <div className="border-t border-yellow-700/40 pt-4 space-y-3">
                   <div className="rounded-lg bg-yellow-900/20 border border-yellow-700/40 p-3">
                     <h3 className="text-sm font-semibold text-yellow-300 mb-1">Admin Override</h3>
-                    <p className="text-xs text-gray-400 mb-3">
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
                       Force-resolve this disputed market with a specific outcome, bypassing community voting.
                     </p>
                     <div className="flex flex-wrap gap-2">
@@ -521,13 +521,13 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
 
               {market.status === 'RESOLVED' && disputeWindowOpen && (
                 user ? (
-                  <div className="space-y-3 border-t border-gray-700 pt-4">
+                  <div className="space-y-3 border-t border-gray-200 dark:border-gray-700 pt-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-1">Dispute Proposed Outcome</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Dispute Proposed Outcome</label>
                       <select
                         value={disputeOutcome}
                         onChange={(e) => setDisputeOutcome(e.target.value as 'YES' | 'NO' | 'INVALID')}
-                        className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       >
                         <option value="YES">YES</option>
                         <option value="NO">NO</option>
@@ -535,15 +535,15 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-1">Dispute Reason</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Dispute Reason</label>
                       <textarea
                         value={disputeReason}
                         onChange={(e) => setDisputeReason(e.target.value)}
                         rows={4}
                         placeholder="Explain why the current resolution is incorrect and provide supporting context..."
-                        className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
                       />
-                      <p className="text-xs text-gray-500 mt-1">Minimum 20 characters. Be specific about the evidence or criteria.</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Minimum 20 characters. Be specific about the evidence or criteria.</p>
                       <div className="mt-2 rounded-md bg-yellow-950/30 border border-yellow-700/30 p-3 space-y-1">
                         <p className="text-xs text-yellow-100">
                           {currentDisputeRoundLabel}
@@ -566,30 +566,30 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                     </Button>
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-400 border-t border-gray-700 pt-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 pt-4">
                     Log in to file a dispute while the dispute window is open.
                   </p>
                 )
               )}
 
               {market.disputes.length > 0 && (
-                <div className="border-t border-gray-700 pt-4 space-y-2">
-                  <h3 className="text-sm font-semibold text-white">Recent Disputes</h3>
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-2">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Recent Disputes</h3>
                   {market.disputes.map((dispute) => (
-                    <div key={dispute.id} className="rounded-lg bg-gray-900/60 border border-gray-700/60 p-3 text-sm">
+                    <div key={dispute.id} className="rounded-lg bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700/60 p-3 text-sm">
                       <div className="flex items-center justify-between gap-3">
-                        <span className="text-gray-300">Proposed: <span className="font-semibold text-white">{dispute.proposedOutcome}</span></span>
-                        <span className="text-xs text-gray-500">{timeUntil(dispute.createdAt)}</span>
+                        <span className="text-gray-700 dark:text-gray-300">Proposed: <span className="font-semibold text-gray-900 dark:text-white">{dispute.proposedOutcome}</span></span>
+                        <span className="text-xs text-gray-500 dark:text-gray-500">{timeUntil(dispute.createdAt)}</span>
                       </div>
-                      <p className="text-gray-400 mt-2">{dispute.reason}</p>
+                      <p className="text-gray-600 dark:text-gray-400 mt-2">{dispute.reason}</p>
                     </div>
                   ))}
                 </div>
               )}
 
               {resolutionActivity.length > 0 && (
-                <div className="border-t border-gray-700 pt-4 space-y-3">
-                  <h3 className="text-sm font-semibold text-white">Resolution Activity</h3>
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-3">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Resolution Activity</h3>
                   <div className="space-y-3">
                     {resolutionActivity.map((item) => (
                       <div key={item.id} className="flex gap-3">
@@ -607,17 +607,17 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                                 : 'bg-gray-400'
                             }`}
                           />
-                          <div className="mt-1 h-full w-px bg-gray-700 last:hidden" />
+                          <div className="mt-1 h-full w-px bg-gray-300 dark:bg-gray-700 last:hidden" />
                         </div>
-                        <div className="flex-1 rounded-lg bg-gray-900/60 border border-gray-700/60 p-3">
+                        <div className="flex-1 rounded-lg bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700/60 p-3">
                           <div className="flex items-start justify-between gap-3">
-                            <p className="text-sm font-medium text-white">{item.title}</p>
-                            <div className="text-right text-xs text-gray-500 shrink-0">
+                            <p className="text-sm font-medium text-gray-900 dark:text-white">{item.title}</p>
+                            <div className="text-right text-xs text-gray-500 dark:text-gray-500 shrink-0">
                               <div>{timeUntil(item.createdAt)}</div>
                               <div>{formatDateTime(item.createdAt)}</div>
                             </div>
                           </div>
-                          <p className="text-sm text-gray-400 mt-1">{item.description}</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{item.description}</p>
                         </div>
                       </div>
                     ))}
@@ -628,8 +628,8 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
           )}
 
           {/* Comments */}
-          <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-4">
-            <h2 className="text-base font-semibold text-white mb-4">
+          <div className="bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4">
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-4">
               Discussion ({market.comments.length})
             </h2>
 
@@ -640,14 +640,14 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                   onChange={(e) => setComment(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleComment() }}
                   placeholder="Share your thoughts..."
-                  className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="flex-1 px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
                 <Button size="sm" onClick={handleComment} loading={submittingComment}>Post</Button>
               </div>
             )}
 
             {market.comments.length === 0 ? (
-              <p className="text-gray-500 text-sm text-center py-4">No comments yet. Be the first!</p>
+              <p className="text-gray-500 dark:text-gray-500 text-sm text-center py-4">No comments yet. Be the first!</p>
             ) : (
               <div className="space-y-3">
                 {market.comments.map((c) => (
@@ -657,10 +657,10 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                     </div>
                     <div>
                       <div className="flex items-baseline gap-2">
-                        <span className="text-sm font-medium text-white">@{c.user.username}</span>
-                        <span className="text-xs text-gray-500">{timeUntil(c.createdAt)}</span>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">@{c.user.username}</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-500">{timeUntil(c.createdAt)}</span>
                       </div>
-                      <p className="text-sm text-gray-300 mt-0.5">{c.content}</p>
+                      <p className="text-sm text-gray-700 dark:text-gray-300 mt-0.5">{c.content}</p>
                     </div>
                   </div>
                 ))}
@@ -674,31 +674,31 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
           <TradePanel market={market} onTradeComplete={fetchMarket} />
 
           {/* Market Stats */}
-          <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-4 text-sm space-y-3">
-            <h3 className="font-semibold text-white">Market Stats</h3>
-            <div className="flex justify-between text-gray-400">
+          <div className="bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4 text-sm space-y-3">
+            <h3 className="font-semibold text-gray-900 dark:text-white">Market Stats</h3>
+            <div className="flex justify-between text-gray-600 dark:text-gray-400">
               <span>Total Volume</span>
-              <span className="text-white">{formatCurrency(market.totalVolume)}</span>
+              <span className="text-gray-900 dark:text-white">{formatCurrency(market.totalVolume)}</span>
             </div>
-            <div className="flex justify-between text-gray-400 pl-3 border-l border-gray-700">
+            <div className="flex justify-between text-gray-600 dark:text-gray-400 pl-3 border-l border-gray-300 dark:border-gray-700">
               <span>AMM Volume</span>
-              <span className="text-white">{formatCurrency(market.ammVolume)}</span>
+              <span className="text-gray-900 dark:text-white">{formatCurrency(market.ammVolume)}</span>
             </div>
-            <div className="flex justify-between text-gray-400 pl-3 border-l border-gray-700">
+            <div className="flex justify-between text-gray-600 dark:text-gray-400 pl-3 border-l border-gray-300 dark:border-gray-700">
               <span>Exchange Vol</span>
-              <span className="text-white">{formatCurrency(market.exchangeVolume)}</span>
+              <span className="text-gray-900 dark:text-white">{formatCurrency(market.exchangeVolume)}</span>
             </div>
-            <div className="flex justify-between text-gray-400">
+            <div className="flex justify-between text-gray-600 dark:text-gray-400">
               <span>Total Trades</span>
-              <span className="text-white">{market._count.trades}</span>
+              <span className="text-gray-900 dark:text-white">{market._count.trades}</span>
             </div>
-            <div className="flex justify-between text-gray-400">
+            <div className="flex justify-between text-gray-600 dark:text-gray-400">
               <span>End Date</span>
-              <span className="text-white">{formatDateTime(market.endDate)}</span>
+              <span className="text-gray-900 dark:text-white">{formatDateTime(market.endDate)}</span>
             </div>
-            <div className="flex justify-between text-gray-400">
+            <div className="flex justify-between text-gray-600 dark:text-gray-400">
               <span>Status</span>
-              <span className="text-white">{market.status}</span>
+              <span className="text-gray-900 dark:text-white">{market.status}</span>
             </div>
           </div>
         </div>
@@ -742,20 +742,20 @@ function ExchangeHistoryPanel({ orderFills, userOrders }: { orderFills: Fill[]; 
   const [tab, setTab] = useState<'fills' | 'orders'>('fills')
 
   return (
-    <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-4">
+    <div className="bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-base font-semibold text-white">Exchange History</h2>
-        <div className="inline-flex rounded-lg border border-gray-700 overflow-hidden text-xs">
+        <h2 className="text-base font-semibold text-gray-900 dark:text-white">Exchange History</h2>
+        <div className="inline-flex rounded-lg border border-gray-300 dark:border-gray-700 overflow-hidden text-xs">
           <button
             onClick={() => setTab('fills')}
-            className={`px-3 py-1.5 font-medium ${tab === 'fills' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`}
+            className={`px-3 py-1.5 font-medium ${tab === 'fills' ? 'bg-indigo-600 text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
           >
             Recent Fills
           </button>
           {userOrders.length > 0 && (
             <button
               onClick={() => setTab('orders')}
-              className={`px-3 py-1.5 font-medium ${tab === 'orders' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`}
+              className={`px-3 py-1.5 font-medium ${tab === 'orders' ? 'bg-indigo-600 text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
             >
               My Orders
             </button>
@@ -765,12 +765,12 @@ function ExchangeHistoryPanel({ orderFills, userOrders }: { orderFills: Fill[]; 
 
       {tab === 'fills' && (
         orderFills.length === 0 ? (
-          <p className="text-sm text-gray-500 text-center py-4">No exchange fills yet</p>
+          <p className="text-sm text-gray-500 dark:text-gray-500 text-center py-4">No exchange fills yet</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-gray-500 border-b border-gray-700">
+                <tr className="text-gray-500 dark:text-gray-500 border-b border-gray-300 dark:border-gray-700">
                   <th className="pb-2 text-left font-medium">Time</th>
                   <th className="pb-2 text-left font-medium">Outcome</th>
                   <th className="pb-2 text-right font-medium">Price</th>
@@ -780,10 +780,10 @@ function ExchangeHistoryPanel({ orderFills, userOrders }: { orderFills: Fill[]; 
                   <th className="pb-2 text-left font-medium">Taker</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-700/50">
+              <tbody className="divide-y divide-gray-300 dark:divide-gray-700/50">
                 {orderFills.map((fill) => (
-                  <tr key={fill.id} className="text-gray-300 hover:bg-gray-700/20 transition-colors">
-                    <td className="py-1.5 text-gray-500">{timeUntil(fill.createdAt)}</td>
+                  <tr key={fill.id} className="text-gray-700 dark:text-gray-300 hover:bg-gray-200/70 dark:hover:bg-gray-700/20 transition-colors">
+                    <td className="py-1.5 text-gray-500 dark:text-gray-500">{timeUntil(fill.createdAt)}</td>
                     <td className="py-1.5">
                       <span className={`font-medium ${fill.outcome === 'YES' ? 'text-green-400' : 'text-red-400'}`}>
                         {fill.outcome}
@@ -791,9 +791,9 @@ function ExchangeHistoryPanel({ orderFills, userOrders }: { orderFills: Fill[]; 
                     </td>
                     <td className="py-1.5 text-right font-mono">{formatPercent(fill.price)}</td>
                     <td className="py-1.5 text-right font-mono">{fill.shares.toFixed(2)}</td>
-                    <td className="py-1.5 text-right font-mono text-gray-400">{formatCurrency(fill.price * fill.shares)}</td>
-                    <td className="py-1.5 pl-4 text-gray-400">@{fill.makerUser.username}</td>
-                    <td className="py-1.5 text-gray-400">@{fill.takerUser.username}</td>
+                    <td className="py-1.5 text-right font-mono text-gray-600 dark:text-gray-400">{formatCurrency(fill.price * fill.shares)}</td>
+                    <td className="py-1.5 pl-4 text-gray-600 dark:text-gray-400">@{fill.makerUser.username}</td>
+                    <td className="py-1.5 text-gray-600 dark:text-gray-400">@{fill.takerUser.username}</td>
                   </tr>
                 ))}
               </tbody>
@@ -808,7 +808,7 @@ function ExchangeHistoryPanel({ orderFills, userOrders }: { orderFills: Fill[]; 
             const filledShares = Math.max(0, Number(order.filledShares ?? 0))
             const fillPct = order.initialShares > 0 ? (filledShares / order.initialShares) * 100 : 0
             return (
-              <div key={order.id} className="rounded-lg border border-gray-700 bg-gray-900/40 p-3 text-xs space-y-2">
+              <div key={order.id} className="rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900/40 p-3 text-xs space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <span className={`font-semibold ${order.side === 'BID' ? 'text-green-400' : 'text-red-400'}`}>
@@ -818,23 +818,23 @@ function ExchangeHistoryPanel({ orderFills, userOrders }: { orderFills: Fill[]; 
                       {order.outcome}
                     </span>
                     {order.orderType && order.orderType !== 'GTC' && (
-                      <span className="bg-gray-700 text-gray-300 px-1 rounded text-[10px]">{order.orderType}</span>
+                      <span className="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded text-[10px]">{order.orderType}</span>
                     )}
-                    <span className="text-white font-mono">
+                    <span className="text-gray-900 dark:text-white font-mono">
                       {formatPercent(order.price)}
                     </span>
-                    <span className="text-gray-400">{order.initialShares.toFixed(2)} shares</span>
+                    <span className="text-gray-600 dark:text-gray-400">{order.initialShares.toFixed(2)} shares</span>
                   </div>
                   <span className={`font-medium ${ORDER_STATUS_COLORS[order.status]}`}>{order.status}</span>
                 </div>
 
                 {/* Fill progress bar */}
                 <div className="space-y-1">
-                  <div className="flex justify-between text-gray-500">
+                  <div className="flex justify-between text-gray-500 dark:text-gray-500">
                     <span>Filled {filledShares.toFixed(2)} / {order.initialShares.toFixed(2)}</span>
                     <span>{fillPct.toFixed(0)}%</span>
                   </div>
-                  <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                  <div className="h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all ${
                         order.status === 'FILLED' ? 'bg-green-500' : order.status === 'CANCELLED' ? 'bg-gray-500' : 'bg-indigo-500'
@@ -845,7 +845,7 @@ function ExchangeHistoryPanel({ orderFills, userOrders }: { orderFills: Fill[]; 
                 </div>
 
                 {/* Status timeline */}
-                <div className="flex flex-wrap gap-3 text-gray-500 pt-1">
+                <div className="flex flex-wrap gap-3 text-gray-500 dark:text-gray-500 pt-1">
                   <span className="flex items-center gap-1">
                     <span className="h-1.5 w-1.5 rounded-full bg-blue-400 inline-block" />
                     Placed {timeUntil(order.createdAt)}

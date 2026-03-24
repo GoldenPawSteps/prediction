@@ -11,8 +11,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
-      <body className="font-sans bg-gray-950 text-white min-h-screen">
+    <html lang="en" suppressHydrationWarning>
+      <body className="font-sans bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100 min-h-screen transition-colors">
         <AuthProvider>
           <Navbar />
           <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -22,9 +22,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             position="bottom-right"
             toastOptions={{
               style: {
-                background: '#1F2937',
-                color: '#F9FAFB',
-                border: '1px solid #374151',
+                background: 'var(--toast-bg)',
+                color: 'var(--toast-fg)',
+                border: '1px solid var(--toast-border)',
               },
             }}
           />

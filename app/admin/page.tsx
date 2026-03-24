@@ -72,19 +72,19 @@ export default function AdminPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">Admin Dashboard</h1>
-        <p className="text-gray-400 mt-1">Manage and resolve prediction markets</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Admin Dashboard</h1>
+        <p className="text-gray-600 dark:text-gray-400 mt-1">Manage and resolve prediction markets</p>
       </div>
 
       {loading ? (
-        <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-20 bg-gray-800 rounded-xl animate-pulse" />)}</div>
+        <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-20 bg-gray-200 dark:bg-gray-800 rounded-xl animate-pulse" />)}</div>
       ) : (
         <div className="space-y-3">
           {markets.map((market) => (
-            <div key={market.id} className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-4">
+            <div key={market.id} className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
-                  <Link href={`/markets/${market.id}`} className="text-white font-medium hover:text-indigo-400 line-clamp-1">
+                  <Link href={`/markets/${market.id}`} className="text-gray-900 dark:text-white font-medium hover:text-indigo-400 line-clamp-1">
                     {market.title}
                   </Link>
                   <div className="flex gap-3 mt-1 text-xs text-gray-500">

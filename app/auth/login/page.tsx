@@ -38,11 +38,11 @@ export default function LoginPage() {
         <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-4">
           <span className="text-white font-bold text-lg">P</span>
         </div>
-        <h1 className="text-2xl font-bold text-white">Welcome back</h1>
-        <p className="text-gray-400 mt-1">Sign in to your Predictify account</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Welcome back</h1>
+        <p className="text-gray-600 dark:text-gray-400 mt-1">Sign in to your Predictify account</p>
       </div>
 
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
             id="email"
@@ -67,7 +67,7 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        <div className="mt-4 text-center text-sm text-gray-500">
+        <div className="mt-4 text-center text-sm text-gray-600 dark:text-gray-500">
           Don&apos;t have an account?{' '}
           <Link href="/auth/register" className="text-indigo-400 hover:underline">
             Sign up
@@ -75,8 +75,8 @@ export default function LoginPage() {
         </div>
 
         {/* Demo credentials */}
-        <div className="mt-4 p-3 bg-gray-800 rounded-lg text-xs text-gray-500">
-          <p className="font-medium text-gray-400 mb-1">Demo Account:</p>
+        <div className="mt-4 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg text-xs text-gray-600 dark:text-gray-500">
+          <p className="font-medium text-gray-700 dark:text-gray-400 mb-1">Demo Account:</p>
           <p>Email: demo@predictify.com</p>
           <p>Password: demo1234</p>
         </div>
