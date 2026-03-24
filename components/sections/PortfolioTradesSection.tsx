@@ -1,0 +1,165 @@
+'use client'
+
+import { usePageSection } from '@/lib/client-page-section'
+import { TableSkeleton } from '@/components/SectionSkeletons'
+import { SectionErrorBoundary } from '@/components/SectionErrorBoundary'
+import { formatCurrency, formatRelativeTime, getCategoryColor } from '@/lib/utils'
+import { useT } from '@/context/I18nContext'
+import { Badge } from '@/components/ui/Badge'
+import Link from 'next/link'
+
+interface Trade {
+  id: string
+  outcome: string
+  type: string
+  shares: number
+  price: number
+  totalCost: number
+  createdAt: string
+  market: { id: string; title: string; category: string }
+}
+
+interface PortfolioTradesData {
+  trades: Trade[]
+}
+
+export function PortfolioTradesSection({ isPrefetched = false }: { isPrefetched?: boolean }) {
+  const t = useT('portfolio')
+  const tCategories = useT('categories')
+  const tAdmin = useT('admin')
+  const tTradePanel = useT('tradePanel')
+
+  const translateCategory = (category: string) => {
+    switch (category) {
+      case 'Politics': return tCategories('politics')
+      case 'Crypto': return tCategories('crypto')
+      case 'Sports': return tCategories('sports')
+      case 'Tech': return tCategories('tech')
+      case 'Entertainment': return tCategories('entertainment')
+      case 'Science': return tCategories('science')
+      case 'Finance': return tCategories('finance')
+      case 'Other': return tCategories('other')
+      default: return category
+    }
+  }
+
+  const translateOutcome = (outcome: string) => {
+    switch (outcome) {
+      case 'YES': return tAdmin('yes')
+      case 'NO': return tAdmin('no')
+      case 'INVALID': return tAdmin('invalid')
+      default: return outcome
+    }
+  }
+
+  const translateTradeType = (type: string) => {
+    switch (type) {
+      case 'BUY': return tTradePanel('buy')
+      case 'SELL': return tTradePanel('sell')
+      default: return type
+    }
+  }
+
+  // Load trades with lower refresh rate (historical data)
+  const { data, isLoading } = usePageSection<PortfolioTradesData>({
+    key: 'portfolio-trades',
+    url: '/api/portfolio',
+    revalidateInterval: 30000, // Refresh every 30 seconds
+    shouldConsume: isPrefetched,
+  })
+
+  if (isLoading) return <TableSkeleton rows={5} />
+
+  const trades = data?.trades || []
+
+  if (trades.length === 0) {
+    return (
+      <div className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-8 text-center">
+        <p className="text-gray-600 dark:text-gray-400">{t('noTrades')}</p>
+      </div>
+    )
+  }
+
+  return (
+    <SectionErrorBoundary sectionName="portfolio-trades">
+      <div className="rounded-lg border border-gray-200 dark:border-gray-800">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t('tradeHistory')}</h3>
+
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+          <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+            <tr>
+              <th className="px-6 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">
+                {t('market')}
+              </th>
+              <th className="px-6 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">
+                {t('type')}
+              </th>
+              <th className="px-6 py-3 text-right font-semibold text-gray-700 dark:text-gray-300">
+                {t('shares')}
+              </th>
+              <th className="px-6 py-3 text-right font-semibold text-gray-700 dark:text-gray-300">
+                {t('price')}
+              </th>
+              <th className="px-6 py-3 text-right font-semibold text-gray-700 dark:text-gray-300">
+                {t('total')}
+              </th>
+              <th className="px-6 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">
+                {t('date')}
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
+            {trades.map((trade) => (
+              <tr
+                key={trade.id}
+                className="hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
+              >
+                <td className="px-6 py-4">
+                  <Link
+                    href={`/markets/${trade.market.id}`}
+                    className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline truncate max-w-xs"
+                  >
+                    {trade.market.title}
+                  </Link>
+                  <br />
+                  <Badge
+                    variant="info"
+                    className={`mt-1 text-xs ${getCategoryColor(trade.market.category)}`}
+                  >
+                    {translateCategory(trade.market.category)}
+                  </Badge>
+                </td>
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-2">
+                    <Badge variant={trade.outcome === 'YES' ? 'success' : 'danger'}>
+                      {translateOutcome(trade.outcome)}
+                    </Badge>
+                    <Badge variant={trade.type === 'BUY' ? 'success' : 'danger'}>
+                      {translateTradeType(trade.type)}
+                    </Badge>
+                  </div>
+                </td>
+                <td className="px-6 py-4 text-right text-gray-900 dark:text-white font-medium">
+                  {trade.shares.toFixed(2)}
+                </td>
+                <td className="px-6 py-4 text-right text-gray-600 dark:text-gray-400">
+                  {formatCurrency(trade.price)}
+                </td>
+                <td className="px-6 py-4 text-right font-semibold text-gray-900 dark:text-white">
+                  {formatCurrency(Math.abs(trade.totalCost))}
+                </td>
+                <td className="px-6 py-4 text-left text-gray-600 dark:text-gray-400 text-xs">
+                  {formatRelativeTime(trade.createdAt)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          </table>
+        </div>
+      </div>
+    </SectionErrorBoundary>
+  )
+}

@@ -67,7 +67,10 @@ export async function GET(req: NextRequest) {
       return b.totalRealizedPnl - a.totalRealizedPnl
     })
 
-    return apiSuccess(sorted.slice(0, 100))
+    return apiSuccess({
+      entries: sorted.slice(0, 100),
+      timestamp: new Date().toISOString(),
+    })
   } catch (err) {
     console.error('Leaderboard error:', err)
     return apiError('Internal server error', 500)

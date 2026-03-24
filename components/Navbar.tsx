@@ -2,13 +2,17 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useT } from '@/context/I18nContext'
 import { Button } from '@/components/ui/Button'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { formatCurrency } from '@/lib/utils'
+import { prefetchJson } from '@/lib/client-prefetch'
+import { prefetchSection } from '@/lib/client-section-prefetch'
+import { startAdminNavMetric } from '@/lib/client-nav-metrics'
+import { beginNavFeedback, endNavFeedback } from '@/lib/client-nav-feedback'
 
 export function Navbar() {
   const pathname = usePathname()
@@ -36,6 +40,101 @@ export function Navbar() {
     ...(user?.isAdmin ? [{ href: '/admin', label: t('admin') }] : []),
   ]
 
+  const handleNavIntentPrefetch = (href: string) => {
+    router.prefetch(href)
+
+    if (href === '/leaderboard') {
+      void prefetchJson('leaderboard:profit', '/api/leaderboard?sortBy=profit')
+      void prefetchSection({
+        key: 'leaderboard-table:profit',
+        url: '/api/leaderboard?sortBy=profit',
+      })
+    }
+
+    if (href === '/portfolio' && user) {
+      void prefetchJson('portfolio:me', '/api/portfolio', { credentials: 'include' })
+      void prefetchSection({
+        key: 'portfolio-summary',
+        url: '/api/portfolio',
+        init: { credentials: 'include' },
+      })
+      void prefetchSection({
+        key: 'portfolio-positions',
+        url: '/api/portfolio',
+        init: { credentials: 'include' },
+      })
+      void prefetchSection({
+        key: 'portfolio-trades',
+        url: '/api/portfolio',
+        init: { credentials: 'include' },
+      })
+    }
+  }
+
+  const handleNavClick = (href: string) => {
+    beginNavFeedback()
+    startAdminNavMetric(href, user?.isAdmin)
+    handleNavIntentPrefetch(href)
+  }
+
+  useEffect(() => {
+    endNavFeedback()
+  }, [pathname])
+
+  useEffect(() => {
+    const idlePrefetch = () => {
+      router.prefetch('/leaderboard')
+      void prefetchJson('leaderboard:profit', '/api/leaderboard?sortBy=profit')
+      void prefetchSection({
+        key: 'leaderboard-table:profit',
+        url: '/api/leaderboard?sortBy=profit',
+      })
+
+      if (user) {
+        router.prefetch('/portfolio')
+        router.prefetch('/markets/create')
+        void prefetchJson('portfolio:me', '/api/portfolio', { credentials: 'include' })
+        void prefetchSection({
+          key: 'portfolio-summary',
+          url: '/api/portfolio',
+          init: { credentials: 'include' },
+        })
+        void prefetchSection({
+          key: 'portfolio-positions',
+          url: '/api/portfolio',
+          init: { credentials: 'include' },
+        })
+        void prefetchSection({
+          key: 'portfolio-trades',
+          url: '/api/portfolio',
+          init: { credentials: 'include' },
+        })
+      } else {
+        router.prefetch('/auth/login')
+        router.prefetch('/auth/register')
+      }
+
+      if (user?.isAdmin) {
+        router.prefetch('/admin')
+      }
+    }
+
+    if (typeof window === 'undefined') return
+
+    const win = globalThis as typeof globalThis & {
+      requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number
+      cancelIdleCallback?: (id: number) => void
+    }
+
+    if (typeof win.requestIdleCallback === 'function' && typeof win.cancelIdleCallback === 'function') {
+      const id = win.requestIdleCallback(idlePrefetch, { timeout: 1200 })
+      return () => win.cancelIdleCallback?.(id)
+    }
+
+    const timeout = globalThis.setTimeout(idlePrefetch, 500)
+    return () => globalThis.clearTimeout(timeout)
+  }, [router, user])
+
   return (
     <nav className="sticky top-0 z-40 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-b border-gray-200 dark:border-gray-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -54,6 +153,9 @@ export function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
+                onMouseEnter={() => handleNavIntentPrefetch(link.href)}
+                onFocus={() => handleNavIntentPrefetch(link.href)}
+                onClick={() => handleNavClick(link.href)}
                 className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                   pathname === link.href
                     ? 'text-gray-900 bg-gray-100 dark:text-white dark:bg-gray-800'
@@ -130,8 +232,13 @@ export function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
+                onMouseEnter={() => handleNavIntentPrefetch(link.href)}
+                onFocus={() => handleNavIntentPrefetch(link.href)}
                 className="block px-3 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md"
-                onClick={() => setMobileOpen(false)}
+                onClick={() => {
+                  handleNavClick(link.href)
+                  setMobileOpen(false)
+                }}
               >
                 {link.label}
               </Link>

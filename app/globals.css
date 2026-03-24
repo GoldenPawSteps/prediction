@@ -53,6 +53,34 @@
   }
 }
 
+@keyframes nav-progress {
+  0% {
+    transform: scaleX(0.08);
+  }
+
+  70% {
+    transform: scaleX(0.8);
+  }
+
+  100% {
+    transform: scaleX(1);
+  }
+}
+
+html[data-nav-pending='true'] body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  transform-origin: left center;
+  background: linear-gradient(90deg, #4f46e5 0%, #22d3ee 100%);
+  animation: nav-progress 600ms ease-out forwards;
+  z-index: 90;
+  pointer-events: none;
+}
+
 @layer utilities {
   :root:not(.dark) .bg-gray-900 {
     background-color: rgb(255 255 255);

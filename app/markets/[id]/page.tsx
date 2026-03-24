@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { use } from 'react'
 import { notFound, useRouter } from 'next/navigation'
 import { PriceChart } from '@/components/PriceChart'
@@ -11,6 +11,9 @@ import { useAuth } from '@/context/AuthContext'
 import { useI18n, useT } from '@/context/I18nContext'
 import { formatQualifiedMajorityLabel, getQualifiedMajorityThreshold, getResolutionQuorum, isImmediateResolutionRound } from '@/lib/resolution'
 import { formatCurrency, formatPercent, formatDateTime, getCategoryColor } from '@/lib/utils'
+import { consumePrefetchedJson } from '@/lib/client-prefetch'
+import { finishAdminNavMetric } from '@/lib/client-nav-metrics'
+import { MarketCommentsSection } from '@/components/sections/MarketCommentsSection'
 import toast from 'react-hot-toast'
 
 function formatRelativeTime(date: string | Date, locale: string): string {
@@ -104,11 +107,11 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
   const { user, refreshUser } = useAuth()
   const [market, setMarket] = useState<Market | null>(null)
   const [loading, setLoading] = useState(true)
-  const [comment, setComment] = useState('')
-  const [submittingComment, setSubmittingComment] = useState(false)
   const [resolutionActionLoading, setResolutionActionLoading] = useState(false)
   const [disputeReason, setDisputeReason] = useState('')
   const [disputeOutcome, setDisputeOutcome] = useState<'YES' | 'NO' | 'INVALID'>('YES')
+  const [commentRefreshKey, setCommentRefreshKey] = useState(0)
+  const hasLoggedNavMetricRef = useRef(false)
 
   const translateCategory = (category: string) => {
     switch (category) {
@@ -145,8 +148,17 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
   }
 
   const fetchMarket = useCallback(async () => {
+    const prefetchKey = `market:${id}`
+    const prefetched = consumePrefetchedJson<Market>(prefetchKey)
+    const hasPrefetched = Boolean(prefetched)
+
+    if (prefetched) {
+      setMarket(prefetched)
+      setLoading(false)
+    }
+
     try {
-      const res = await fetch(`/api/markets/${id}`)
+      const res = await fetch(`/api/markets/${id}`, hasPrefetched ? { cache: 'no-store' } : undefined)
       if (res.status === 404) { notFound(); return }
       if (res.ok) {
         const data = await res.json()
@@ -161,28 +173,16 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
 
   useEffect(() => { fetchMarket() }, [fetchMarket])
 
-  const handleComment = async () => {
-    if (!comment.trim()) return
-    setSubmittingComment(true)
-    try {
-      const res = await fetch(`/api/markets/${id}/comment`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: comment }),
-      })
-      if (res.ok) {
-        setComment('')
-        fetchMarket()
-        toast.success(t('commentPosted'))
-      } else {
-        const data = await res.json()
-        toast.error(data.error || t('commentPostFailed'))
-      }
-    } catch {
-      toast.error(t('networkError'))
-    } finally {
-      setSubmittingComment(false)
-    }
+  useEffect(() => {
+    if (loading || !market || hasLoggedNavMetricRef.current) return
+
+    finishAdminNavMetric(`/markets/${id}`, user?.isAdmin, 'Market detail data')
+    hasLoggedNavMetricRef.current = true
+  }, [id, loading, market, user?.isAdmin])
+
+  const handleCommentPosted = () => {
+    // Trigger comment section refresh when new comment is posted
+    setCommentRefreshKey(prev => prev + 1)
   }
 
   const handleVote = async (outcome: 'YES' | 'NO' | 'INVALID') => {
@@ -730,46 +730,13 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
             </div>
           )}
 
-          {/* Comments */}
-          <div className="bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4">
-            <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-4">
-              {t('discussion')} ({market.comments.length})
-            </h2>
-
-            {user && (
-              <div className="flex gap-2 mb-4">
-                <input
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleComment() }}
-                  placeholder={t('shareThoughts')}
-                  className="flex-1 px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-                <Button size="sm" onClick={handleComment} loading={submittingComment}>{t('post')}</Button>
-              </div>
-            )}
-
-            {market.comments.length === 0 ? (
-              <p className="text-gray-500 dark:text-gray-500 text-sm text-center py-4">{t('noCommentsYet')}</p>
-            ) : (
-              <div className="space-y-3">
-                {market.comments.map((c) => (
-                  <div key={c.id} className="flex gap-3">
-                    <div className="w-7 h-7 bg-indigo-600 rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
-                      {c.user.username[0].toUpperCase()}
-                    </div>
-                    <div>
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">@{c.user.username}</span>
-                        <span className="text-xs text-gray-500 dark:text-gray-500">{formatRelativeTime(c.createdAt, locale)}</span>
-                      </div>
-                      <p className="text-sm text-gray-700 dark:text-gray-300 mt-0.5">{c.content}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          {/* Comments Section - Progressive Loading */}
+          <MarketCommentsSection
+            key={`comments-${id}-${commentRefreshKey}`}
+            marketId={id}
+            isPrefetched={Boolean(market)}
+            onCommentPosted={handleCommentPosted}
+          />
         </div>
 
         {/* Right Column */}

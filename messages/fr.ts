@@ -219,6 +219,7 @@ export const fr: Messages = {
     createdBy: 'Par',
     currentProbability: 'Probabilité Actuelle',
     priceHistoryTitle: 'Historique des Prix',
+    exchangeHistoryTitle: 'Historique Exchange',
     aboutThisMarket: 'À propos de ce Marché',
     resolutionSourceLabel: 'Source de résolution',
     leadingOutcome: 'Résultat en tête',

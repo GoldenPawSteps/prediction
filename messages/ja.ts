@@ -219,6 +219,7 @@ export const ja: Messages = {
     createdBy: '作成者',
     currentProbability: '現在の確率',
     priceHistoryTitle: '価格履歴',
+    exchangeHistoryTitle: 'Exchange 履歴',
     aboutThisMarket: 'このマーケットについて',
     resolutionSourceLabel: '解決ソース',
     leadingOutcome: '先行している結果',

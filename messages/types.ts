@@ -217,6 +217,7 @@ export interface Messages {
     createdBy: string
     currentProbability: string
     priceHistoryTitle: string
+    exchangeHistoryTitle: string
     aboutThisMarket: string
     resolutionSourceLabel: string
     leadingOutcome: string

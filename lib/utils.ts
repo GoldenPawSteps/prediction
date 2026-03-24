@@ -37,6 +37,27 @@ export function formatDateTime(date: string | Date): string {
   return format(new Date(date), 'MMM d, yyyy HH:mm')
 }
 
+export function formatRelativeTime(date: string | Date, locale: string = 'en'): string {
+  const target = new Date(date).getTime()
+  const diffMs = target - Date.now()
+  const absMs = Math.abs(diffMs)
+
+  const minute = 60 * 1000
+  const hour = 60 * minute
+  const day = 24 * hour
+  const month = 30 * day
+  const year = 365 * day
+
+  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'always' })
+
+  if (absMs < minute) return rtf.format(Math.round(diffMs / 1000), 'second')
+  if (absMs < hour) return rtf.format(Math.round(diffMs / minute), 'minute')
+  if (absMs < day) return rtf.format(Math.round(diffMs / hour), 'hour')
+  if (absMs < month) return rtf.format(Math.round(diffMs / day), 'day')
+  if (absMs < year) return rtf.format(Math.round(diffMs / month), 'month')
+  return rtf.format(Math.round(diffMs / year), 'year')
+}
+
 export function getStatusColor(status: string): string {
   switch (status) {
     case 'OPEN': return 'text-green-400'

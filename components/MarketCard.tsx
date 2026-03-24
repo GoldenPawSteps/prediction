@@ -1,7 +1,12 @@
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { formatCurrency, formatPercent, getCategoryColor } from '@/lib/utils'
 import { Badge } from '@/components/ui/Badge'
 import { useI18n, useT } from '@/context/I18nContext'
+import { prefetchJson } from '@/lib/client-prefetch'
+import { startAdminNavMetric } from '@/lib/client-nav-metrics'
+import { beginNavFeedback } from '@/lib/client-nav-feedback'
+import { useAuth } from '@/context/AuthContext'
 
 function formatRelativeTime(date: string | Date, locale: string): string {
   const target = new Date(date).getTime()
@@ -76,18 +81,39 @@ interface MarketCardProps {
 }
 
 export function MarketCard({ market }: MarketCardProps) {
+  const router = useRouter()
+  const { user } = useAuth()
   const { locale } = useI18n()
   const tCard = useT('marketCard')
   const tCommon = useT('common')
   const tCategories = useT('categories')
   const tStatus = useT('status')
   const tAdmin = useT('admin')
+  const detailHref = `/markets/${market.id}`
+  const marketApiKey = `market:${market.id}`
   const yesProb = market.probabilities.yes
   const noProb = market.probabilities.no
   const isExpired = new Date(market.endDate) < new Date()
 
+  const handleIntentPrefetch = () => {
+    router.prefetch(detailHref)
+    void prefetchJson(marketApiKey, `/api/markets/${market.id}`)
+  }
+
+  const handleMarketClick = () => {
+    beginNavFeedback()
+    startAdminNavMetric(detailHref, user?.isAdmin)
+    handleIntentPrefetch()
+  }
+
   return (
-    <Link href={`/markets/${market.id}`}>
+    <Link
+      href={detailHref}
+      onMouseEnter={handleIntentPrefetch}
+      onFocus={handleIntentPrefetch}
+      onTouchStart={handleIntentPrefetch}
+      onClick={handleMarketClick}
+    >
       <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4 hover:border-indigo-500/50 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all duration-200 cursor-pointer group">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 mb-3">

@@ -219,6 +219,7 @@ export const zh: Messages = {
     createdBy: '创建者',
     currentProbability: '当前概率',
     priceHistoryTitle: '价格历史',
+    exchangeHistoryTitle: '交易所历史',
     aboutThisMarket: '关于此市场',
     resolutionSourceLabel: '结算来源',
     leadingOutcome: '领先结果',
