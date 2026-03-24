@@ -58,6 +58,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         data: { marketId, yesPrice: finalYesPrice, noPrice: finalNoPrice, volume: 0 },
       })
 
+      // Snapshot net trade flow before writing settlement trades so
+      // creator refunds are not inflated by synthetic settlement entries.
+      const tradeAggregateBeforeSettlement = await tx.trade.aggregate({
+        where: { marketId },
+        _sum: { totalCost: true },
+      })
+      const netTradeCostBeforeSettlement = tradeAggregateBeforeSettlement._sum.totalCost ?? 0
+
       let totalPayout = 0
 
       if (outcome !== 'INVALID') {
@@ -148,12 +156,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       })
 
       // Return unused market maker liquidity to the market creator.
-      const tradeAggregate = await tx.trade.aggregate({
-        where: { marketId },
-        _sum: { totalCost: true },
-      })
-      const netTradeCost = tradeAggregate._sum.totalCost ?? 0
-      const remainingLiquidity = market.initialLiquidity + netTradeCost - totalPayout
+      const remainingLiquidity = market.initialLiquidity + netTradeCostBeforeSettlement - totalPayout
       const refundedToCreator = Math.max(0, remainingLiquidity)
 
       if (!isReResolution && refundedToCreator > 0) {
@@ -166,7 +169,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return {
         reversedSettlementTrades,
         totalPayout,
-        netTradeCost,
+        netTradeCost: netTradeCostBeforeSettlement,
         refundedToCreator: isReResolution ? 0 : refundedToCreator,
       }
     })

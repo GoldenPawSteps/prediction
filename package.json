@@ -13,6 +13,7 @@
     "test:exchange:gtd": "node test-exchange-orders.js gtd",
     "test:exchange:fok": "node test-exchange-orders.js fok",
     "test:exchange:fak": "node test-exchange-orders.js fak",
+    "test:resolution-refund": "node test-resolution-refund.js",
     "seed": "tsx prisma/seed.ts",
     "db:migrate": "prisma migrate deploy",
     "db:generate": "prisma generate",

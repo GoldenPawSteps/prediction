@@ -68,3 +68,22 @@ export function getMarketProbabilities(yesShares: number, noShares: number, b: n
     no: lmsrNoPrice(yesShares, noShares, b),
   }
 }
+
+export function lmsrLiquidityParamForMaxLoss(maxLoss: number, priorProbability: number) {
+  const epsilon = 1e-6
+  const p = Math.min(1 - epsilon, Math.max(epsilon, priorProbability))
+  const minOutcomeProb = Math.min(p, 1 - p)
+  return maxLoss / -Math.log(minOutcomeProb)
+}
+
+export function lmsrInitialSharesForPrior(priorProbability: number, b: number) {
+  const epsilon = 1e-6
+  const p = Math.min(1 - epsilon, Math.max(epsilon, priorProbability))
+  const logOdds = b * Math.log(p / (1 - p))
+
+  if (logOdds >= 0) {
+    return { yesShares: logOdds, noShares: 0 }
+  }
+
+  return { yesShares: 0, noShares: -logOdds }
+}

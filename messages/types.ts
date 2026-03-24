@@ -130,6 +130,8 @@ export interface Messages {
     resolutionHint: string
     liquidityLabel: string
     liquidityHint: string
+    priorLabel: string
+    priorHint: string
     disputeLabel: string
     disputeHint: string
     tagsLabel: string
@@ -143,6 +145,7 @@ export interface Messages {
     validationResolutionRequired: string
     validationResolutionUrl: string
     validationLiquidityRange: string
+    validationPriorRange: string
     validationDisputeRange: string
     toastCreated: string
     toastCreateFailed: string

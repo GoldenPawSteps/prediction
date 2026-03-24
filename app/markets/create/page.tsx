@@ -43,6 +43,7 @@ export default function CreateMarketPage() {
     endDate: '',
     resolutionSource: '',
     initialLiquidity: 100,
+    priorProbability: 50,
     disputeWindowHours: 24,
     tags: '',
   })
@@ -57,6 +58,7 @@ export default function CreateMarketPage() {
     if (!form.resolutionSource) errs.resolutionSource = t('validationResolutionRequired')
     else if (!form.resolutionSource.startsWith('http')) errs.resolutionSource = t('validationResolutionUrl')
     if (form.initialLiquidity < 10 || form.initialLiquidity > 10000) errs.initialLiquidity = t('validationLiquidityRange')
+    if (form.priorProbability < 1 || form.priorProbability > 99) errs.priorProbability = t('validationPriorRange')
     if (form.disputeWindowHours < 1 || form.disputeWindowHours > 720) errs.disputeWindowHours = t('validationDisputeRange')
     setErrors(errs)
     return Object.keys(errs).length === 0
@@ -78,6 +80,7 @@ export default function CreateMarketPage() {
           endDate: new Date(form.endDate).toISOString(),
           tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
           initialLiquidity: Number(form.initialLiquidity),
+          priorProbability: Number(form.priorProbability) / 100,
         }),
       })
       const data = await res.json()
@@ -208,6 +211,24 @@ export default function CreateMarketPage() {
           <p className="text-gray-500 dark:text-gray-500 text-xs mt-1">
             {t('liquidityHint', { balance: user.balance.toFixed(2) })}
           </p>
+        </div>
+
+        {/* AMM Prior Probability */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            {t('priorLabel')} <span className="text-red-400">*</span>
+          </label>
+          <input
+            type="number"
+            min="1"
+            max="99"
+            step="0.1"
+            value={form.priorProbability}
+            onChange={(e) => setForm({ ...form, priorProbability: Number(e.target.value) })}
+            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+          {errors.priorProbability && <p className="text-red-400 text-xs mt-1">{errors.priorProbability}</p>}
+          <p className="text-gray-500 dark:text-gray-500 text-xs mt-1">{t('priorHint')}</p>
         </div>
 
         {/* Dispute Window */}

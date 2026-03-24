@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/api-helpers'
 import { apiError, apiSuccess } from '@/lib/api-helpers'
 import { getMarketProbabilities } from '@/lib/lmsr'
+import { lmsrLiquidityParamForMaxLoss } from '@/lib/lmsr'
+import { lmsrInitialSharesForPrior } from '@/lib/lmsr'
 import { closeExpiredOpenMarkets } from '@/lib/market-status'
 import { z } from 'zod'
 
@@ -18,6 +20,7 @@ const createMarketSchema = z.object({
   endDate: z.string().datetime(),
   resolutionSource: z.string().url(),
   initialLiquidity: z.number().min(10).max(10000).default(100),
+  priorProbability: z.number().min(0.01).max(0.99).default(0.5),
   disputeWindowHours: z.number().int().min(1).max(720).default(24),
   tags: z.array(z.string()).default([]),
 })
@@ -85,13 +88,27 @@ export async function POST(req: NextRequest) {
       return apiError(parsed.error.issues[0].message)
     }
 
-    const { title, description, category, endDate, resolutionSource, initialLiquidity, disputeWindowHours, tags } = parsed.data
+    const {
+      title,
+      description,
+      category,
+      endDate,
+      resolutionSource,
+      initialLiquidity,
+      priorProbability,
+      disputeWindowHours,
+      tags,
+    } = parsed.data
 
     const user = await prisma.user.findUnique({ where: { id: authUser.userId } })
     if (!user) return apiError('User not found', 404)
     if (user.balance < initialLiquidity) return apiError('Insufficient balance')
 
+    const liquidityParam = lmsrLiquidityParamForMaxLoss(initialLiquidity, priorProbability)
+
     const createMarketInTransaction = async (tx: Prisma.TransactionClient, includeDisputeWindowHours: boolean) => {
+      const { yesShares, noShares } = lmsrInitialSharesForPrior(priorProbability, liquidityParam)
+
       await tx.user.update({
         where: { id: authUser.userId },
         data: { balance: { decrement: initialLiquidity } },
@@ -104,8 +121,10 @@ export async function POST(req: NextRequest) {
         endDate: new Date(endDate),
         resolutionSource,
         initialLiquidity,
-        liquidityParam: initialLiquidity,
+        liquidityParam,
         creatorId: authUser.userId,
+        yesShares,
+        noShares,
         tags,
       }
 
@@ -116,7 +135,7 @@ export async function POST(req: NextRequest) {
       const m = await tx.market.create({ data: marketData })
 
       await tx.priceHistory.create({
-        data: { marketId: m.id, yesPrice: 0.5, noPrice: 0.5 },
+        data: { marketId: m.id, yesPrice: priorProbability, noPrice: 1 - priorProbability },
       })
 
       return m

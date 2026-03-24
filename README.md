@@ -66,3 +66,31 @@ Open [http://localhost:3000](http://localhost:3000)
 ## Documentation
 
 See [DEPLOYMENT.md](./DEPLOYMENT.md) for full deployment instructions, API reference, and architecture overview.
+
+## Create Market API
+
+`POST /api/markets`
+
+Request body example:
+
+```json
+{
+	"title": "Will BTC close above $120k by Dec 31, 2026?",
+	"description": "Resolves YES if BTC/USD spot closes above 120,000 on 2026-12-31 UTC.",
+	"category": "Crypto",
+	"endDate": "2026-12-31T23:59:00.000Z",
+	"resolutionSource": "https://www.coindesk.com/price/bitcoin/",
+	"initialLiquidity": 100,
+	"priorProbability": 0.62,
+	"disputeWindowHours": 24,
+	"tags": ["bitcoin", "crypto"]
+}
+```
+
+Notes:
+
+- `initialLiquidity` must be between `10` and `10000`.
+- `priorProbability` is optional (default `0.5`) and must be between `0.01` and `0.99`.
+- `priorProbability` sets the AMM's starting YES/NO probabilities before the first trade.
+- `initialLiquidity` is treated as the market maker's maximum loss budget.
+- The LMSR liquidity parameter is derived as `b = initialLiquidity / -log(min(priorProbability, 1 - priorProbability))`.
