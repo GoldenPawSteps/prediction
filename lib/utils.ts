@@ -47,16 +47,19 @@ export function getStatusColor(status: string): string {
   }
 }
 
+const CATEGORY_COLORS = {
+  Politics: 'bg-red-900/50 text-red-300',
+  Crypto: 'bg-orange-900/50 text-orange-300',
+  Sports: 'bg-green-900/50 text-green-300',
+  Tech: 'bg-blue-900/50 text-blue-300',
+  Entertainment: 'bg-purple-900/50 text-purple-300',
+  Science: 'bg-cyan-900/50 text-cyan-300',
+  Finance: 'bg-yellow-900/50 text-yellow-300',
+  Other: 'bg-gray-700/50 text-gray-300',
+} as const
+
 export function getCategoryColor(category: string): string {
-  const colors: Record<string, string> = {
-    Politics: 'bg-red-900/50 text-red-300',
-    Crypto: 'bg-orange-900/50 text-orange-300',
-    Sports: 'bg-green-900/50 text-green-300',
-    Tech: 'bg-blue-900/50 text-blue-300',
-    Entertainment: 'bg-purple-900/50 text-purple-300',
-    Science: 'bg-cyan-900/50 text-cyan-300',
-    Finance: 'bg-yellow-900/50 text-yellow-300',
-    Other: 'bg-gray-700/50 text-gray-300',
-  }
-  return colors[category] || colors.Other
+  return Object.prototype.hasOwnProperty.call(CATEGORY_COLORS, category)
+    ? CATEGORY_COLORS[category as keyof typeof CATEGORY_COLORS]
+    : CATEGORY_COLORS.Other
 }

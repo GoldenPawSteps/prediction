@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/Input'
 import { useT } from '@/context/I18nContext'
 import toast from 'react-hot-toast'
 
-const CATEGORIES = ['Politics', 'Crypto', 'Sports', 'Tech', 'Entertainment', 'Science', 'Finance', 'Other']
+const CATEGORIES = ['Politics', 'Crypto', 'Sports', 'Tech', 'Entertainment', 'Science', 'Finance', 'Other'] as const
 const CATEGORY_KEYS = {
   Politics: 'politics',
   Crypto: 'crypto',
