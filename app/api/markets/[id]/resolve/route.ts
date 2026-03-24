@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
-import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, apiError, apiSuccess } from '@/lib/api-helpers'
+import { settleMarketResolution } from '@/lib/market-settlement'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   // Allow anyone to resolve, no admin check needed (voting drives resolution now)
@@ -34,14 +34,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const isReResolution = market.status === 'DISPUTED'
 
     // Resolve the market and calculate payouts
-    const settlement = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      const reversedSettlementTrades = await reversePreviousSettlementIfNeeded(
-        tx,
-        marketId,
-        isReResolution,
-        market.resolutionTime
-      )
-
+    const settlement = await prisma.$transaction(async (tx) => {
       await tx.market.update({
         where: { id: marketId },
         data: {
@@ -58,120 +51,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         data: { marketId, yesPrice: finalYesPrice, noPrice: finalNoPrice, volume: 0 },
       })
 
-      // Snapshot net trade flow before writing settlement trades so
-      // creator refunds are not inflated by synthetic settlement entries.
-      const tradeAggregateBeforeSettlement = await tx.trade.aggregate({
-        where: { marketId },
-        _sum: { totalCost: true },
+      return settleMarketResolution(tx, {
+        marketId,
+        outcome,
+        creatorId: market.creatorId,
+        initialLiquidity: market.initialLiquidity,
+        isReResolution,
+        previousResolutionTime: market.resolutionTime,
       })
-      const netTradeCostBeforeSettlement = tradeAggregateBeforeSettlement._sum.totalCost ?? 0
-
-      let totalPayout = 0
-
-      if (outcome !== 'INVALID') {
-        // Pay out winning positions
-        const winningOutcome = outcome as 'YES' | 'NO'
-        const losingOutcome = outcome === 'YES' ? 'NO' : 'YES'
-
-        const winningPositions = await tx.position.findMany({
-          where: { marketId, outcome: winningOutcome, shares: { gt: 0 } },
-        })
-        for (const position of winningPositions) {
-          totalPayout += position.shares
-          await tx.user.update({
-            where: { id: position.userId },
-            data: { balance: { increment: position.shares } },
-          })
-          const pnl = position.shares - position.avgEntryPrice * position.shares
-          await tx.position.update({
-            where: { id: position.id },
-            data: { realizedPnl: { increment: pnl } },
-          })
-          // Record settlement as a SELL at resolution price (1.0 for winner)
-          await tx.trade.create({
-            data: {
-              userId: position.userId,
-              marketId,
-              outcome: position.outcome,
-              type: 'SELL',
-              shares: position.shares,
-              price: 1.0,
-              totalCost: position.shares,
-            },
-          })
-        }
-
-        // Record loss for losing positions (worth $0 at resolution)
-        const losingPositions = await tx.position.findMany({
-          where: { marketId, outcome: losingOutcome, shares: { gt: 0 } },
-        })
-        for (const position of losingPositions) {
-          const pnl = -(position.avgEntryPrice * position.shares)
-          await tx.position.update({
-            where: { id: position.id },
-            data: { realizedPnl: { increment: pnl } },
-          })
-          // Record settlement as a SELL at resolution price (0.0 for loser)
-          await tx.trade.create({
-            data: {
-              userId: position.userId,
-              marketId,
-              outcome: position.outcome,
-              type: 'SELL',
-              shares: position.shares,
-              price: 0.0,
-              totalCost: 0.0,
-            },
-          })
-        }
-      } else {
-        // INVALID: refund based on cost paid
-        const positions = await tx.position.findMany({ where: { marketId, shares: { gt: 0 } } })
-        for (const position of positions) {
-          const refund = position.avgEntryPrice * position.shares
-          totalPayout += refund
-          await tx.user.update({
-            where: { id: position.userId },
-            data: { balance: { increment: refund } },
-          })
-          // Record settlement as a SELL at break-even price (avgEntryPrice)
-          await tx.trade.create({
-            data: {
-              userId: position.userId,
-              marketId,
-              outcome: position.outcome,
-              type: 'SELL',
-              shares: position.shares,
-              price: position.avgEntryPrice,
-              totalCost: refund,
-            },
-          })
-        }
-      }
-
-      // Close all positions by zeroing shares (removes them from Open Positions)
-      await tx.position.updateMany({
-        where: { marketId },
-        data: { shares: 0 },
-      })
-
-      // Return unused market maker liquidity to the market creator.
-      const remainingLiquidity = market.initialLiquidity + netTradeCostBeforeSettlement - totalPayout
-      const refundedToCreator = Math.max(0, remainingLiquidity)
-
-      if (!isReResolution && refundedToCreator > 0) {
-        await tx.user.update({
-          where: { id: market.creatorId },
-          data: { balance: { increment: refundedToCreator } },
-        })
-      }
-
-      return {
-        reversedSettlementTrades,
-        totalPayout,
-        netTradeCost: netTradeCostBeforeSettlement,
-        refundedToCreator: isReResolution ? 0 : refundedToCreator,
-      }
     })
 
     return apiSuccess({ success: true, outcome, settlement })
@@ -179,69 +66,4 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     console.error('Resolve market error:', err)
     return apiError('Internal server error', 500)
   }
-}
-
-async function reversePreviousSettlementIfNeeded(
-  tx: Prisma.TransactionClient,
-  marketId: string,
-  isReResolution: boolean,
-  previousResolutionTime: Date | null
-) {
-  if (!isReResolution || !previousResolutionTime) return 0
-
-  const settlementTrades = await tx.trade.findMany({
-    where: {
-      marketId,
-      type: 'SELL',
-      createdAt: { gte: previousResolutionTime },
-      shares: { gt: 0 },
-    },
-    orderBy: { createdAt: 'asc' },
-  })
-
-  for (const trade of settlementTrades) {
-    if (trade.totalCost > 0) {
-      await tx.user.update({
-        where: { id: trade.userId },
-        data: { balance: { decrement: trade.totalCost } },
-      })
-    }
-
-    const position = await tx.position.findUnique({
-      where: {
-        userId_marketId_outcome: {
-          userId: trade.userId,
-          marketId,
-          outcome: trade.outcome,
-        },
-      },
-      select: { id: true, avgEntryPrice: true },
-    })
-
-    if (position) {
-      const settlementPnl = (trade.price - position.avgEntryPrice) * trade.shares
-      await tx.position.update({
-        where: { id: position.id },
-        data: {
-          shares: { increment: trade.shares },
-          realizedPnl: { decrement: settlementPnl },
-        },
-      })
-    }
-
-    // Keep auditability by writing a compensating trade for the reversed settlement.
-    await tx.trade.create({
-      data: {
-        userId: trade.userId,
-        marketId,
-        outcome: trade.outcome,
-        type: 'BUY',
-        shares: trade.shares,
-        price: trade.price,
-        totalCost: trade.totalCost,
-      },
-    })
-  }
-
-  return settlementTrades.length
 }
