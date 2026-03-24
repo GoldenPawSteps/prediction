@@ -65,7 +65,7 @@ interface Market {
     id: string; userId: string; outcome: 'YES' | 'NO'; side: 'BID' | 'ASK'
     status: 'OPEN' | 'PARTIAL' | 'FILLED' | 'CANCELLED'
     orderType?: string
-    price: number; initialShares: number; remainingShares: number; createdAt: string; updatedAt?: string
+    price: number; initialShares: number; remainingShares: number; filledShares?: number; expiresAt?: string | null; createdAt: string; updatedAt?: string
   }>
 }
 
@@ -728,7 +728,7 @@ type UserOrder = {
   id: string; userId: string; outcome: 'YES' | 'NO'; side: 'BID' | 'ASK'
   status: 'OPEN' | 'PARTIAL' | 'FILLED' | 'CANCELLED'
   orderType?: string
-  price: number; initialShares: number; remainingShares: number; createdAt: string; updatedAt?: string
+  price: number; initialShares: number; remainingShares: number; filledShares?: number; expiresAt?: string | null; createdAt: string; updatedAt?: string
 }
 
 const ORDER_STATUS_COLORS: Record<string, string> = {
@@ -805,7 +805,7 @@ function ExchangeHistoryPanel({ orderFills, userOrders }: { orderFills: Fill[]; 
       {tab === 'orders' && (
         <div className="space-y-2">
           {userOrders.map((order) => {
-            const filledShares = Math.max(0, order.initialShares - order.remainingShares)
+            const filledShares = Math.max(0, Number(order.filledShares ?? 0))
             const fillPct = order.initialShares > 0 ? (filledShares / order.initialShares) * 100 : 0
             return (
               <div key={order.id} className="rounded-lg border border-gray-700 bg-gray-900/40 p-3 text-xs space-y-2">
@@ -817,11 +817,11 @@ function ExchangeHistoryPanel({ orderFills, userOrders }: { orderFills: Fill[]; 
                     <span className={`font-medium ${order.outcome === 'YES' ? 'text-green-300' : 'text-red-300'}`}>
                       {order.outcome}
                     </span>
-                    {order.orderType && order.orderType !== 'LIMIT' && (
+                    {order.orderType && order.orderType !== 'GTC' && (
                       <span className="bg-gray-700 text-gray-300 px-1 rounded text-[10px]">{order.orderType}</span>
                     )}
                     <span className="text-white font-mono">
-                      {order.orderType === 'MARKET' ? 'MKT' : formatPercent(order.price)}
+                      {formatPercent(order.price)}
                     </span>
                     <span className="text-gray-400">{order.initialShares.toFixed(2)} shares</span>
                   </div>
@@ -850,6 +850,12 @@ function ExchangeHistoryPanel({ orderFills, userOrders }: { orderFills: Fill[]; 
                     <span className="h-1.5 w-1.5 rounded-full bg-blue-400 inline-block" />
                     Placed {timeUntil(order.createdAt)}
                   </span>
+                  {order.orderType === 'GTD' && order.expiresAt && (
+                    <span className="flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 inline-block" />
+                      Expires {formatDateTime(order.expiresAt)}
+                    </span>
+                  )}
                   {order.status === 'FILLED' && order.updatedAt && (
                     <span className="flex items-center gap-1">
                       <span className="h-1.5 w-1.5 rounded-full bg-green-400 inline-block" />

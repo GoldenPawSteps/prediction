@@ -5,8 +5,14 @@ import { prisma } from './prisma'
 export const AUTH_COOKIE_NAME = 'session_token'
 export const LEGACY_AUTH_COOKIE_NAME = 'token'
 
-function getTokenFromCookieHeader(cookieHeader: string | null, cookieName: string): string | null {
-  if (!cookieHeader) return null
+type VerifiedTokenCandidate = {
+  token: string
+  index: number
+  payload: JWTPayload
+}
+
+function getVerifiedTokensFromCookieHeader(cookieHeader: string | null, cookieName: string): VerifiedTokenCandidate[] {
+  if (!cookieHeader) return []
 
   const tokenPairs = cookieHeader
     .split(';')
@@ -15,15 +21,13 @@ function getTokenFromCookieHeader(cookieHeader: string | null, cookieName: strin
     .map((part) => part.slice(`${cookieName}=`.length))
     .filter(Boolean)
 
-  if (tokenPairs.length === 0) return null
-
-  if (tokenPairs.length === 1) return tokenPairs[0]
+  if (tokenPairs.length === 0) return []
 
   const verified = tokenPairs
     .map((token, index) => ({ token, index, payload: verifyToken(token) }))
     .filter((entry): entry is { token: string; index: number; payload: JWTPayload } => Boolean(entry.payload?.userId))
 
-  if (verified.length === 0) return null
+  if (verified.length === 0) return []
 
   const sortedByFreshness = [...verified].sort((a, b) => {
     const aiat = a.payload.iat ?? 0
@@ -37,7 +41,7 @@ function getTokenFromCookieHeader(cookieHeader: string | null, cookieName: strin
     console.warn('Ambiguous auth cookies detected: selecting most recent token by iat')
   }
 
-  return sortedByFreshness[0].token
+  return sortedByFreshness
 }
 
 export function getTokenFromRequest(req: NextRequest): string | null {
@@ -47,43 +51,68 @@ export function getTokenFromRequest(req: NextRequest): string | null {
   }
 
   const cookieHeader = req.headers.get('cookie')
-  const cookieToken = getTokenFromCookieHeader(cookieHeader, AUTH_COOKIE_NAME)
-  if (cookieToken) {
-    return cookieToken
+  const cookieCandidates = getVerifiedTokensFromCookieHeader(cookieHeader, AUTH_COOKIE_NAME)
+  if (cookieCandidates.length > 0) {
+    return cookieCandidates[0].token
   }
 
   return req.cookies.get(AUTH_COOKIE_NAME)?.value || null
 }
 
+function getCandidateTokensFromRequest(req: NextRequest): string[] {
+  const authHeader = req.headers.get('authorization')
+  if (authHeader?.startsWith('Bearer ')) {
+    return [authHeader.slice(7)]
+  }
+
+  const cookieHeader = req.headers.get('cookie')
+  const cookieCandidates = [
+    ...getVerifiedTokensFromCookieHeader(cookieHeader, AUTH_COOKIE_NAME),
+    ...getVerifiedTokensFromCookieHeader(cookieHeader, LEGACY_AUTH_COOKIE_NAME),
+  ]
+
+  if (cookieCandidates.length > 0) {
+    const uniqueTokens = Array.from(new Set(cookieCandidates.map((candidate) => candidate.token)))
+    return uniqueTokens
+  }
+
+  const fallback = req.cookies.get(AUTH_COOKIE_NAME)?.value || req.cookies.get(LEGACY_AUTH_COOKIE_NAME)?.value
+  return fallback ? [fallback] : []
+}
+
 export async function getUserFromRequest(req: NextRequest): Promise<JWTPayload | null> {
-  const token = getTokenFromRequest(req)
-  if (!token) return null
+  const tokens = getCandidateTokensFromRequest(req)
+  if (tokens.length === 0) return null
 
-  const payload = verifyToken(token)
-  if (!payload) return null
+  for (const token of tokens) {
+    const payload = verifyToken(token)
+    if (!payload) continue
 
-  const user = await prisma.user.findUnique({
-    where: { id: payload.userId },
-    select: {
-      id: true,
-      email: true,
-      isAdmin: true,
-      sessionVersion: true,
-    },
-  })
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: {
+        id: true,
+        email: true,
+        isAdmin: true,
+        sessionVersion: true,
+      },
+    })
 
-  if (!user || user.sessionVersion !== payload.sessionVersion) {
-    return null
+    if (!user || user.sessionVersion !== payload.sessionVersion) {
+      continue
+    }
+
+    return {
+      userId: user.id,
+      email: user.email,
+      isAdmin: user.isAdmin,
+      sessionVersion: user.sessionVersion,
+      iat: payload.iat,
+      exp: payload.exp,
+    }
   }
 
-  return {
-    userId: user.id,
-    email: user.email,
-    isAdmin: user.isAdmin,
-    sessionVersion: user.sessionVersion,
-    iat: payload.iat,
-    exp: payload.exp,
-  }
+  return null
 }
 
 export async function requireAuth(req: NextRequest): Promise<JWTPayload | NextResponse> {

@@ -3,7 +3,10 @@ import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, apiError, apiSuccess } from '@/lib/api-helpers'
 import { lmsrTradeCost, getMarketProbabilities } from '@/lib/lmsr'
+import { activeOrderWhere, expireStaleMarketOrders } from '@/lib/order-expiration'
 import { z } from 'zod'
+
+// AMM trade handler: buy/sell flow with reservation-aware sell checks.
 
 const tradeSchema = z.object({
   outcome: z.enum(['YES', 'NO']),
@@ -29,6 +32,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const { outcome, type, shares } = parsed.data
 
     const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      await expireStaleMarketOrders(tx, marketId)
+
       const market = await tx.market.findUnique({ where: { id: marketId } })
       if (!market) throw new Error('Market not found')
       if (market.status !== 'OPEN') throw new Error('Market is not open for trading')
@@ -71,6 +76,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             outcome,
             side: 'ASK',
             status: { in: ['OPEN', 'PARTIAL'] },
+            ...activeOrderWhere(new Date()),
           },
           _sum: { remainingShares: true },
         })

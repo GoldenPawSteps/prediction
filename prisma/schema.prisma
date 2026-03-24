@@ -36,10 +36,10 @@ enum OrderSide {
 }
 
 enum OrderType {
-  LIMIT
-  MARKET
-  POST_ONLY
-  IOC
+  GTC
+  GTD
+  FOK
+  FAK
 }
 
 enum OrderStatus {
@@ -190,13 +190,14 @@ model MarketOrder {
   market                Market      @relation(fields: [marketId], references: [id])
   outcome               TradeOutcome
   side                  OrderSide
-  orderType             OrderType   @default(LIMIT)
+  orderType             OrderType   @default(GTC)
   status                OrderStatus @default(OPEN)
   price                 Float
   initialShares         Float
   remainingShares       Float
   reservedAmount        Float       @default(0)
   avgEntryPriceSnapshot Float       @default(0)
+  expiresAt             DateTime?
   createdAt             DateTime    @default(now())
   updatedAt             DateTime    @updatedAt
   makerFills            MarketOrderFill[] @relation("MarketOrderFillMakerOrder")

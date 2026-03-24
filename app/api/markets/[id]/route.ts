@@ -4,28 +4,35 @@ import { apiError, apiSuccess } from '@/lib/api-helpers'
 import { getUserFromRequest } from '@/lib/api-helpers'
 import { getMarketProbabilities } from '@/lib/lmsr'
 import { closeMarketIfExpired } from '@/lib/market-status'
+import { activeOrderWhere, expireStaleMarketOrders } from '@/lib/order-expiration'
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const viewer = await getUserFromRequest(_req)
     await closeMarketIfExpired(id)
+    await prisma.$transaction(async (tx) => {
+      await expireStaleMarketOrders(tx, id)
+    })
+    const now = new Date()
 
     const market = await prisma.market.findUnique({
       where: { id },
       include: {
         creator: { select: { id: true, username: true, avatar: true } },
         orders: {
-          where: { status: { in: ['OPEN', 'PARTIAL'] } },
+          where: { status: { in: ['OPEN', 'PARTIAL'] }, remainingShares: { gt: 0 }, ...activeOrderWhere(now) },
           select: {
             id: true,
             userId: true,
             outcome: true,
             side: true,
             status: true,
+            orderType: true,
             price: true,
             initialShares: true,
             remainingShares: true,
+            expiresAt: true,
             createdAt: true,
             user: { select: { id: true, username: true, avatar: true } },
           },
@@ -94,6 +101,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
             price: true,
             initialShares: true,
             remainingShares: true,
+            expiresAt: true,
             createdAt: true,
             updatedAt: true,
           },
@@ -101,6 +109,36 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
           take: 30,
         })
       : []
+
+    const userOrderIds = userOrders.map((order) => order.id)
+
+    const [makerFillSums, takerFillSums] = userOrderIds.length > 0
+      ? await Promise.all([
+          prisma.marketOrderFill.groupBy({
+            by: ['makerOrderId'],
+            where: { makerOrderId: { in: userOrderIds } },
+            _sum: { shares: true },
+          }),
+          prisma.marketOrderFill.groupBy({
+            by: ['takerOrderId'],
+            where: { takerOrderId: { in: userOrderIds } },
+            _sum: { shares: true },
+          }),
+        ])
+      : [[], []]
+
+    const filledSharesByOrderId = new Map<string, number>()
+    for (const fill of makerFillSums) {
+      filledSharesByOrderId.set(fill.makerOrderId, (filledSharesByOrderId.get(fill.makerOrderId) ?? 0) + (fill._sum.shares ?? 0))
+    }
+    for (const fill of takerFillSums) {
+      filledSharesByOrderId.set(fill.takerOrderId, (filledSharesByOrderId.get(fill.takerOrderId) ?? 0) + (fill._sum.shares ?? 0))
+    }
+
+    const userOrdersWithFilledShares = userOrders.map((order) => ({
+      ...order,
+      filledShares: filledSharesByOrderId.get(order.id) ?? 0,
+    }))
 
     const probabilities = market.resolution === 'YES'
       ? { yes: 1, no: 0 }
@@ -112,7 +150,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
     return apiSuccess({
       ...market,
-      userOrders,
+      userOrders: userOrdersWithFilledShares,
       probabilities,
       disputeCount: market._count.disputes,
     })

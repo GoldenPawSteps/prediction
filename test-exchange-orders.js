@@ -2,13 +2,19 @@
 /**
  * Exchange integration test
  * Validates:
- * 1) BID-maker partial fill + cancellation + refund
- * 2) ASK-maker with BID taker reserve release
+ * 1) GTC BID-maker partial fill + cancellation + refund
+ * 2) GTC ASK-maker with BID taker reserve release
+ * 3) GTD expiry releases reserves and cancels stale orders
+ * 4) FOK rejects if full size is not immediately available
+ * 5) FAK fills available size and kills the remainder
  *
  * Usage:
- *   node test-exchange-orders.js                # runs both scenarios
+ *   node test-exchange-orders.js                # runs all scenarios
  *   node test-exchange-orders.js bid-maker      # runs scenario 1 only
  *   node test-exchange-orders.js ask-maker      # runs scenario 2 only
+ *   node test-exchange-orders.js gtd            # runs scenario 3 only
+ *   node test-exchange-orders.js fok            # runs scenario 4 only
+ *   node test-exchange-orders.js fak            # runs scenario 5 only
  */
 
 const BASE_URL = 'http://localhost:3001'
@@ -76,6 +82,10 @@ function approxEqual(actual, expected, tolerance = 0.000001) {
   return Math.abs(actual - expected) <= tolerance
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 async function waitForServer() {
   for (let i = 0; i < 40; i++) {
     try {
@@ -108,13 +118,35 @@ async function getBalance(jar) {
   return res.data.balance
 }
 
+async function createMarket(jar, label) {
+  const marketRes = await request(
+    'POST',
+    '/api/markets',
+    {
+      title: `Exchange test market ${label} ${Date.now()}`,
+      description: 'Integration test market for exchange order behavior checks.',
+      category: 'Crypto',
+      endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      resolutionSource: 'https://example.com',
+      tags: ['exchange', 'integration'],
+    },
+    jar
+  )
+  assert(marketRes.ok, `Create market failed: ${JSON.stringify(marketRes.data)}`)
+  return marketRes.data.market.id
+}
+
 async function run() {
   const scenarioArg = process.argv[2]
-  const runBidMakerScenario = !scenarioArg || scenarioArg === 'bid-maker'
-  const runAskMakerScenario = !scenarioArg || scenarioArg === 'ask-maker'
+  const runAllScenarios = !scenarioArg
+  const runBidMakerScenario = runAllScenarios || scenarioArg === 'bid-maker'
+  const runAskMakerScenario = runAllScenarios || scenarioArg === 'ask-maker'
+  const runGtdScenario = runAllScenarios || scenarioArg === 'gtd'
+  const runFokScenario = runAllScenarios || scenarioArg === 'fok'
+  const runFakScenario = runAllScenarios || scenarioArg === 'fak'
 
-  if (!runBidMakerScenario && !runAskMakerScenario) {
-    throw new Error('Unknown scenario argument. Use: bid-maker | ask-maker')
+  if (!runBidMakerScenario && !runAskMakerScenario && !runGtdScenario && !runFokScenario && !runFakScenario) {
+    throw new Error('Unknown scenario argument. Use: bid-maker | ask-maker | gtd | fok | fak')
   }
 
   console.log('Running exchange integration test...')
@@ -126,21 +158,7 @@ async function run() {
   const traderA = await registerUniqueUser(suffixA)
   const traderB = await registerUniqueUser(suffixB)
 
-  const marketRes = await request(
-    'POST',
-    '/api/markets',
-    {
-      title: `Exchange test market ${Date.now()}`,
-      description: 'Integration test market for exchange partial fill and cancellation refund checks.',
-      category: 'Crypto',
-      endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      resolutionSource: 'https://example.com',
-      tags: ['exchange', 'integration'],
-    },
-    traderA.jar
-  )
-  assert(marketRes.ok, `Create market failed: ${JSON.stringify(marketRes.data)}`)
-  const marketId = marketRes.data.market.id
+  const marketId = await createMarket(traderA.jar, 'gtc')
 
   if (runBidMakerScenario) {
     console.log('Scenario 1: BID maker -> partial fill -> cancel remainder')
@@ -162,7 +180,7 @@ async function run() {
     const bidRes = await request(
       'POST',
       `/api/markets/${marketId}/order`,
-      { outcome: 'YES', side: 'BID', price: bidPrice, shares: bidShares },
+      { outcome: 'YES', side: 'BID', orderType: 'GTC', price: bidPrice, shares: bidShares },
       traderB.jar
     )
     assert(bidRes.ok, `Place bid failed: ${JSON.stringify(bidRes.data)}`)
@@ -177,7 +195,7 @@ async function run() {
     const askRes = await request(
       'POST',
       `/api/markets/${marketId}/order`,
-      { outcome: 'YES', side: 'ASK', price: 0.6, shares: 1 },
+      { outcome: 'YES', side: 'ASK', orderType: 'GTC', price: 0.6, shares: 1 },
       traderA.jar
     )
     assert(askRes.ok, `Place ask failed: ${JSON.stringify(askRes.data)}`)
@@ -194,6 +212,7 @@ async function run() {
 
     const filledHistory = (marketForB.data.userOrders || []).find((o) => o.id === bidRes.data.order.id)
     assert(filledHistory, 'Expected bid order to appear in user order history')
+    assert(filledHistory.orderType === 'GTC', `Expected GTC order type, got ${filledHistory.orderType}`)
     assert(filledHistory.status === 'PARTIAL', `Expected PARTIAL status after one fill, got ${filledHistory.status}`)
 
     const cancelRes = await request(
@@ -253,7 +272,7 @@ async function run() {
     const askMakerRes = await request(
       'POST',
       `/api/markets/${marketId}/order`,
-      { outcome: 'NO', side: 'ASK', price: askMakerPrice, shares: askMakerShares },
+      { outcome: 'NO', side: 'ASK', orderType: 'GTC', price: askMakerPrice, shares: askMakerShares },
       traderA.jar
     )
     assert(askMakerRes.ok, `Place maker ask failed: ${JSON.stringify(askMakerRes.data)}`)
@@ -267,7 +286,7 @@ async function run() {
     const bidTakerRes = await request(
       'POST',
       `/api/markets/${marketId}/order`,
-      { outcome: 'NO', side: 'BID', price: bidTakerPrice, shares: bidTakerShares },
+      { outcome: 'NO', side: 'BID', orderType: 'GTC', price: bidTakerPrice, shares: bidTakerShares },
       traderB.jar
     )
     assert(bidTakerRes.ok, `Place taker bid failed: ${JSON.stringify(bidTakerRes.data)}`)
@@ -305,6 +324,188 @@ async function run() {
           balanceBBeforeTakerBid,
           balanceBAfterTakerBid,
           expectedAfterTakerBid,
+        },
+        null,
+        2
+      )
+    )
+  }
+
+  if (runGtdScenario) {
+    console.log('Scenario 3: GTD expiry -> auto-cancel -> reserve refund')
+
+    const gtdMarketId = await createMarket(traderA.jar, 'gtd')
+    const balanceBBeforeGtd = await getBalance(traderB.jar)
+    const gtdPrice = 0.42
+    const gtdShares = 1.5
+    const gtdReserve = gtdPrice * gtdShares
+    const expiresAt = new Date(Date.now() + 2500).toISOString()
+
+    const gtdRes = await request(
+      'POST',
+      `/api/markets/${gtdMarketId}/order`,
+      { outcome: 'YES', side: 'BID', orderType: 'GTD', price: gtdPrice, shares: gtdShares, expiresAt },
+      traderB.jar
+    )
+    assert(gtdRes.ok, `Place GTD bid failed: ${JSON.stringify(gtdRes.data)}`)
+    assert(gtdRes.data.order.orderType === 'GTD', `Expected GTD order type, got ${gtdRes.data.order.orderType}`)
+
+    const balanceBAfterGtd = await getBalance(traderB.jar)
+    assert(
+      approxEqual(balanceBAfterGtd, balanceBBeforeGtd - gtdReserve),
+      `GTD reserve mismatch. Expected ${balanceBBeforeGtd - gtdReserve}, got ${balanceBAfterGtd}`
+    )
+
+    await sleep(3200)
+
+    const marketAfterExpiry = await request('GET', `/api/markets/${gtdMarketId}`, null, traderB.jar)
+    assert(marketAfterExpiry.ok, `Fetch market after GTD expiry failed: ${JSON.stringify(marketAfterExpiry.data)}`)
+
+    const expiredOpenOrder = (marketAfterExpiry.data.orders || []).find((o) => o.id === gtdRes.data.order.id)
+    assert(!expiredOpenOrder, 'Expected expired GTD order to be removed from open orders')
+
+    const expiredHistory = (marketAfterExpiry.data.userOrders || []).find((o) => o.id === gtdRes.data.order.id)
+    assert(expiredHistory, 'Expected GTD order in user order history after expiry')
+    assert(expiredHistory.status === 'CANCELLED', `Expected GTD to become CANCELLED, got ${expiredHistory.status}`)
+
+    const balanceBAfterExpiry = await getBalance(traderB.jar)
+    assert(
+      approxEqual(balanceBAfterExpiry, balanceBBeforeGtd),
+      `Expected GTD reserve refund after expiry. Expected ${balanceBBeforeGtd}, got ${balanceBAfterExpiry}`
+    )
+
+    console.log(
+      JSON.stringify(
+        {
+          scenario: 'gtd',
+          gtdMarketId,
+          balanceBBeforeGtd,
+          balanceBAfterGtd,
+          balanceBAfterExpiry,
+        },
+        null,
+        2
+      )
+    )
+  }
+
+  if (runFokScenario) {
+    console.log('Scenario 4: FOK -> reject when full size is unavailable')
+
+    const fokMarketId = await createMarket(traderA.jar, 'fok')
+
+    const buyFokInventory = await request(
+      'POST',
+      `/api/markets/${fokMarketId}/trade`,
+      { outcome: 'YES', type: 'BUY', shares: 2 },
+      traderA.jar
+    )
+    assert(buyFokInventory.ok, `AMM buy for FOK inventory failed: ${JSON.stringify(buyFokInventory.data)}`)
+
+    const makerAskRes = await request(
+      'POST',
+      `/api/markets/${fokMarketId}/order`,
+      { outcome: 'YES', side: 'ASK', orderType: 'GTC', price: 0.4, shares: 1 },
+      traderA.jar
+    )
+    assert(makerAskRes.ok, `Place maker ask for FOK failed: ${JSON.stringify(makerAskRes.data)}`)
+
+    const balanceBBeforeFok = await getBalance(traderB.jar)
+    const fokRes = await request(
+      'POST',
+      `/api/markets/${fokMarketId}/order`,
+      { outcome: 'YES', side: 'BID', orderType: 'FOK', price: 0.45, shares: 2 },
+      traderB.jar
+    )
+    assert(!fokRes.ok, 'Expected FOK order to fail when insufficient size is available')
+    assert(
+      String(fokRes.data.error || '').includes('FOK order could not be fully matched immediately'),
+      `Unexpected FOK error: ${JSON.stringify(fokRes.data)}`
+    )
+
+    const balanceBAfterFok = await getBalance(traderB.jar)
+    assert(approxEqual(balanceBAfterFok, balanceBBeforeFok), 'FOK should not reserve any balance on rejection')
+
+    const marketAfterFok = await request('GET', `/api/markets/${fokMarketId}`, null, traderA.jar)
+    assert(marketAfterFok.ok, `Fetch market after FOK failed: ${JSON.stringify(marketAfterFok.data)}`)
+
+    const survivingAsk = (marketAfterFok.data.orders || []).find((o) => o.id === makerAskRes.data.order.id)
+    assert(survivingAsk, 'Expected maker ask to remain open after FOK rejection')
+    assert(approxEqual(survivingAsk.remainingShares, 1), `Expected maker ask to remain untouched, got ${survivingAsk.remainingShares}`)
+
+    console.log(
+      JSON.stringify(
+        {
+          scenario: 'fok',
+          fokMarketId,
+          balanceBBeforeFok,
+          balanceBAfterFok,
+        },
+        null,
+        2
+      )
+    )
+  }
+
+  if (runFakScenario) {
+    console.log('Scenario 5: FAK -> partial fill -> kill remainder')
+
+    const fakMarketId = await createMarket(traderA.jar, 'fak')
+
+    const buyFakInventory = await request(
+      'POST',
+      `/api/markets/${fakMarketId}/trade`,
+      { outcome: 'NO', type: 'BUY', shares: 3 },
+      traderA.jar
+    )
+    assert(buyFakInventory.ok, `AMM buy for FAK inventory failed: ${JSON.stringify(buyFakInventory.data)}`)
+
+    const fakAskRes = await request(
+      'POST',
+      `/api/markets/${fakMarketId}/order`,
+      { outcome: 'NO', side: 'ASK', orderType: 'GTC', price: 0.45, shares: 1.5 },
+      traderA.jar
+    )
+    assert(fakAskRes.ok, `Place maker ask for FAK failed: ${JSON.stringify(fakAskRes.data)}`)
+
+    const balanceBBeforeFak = await getBalance(traderB.jar)
+    const fakRes = await request(
+      'POST',
+      `/api/markets/${fakMarketId}/order`,
+      { outcome: 'NO', side: 'BID', orderType: 'FAK', price: 0.5, shares: 2 },
+      traderB.jar
+    )
+    assert(fakRes.ok, `Place FAK bid failed: ${JSON.stringify(fakRes.data)}`)
+    assert(approxEqual(fakRes.data.filledShares, 1.5), `Expected FAK to fill 1.5 shares, got ${fakRes.data.filledShares}`)
+    assert(approxEqual(fakRes.data.remainingShares, 0.5), `Expected API remainingShares to report 0.5 before kill, got ${fakRes.data.remainingShares}`)
+    assert(fakRes.data.order.status === 'PARTIAL', `Expected FAK order status PARTIAL, got ${fakRes.data.order.status}`)
+
+    const balanceBAfterFak = await getBalance(traderB.jar)
+    const expectedAfterFak = balanceBBeforeFak - (1.5 * 0.45)
+    assert(
+      approxEqual(balanceBAfterFak, expectedAfterFak),
+      `FAK final balance mismatch. Expected ${expectedAfterFak}, got ${balanceBAfterFak}`
+    )
+
+    const marketAfterFak = await request('GET', `/api/markets/${fakMarketId}`, null, traderB.jar)
+    assert(marketAfterFak.ok, `Fetch market after FAK failed: ${JSON.stringify(marketAfterFak.data)}`)
+
+    const openFakOrder = (marketAfterFak.data.orders || []).find((o) => o.id === fakRes.data.order.id)
+    assert(!openFakOrder, 'Expected FAK remainder to be removed from open orders')
+
+    const fakHistory = (marketAfterFak.data.userOrders || []).find((o) => o.id === fakRes.data.order.id)
+    assert(fakHistory, 'Expected FAK order in user history')
+    assert(fakHistory.status === 'PARTIAL', `Expected FAK history status PARTIAL, got ${fakHistory.status}`)
+    assert(approxEqual(fakHistory.remainingShares, 0), `Expected killed remainder to be 0 in history, got ${fakHistory.remainingShares}`)
+
+    console.log(
+      JSON.stringify(
+        {
+          scenario: 'fak',
+          fakMarketId,
+          balanceBBeforeFak,
+          balanceBAfterFak,
+          expectedAfterFak,
         },
         null,
         2

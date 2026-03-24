@@ -7,12 +7,12 @@ import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
-import { formatCurrency, formatPercent } from '@/lib/utils'
+import { formatCurrency, formatPercent, timeUntil } from '@/lib/utils'
 
 type OrderSide = 'BID' | 'ASK'
 type OrderOutcome = 'YES' | 'NO'
 type OrderStatus = 'OPEN' | 'PARTIAL' | 'FILLED' | 'CANCELLED'
-type OrderType = 'LIMIT' | 'MARKET' | 'POST_ONLY' | 'IOC'
+type OrderType = 'GTC' | 'GTD' | 'FOK' | 'FAK'
 
 interface MarketOrder {
   id: string
@@ -24,6 +24,8 @@ interface MarketOrder {
   price: number
   initialShares: number
   remainingShares: number
+  filledShares?: number
+  expiresAt?: string | null
   createdAt: string
   updatedAt?: string
   user?: { id: string; username: string; avatar: string | null }
@@ -57,6 +59,35 @@ interface TradePanelProps {
   onTradeComplete: () => void
 }
 
+function getLocalDateTimeInputValue(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day}T${hours}:${minutes}`
+}
+
+async function readApiPayload(res: Response): Promise<{ error?: string; [key: string]: unknown }> {
+  const contentType = res.headers.get('content-type') || ''
+
+  if (contentType.includes('application/json')) {
+    try {
+      return (await res.json()) as { error?: string; [key: string]: unknown }
+    } catch {
+      return { error: `Invalid JSON response from server (${res.status})` }
+    }
+  }
+
+  const text = await res.text()
+  const snippet = text.replace(/\s+/g, ' ').trim().slice(0, 120)
+  return {
+    error: snippet
+      ? `Unexpected server response (${res.status}): ${snippet}`
+      : `Unexpected server response (${res.status})`,
+  }
+}
+
 export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
   const { user, refreshUser } = useAuth()
   const [mode, setMode] = useState<'AMM' | 'EXCHANGE'>('AMM')
@@ -64,9 +95,10 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
   const [tradeType, setTradeType] = useState<'BUY' | 'SELL'>('BUY')
   const [shares, setShares] = useState('')
   const [orderSide, setOrderSide] = useState<OrderSide>('BID')
-  const [orderType, setOrderType] = useState<OrderType>('LIMIT')
+  const [orderType, setOrderType] = useState<OrderType>('GTC')
   const [orderPrice, setOrderPrice] = useState('0.50')
   const [orderShares, setOrderShares] = useState('')
+  const [gtdExpiresAt, setGtdExpiresAt] = useState('')
   const [loading, setLoading] = useState(false)
   const [orderLoading, setOrderLoading] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -74,7 +106,9 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
   const isExpired = new Date(market.endDate) <= new Date()
 
   const currentPrice = selectedOutcome === 'YES' ? market.probabilities.yes : market.probabilities.no
-  const openOrders = (market.orders ?? []).filter((order) => order.status === 'OPEN' || order.status === 'PARTIAL')
+  const openOrders = (market.orders ?? []).filter(
+    (order) => (order.status === 'OPEN' || order.status === 'PARTIAL') && order.remainingShares > 0
+  )
   const selectedOutcomeOrders = openOrders.filter((order) => order.outcome === selectedOutcome)
   const bids = selectedOutcomeOrders
     .filter((order) => order.side === 'BID')
@@ -112,7 +146,7 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ outcome: selectedOutcome, type: tradeType, shares: sharesNum }),
       })
-      const data = await res.json()
+      const data = await readApiPayload(res)
       if (res.ok) {
         toast.success(`${tradeType === 'BUY' ? 'Bought' : 'Sold'} ${sharesNum} ${selectedOutcome} shares!`)
         setShares('')
@@ -122,8 +156,8 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
       } else {
         toast.error(data.error || 'Trade failed')
       }
-    } catch {
-      toast.error('Network error')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Network error')
     } finally {
       setLoading(false)
     }
@@ -138,7 +172,7 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
     const price = parseFloat(orderPrice)
     const quantity = parseFloat(orderShares)
 
-    if (orderType !== 'MARKET' && (!price || price <= 0 || price >= 1)) {
+    if (!price || price <= 0 || price >= 1) {
       toast.error('Price must be between 0 and 1')
       return
     }
@@ -146,10 +180,21 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
       toast.error('Enter a valid share amount')
       return
     }
+    if (orderType === 'GTD') {
+      if (!gtdExpiresAt) {
+        toast.error('Choose a good-till date/time for GTD orders')
+        return
+      }
+
+      const expiry = new Date(gtdExpiresAt)
+      if (Number.isNaN(expiry.getTime()) || expiry <= new Date()) {
+        toast.error('GTD expiration must be in the future')
+        return
+      }
+    }
 
     setOrderLoading(true)
     try {
-      const isMarket = orderType === 'MARKET'
       const res = await fetch(`/api/markets/${market.id}/order`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -157,22 +202,24 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
           outcome: selectedOutcome,
           side: orderSide,
           orderType,
-          ...(isMarket ? {} : { price }),
+          price,
           shares: quantity,
+          ...(orderType === 'GTD' ? { expiresAt: new Date(gtdExpiresAt).toISOString() } : {}),
         }),
       })
-      const data = await res.json()
+      const data = await readApiPayload(res)
       if (res.ok) {
-        const filled = data?.filledShares ?? 0
+        const filled = Number(data?.filledShares ?? 0)
         toast.success(`Order placed${filled > 0 ? ` (${filled.toFixed(2)} shares matched)` : ''}`)
         setOrderShares('')
+        if (orderType === 'GTD') setGtdExpiresAt('')
         await refreshUser()
         onTradeComplete()
       } else {
         toast.error(data.error || 'Failed to place order')
       }
-    } catch {
-      toast.error('Network error')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Network error')
     } finally {
       setOrderLoading(false)
     }
@@ -188,7 +235,7 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orderId }),
       })
-      const data = await res.json()
+      const data = await readApiPayload(res)
       if (res.ok) {
         toast.success('Order cancelled')
         await refreshUser()
@@ -196,8 +243,8 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
       } else {
         toast.error(data.error || 'Failed to cancel order')
       }
-    } catch {
-      toast.error('Network error')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Network error')
     } finally {
       setOrderLoading(false)
     }
@@ -381,7 +428,7 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
             <div className="space-y-1">
               <div className="text-xs text-gray-400 font-medium">Order Type</div>
               <div className="grid grid-cols-4 gap-1">
-                {(['LIMIT', 'MARKET', 'POST_ONLY', 'IOC'] as OrderType[]).map((t) => (
+                {(['GTC', 'GTD', 'FOK', 'FAK'] as OrderType[]).map((t) => (
                   <button
                     key={t}
                     onClick={() => setOrderType(t)}
@@ -389,21 +436,21 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
                       orderType === t ? 'bg-indigo-600 text-white' : 'bg-gray-700 text-gray-400 hover:text-white'
                     }`}
                   >
-                    {t === 'POST_ONLY' ? 'Post' : t}
+                    {t}
                   </button>
                 ))}
               </div>
               <div className="text-xs text-gray-500">
-                {orderType === 'LIMIT' && 'Rest on the book at your price. Fills when crossed.'}
-                {orderType === 'MARKET' && 'Fill immediately at best available price. No price needed.'}
-                {orderType === 'POST_ONLY' && 'Rejected if it would cross the spread (maker only).'}
-                {orderType === 'IOC' && 'Fill what\'s available now; cancel any remainder.'}
+                {orderType === 'GTC' && 'Good till cancelled. Rests on the book until filled or manually cancelled.'}
+                {orderType === 'GTD' && 'Good till date. Rests on the book until the time you set or until it fills.'}
+                {orderType === 'FOK' && 'Fill or kill. Must fill completely right now or it is rejected.'}
+                {orderType === 'FAK' && 'Fill and kill. Takes what is available now and cancels the remainder.'}
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
               <Input
-                label={orderType === 'MARKET' ? 'Price (N/A)' : 'Limit Price'}
+                label="Price"
                 type="number"
                 min="0.01"
                 max="0.99"
@@ -411,7 +458,6 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
                 placeholder="0.50"
                 value={orderPrice}
                 onChange={(e) => setOrderPrice(e.target.value)}
-                disabled={orderType === 'MARKET'}
               />
               <Input
                 label="Shares"
@@ -421,26 +467,43 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
                 placeholder="0.00"
                 value={orderShares}
                 onChange={(e) => setOrderShares(e.target.value)}
-                hint={orderSide === 'BID' && orderType !== 'MARKET' ? `Reserve: ${formatCurrency((parseFloat(orderPrice) || 0) * (parseFloat(orderShares) || 0))}` : undefined}
+                hint={orderSide === 'BID' ? `Reserve: ${formatCurrency((parseFloat(orderPrice) || 0) * (parseFloat(orderShares) || 0))}` : undefined}
               />
             </div>
+
+            {orderType === 'GTD' && (
+              <Input
+                label="Good Till"
+                type="datetime-local"
+                value={gtdExpiresAt}
+                onChange={(e) => setGtdExpiresAt(e.target.value)}
+                min={getLocalDateTimeInputValue(new Date(Date.now() + 60_000))}
+              />
+            )}
 
             <Button
               className="w-full"
               loading={orderLoading}
               onClick={handlePlaceOrder}
-              disabled={!orderShares || (orderType !== 'MARKET' && !orderPrice)}
+              disabled={!orderShares || !orderPrice || (orderType === 'GTD' && !gtdExpiresAt)}
               variant={orderSide === 'BID' ? 'primary' : 'danger'}
             >
-              {orderType === 'MARKET' ? 'Market' : orderType === 'POST_ONLY' ? 'Post-Only' : orderType} {orderSide} {selectedOutcome}
+              {orderType} {orderSide} {selectedOutcome}
             </Button>
 
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div className="bg-gray-900/60 rounded-lg p-3 border border-gray-700 space-y-1 max-h-36 overflow-y-auto">
                 <div className="text-green-400 font-semibold mb-1">Bids</div>
                 {bids.length === 0 ? <div className="text-gray-500">No bids</div> : bids.slice(0, 8).map((order) => (
-                  <div key={order.id} className="flex justify-between text-gray-300">
-                    <span>{order.remainingShares.toFixed(2)}</span>
+                  <div key={order.id} className="flex items-start justify-between gap-2 text-gray-300">
+                    <div className="flex flex-col">
+                      <span>{order.remainingShares.toFixed(2)}</span>
+                      {order.orderType === 'GTD' && order.expiresAt && (
+                        <span className="text-[10px] text-indigo-300" title={new Date(order.expiresAt).toLocaleString()}>
+                          GTD · {timeUntil(order.expiresAt)}
+                        </span>
+                      )}
+                    </div>
                     <span>{formatPercent(order.price)}</span>
                   </div>
                 ))}
@@ -448,8 +511,15 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
               <div className="bg-gray-900/60 rounded-lg p-3 border border-gray-700 space-y-1 max-h-36 overflow-y-auto">
                 <div className="text-red-400 font-semibold mb-1">Asks</div>
                 {asks.length === 0 ? <div className="text-gray-500">No asks</div> : asks.slice(0, 8).map((order) => (
-                  <div key={order.id} className="flex justify-between text-gray-300">
-                    <span>{order.remainingShares.toFixed(2)}</span>
+                  <div key={order.id} className="flex items-start justify-between gap-2 text-gray-300">
+                    <div className="flex flex-col">
+                      <span>{order.remainingShares.toFixed(2)}</span>
+                      {order.orderType === 'GTD' && order.expiresAt && (
+                        <span className="text-[10px] text-indigo-300" title={new Date(order.expiresAt).toLocaleString()}>
+                          GTD · {timeUntil(order.expiresAt)}
+                        </span>
+                      )}
+                    </div>
                     <span>{formatPercent(order.price)}</span>
                   </div>
                 ))}
@@ -463,6 +533,9 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
                   <div key={order.id} className="flex items-center justify-between gap-2 text-xs">
                     <span className="text-gray-300">
                       {order.side} {order.outcome} {order.remainingShares.toFixed(2)}/{order.initialShares.toFixed(2)} @ {formatPercent(order.price)}
+                      {order.orderType === 'GTD' && order.expiresAt && (
+                        <span className="text-indigo-300"> · GTD {timeUntil(order.expiresAt)}</span>
+                      )}
                     </span>
                     <button
                       className="text-red-400 hover:text-red-300"
@@ -480,7 +553,7 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
               <div className="bg-gray-900/60 rounded-lg p-3 border border-gray-700 space-y-2">
                 <div className="text-xs text-gray-400">Your Recent Orders</div>
                 {myOrderHistory.map((order) => {
-                  const filledShares = Math.max(0, order.initialShares - order.remainingShares)
+                  const filledShares = Math.max(0, Number(order.filledShares ?? 0))
                   const statusTone = order.status === 'FILLED'
                     ? 'text-green-400'
                     : order.status === 'CANCELLED'
@@ -494,16 +567,21 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-gray-300 flex items-center gap-1">
                           {order.side} {order.outcome}{' '}
-                          {order.orderType && order.orderType !== 'LIMIT' && (
+                          {order.orderType && order.orderType !== 'GTC' && (
                             <span className="bg-gray-700 text-gray-300 px-1 rounded text-[10px]">{order.orderType}</span>
                           )}
-                          {' '}{order.initialShares.toFixed(2)} @ {order.orderType === 'MARKET' ? 'MKT' : formatPercent(order.price)}
+                          {' '}{order.initialShares.toFixed(2)} @ {formatPercent(order.price)}
                         </span>
                         <span className={statusTone}>{order.status}</span>
                       </div>
                       <div className="mt-1 text-gray-500">
                         Filled {filledShares.toFixed(2)} / {order.initialShares.toFixed(2)}
                       </div>
+                      {order.orderType === 'GTD' && order.expiresAt && (
+                        <div className="mt-1 text-gray-500">
+                          Expires {new Date(order.expiresAt).toLocaleString()}
+                        </div>
+                      )}
                     </div>
                   )
                 })}

@@ -2,15 +2,16 @@ import { NextRequest } from 'next/server'
 import type { Prisma, TradeOutcome } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, apiError, apiSuccess } from '@/lib/api-helpers'
+import { activeOrderWhere, expireStaleMarketOrders } from '@/lib/order-expiration'
 import { z } from 'zod'
 
 const placeOrderSchema = z.object({
 	outcome: z.enum(['YES', 'NO']),
 	side: z.enum(['BID', 'ASK']),
-	orderType: z.enum(['LIMIT', 'MARKET', 'POST_ONLY', 'IOC']).default('LIMIT'),
-	// MARKET orders don't require a price — if omitted we use a sentinel that matches anything
-	price: z.number().gt(0).lt(1).optional(),
+	orderType: z.enum(['GTC', 'GTD', 'FOK', 'FAK']).default('GTC'),
+	price: z.number().gt(0).lt(1),
 	shares: z.number().positive(),
+	expiresAt: z.string().datetime().optional(),
 })
 
 const cancelOrderSchema = z.object({
@@ -35,22 +36,32 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 			return apiError(parsed.error.issues[0].message)
 		}
 
-		const { outcome, side, orderType, shares } = parsed.data
-		let price = parsed.data.price
+		const { outcome, side, orderType, price, shares, expiresAt } = parsed.data
+		const expiresAtDate = expiresAt ? new Date(expiresAt) : null
 
-		// MARKET orders don't use a limit price — use a sentinel that matches everything
-		if (orderType === 'MARKET') {
-			price = side === 'BID' ? 0.9999 : 0.0001
-		} else if (!price) {
-			return apiError('price is required for LIMIT, POST_ONLY, and IOC orders')
+		if (orderType === 'GTD' && !expiresAtDate) {
+			return apiError('expiresAt is required for GTD orders')
+		}
+		if (orderType !== 'GTD' && expiresAtDate) {
+			return apiError('expiresAt is only supported for GTD orders')
 		}
 
 		const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+			await expireStaleMarketOrders(tx, marketId)
+
 			const market = await tx.market.findUnique({ where: { id: marketId } })
 			if (!market) throw new Error('Market not found')
 			if (market.status !== 'OPEN') throw new Error('Market is not open for trading')
 			if (new Date(market.endDate) <= new Date()) {
 				throw new Error('Market has expired and is no longer accepting trades')
+			}
+			if (expiresAtDate) {
+				if (expiresAtDate <= new Date()) {
+					throw new Error('GTD expiration must be in the future')
+				}
+				if (expiresAtDate > new Date(market.endDate)) {
+					throw new Error('GTD expiration cannot extend past the market end date')
+				}
 			}
 
 			const user = await tx.user.findUnique({ where: { id: authUser.userId } })
@@ -76,20 +87,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 				avgEntryPriceSnapshot = position.avgEntryPrice
 			}
 
-			// POST_ONLY: reject immediately if the order would match
-			if (orderType === 'POST_ONLY') {
-				const wouldMatch = await tx.marketOrder.findFirst({
-					where: {
-						marketId,
-						outcome,
-						side: side === 'BID' ? 'ASK' : 'BID',
-						userId: { not: authUser.userId },
-						status: { in: ['OPEN', 'PARTIAL'] },
-						remainingShares: { gt: 0 },
-						price: side === 'BID' ? { lte: price } : { gte: price },
-					},
-				})
-				if (wouldMatch) throw new Error('Post-only order would cross the spread and was rejected')
+			const now = new Date()
+			const matchingOrders = await tx.marketOrder.findMany({
+				where: {
+					marketId,
+					outcome,
+					side: side === 'BID' ? 'ASK' : 'BID',
+					userId: { not: authUser.userId },
+					status: { in: ['OPEN', 'PARTIAL'] },
+					remainingShares: { gt: 0 },
+					price: side === 'BID' ? { lte: price } : { gte: price },
+					...activeOrderWhere(now),
+				},
+				orderBy: side === 'BID'
+					? [{ price: 'asc' }, { createdAt: 'asc' }]
+					: [{ price: 'desc' }, { createdAt: 'asc' }],
+			})
+
+			const matchableShares = matchingOrders.reduce((total, order) => total + order.remainingShares, 0)
+			if (orderType === 'FOK' && matchableShares + 0.0000001 < shares) {
+				throw new Error('FOK order could not be fully matched immediately')
 			}
 
 			if (reserveAmount > 0) {
@@ -112,22 +129,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 					remainingShares: shares,
 					reservedAmount: reserveAmount,
 					avgEntryPriceSnapshot,
+					expiresAt: expiresAtDate,
 				},
-			})
-
-			const matchingOrders = await tx.marketOrder.findMany({
-				where: {
-					marketId,
-					outcome,
-					side: side === 'BID' ? 'ASK' : 'BID',
-					userId: { not: authUser.userId },
-					status: { in: ['OPEN', 'PARTIAL'] },
-					remainingShares: { gt: 0 },
-					price: side === 'BID' ? { lte: price } : { gte: price },
-				},
-				orderBy: side === 'BID'
-					? [{ price: 'asc' }, { createdAt: 'asc' }]
-					: [{ price: 'desc' }, { createdAt: 'asc' }],
 			})
 
 			let remainingShares = shares
@@ -227,8 +230,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 				})
 			}
 
-			// IOC and MARKET: cancel any unmatched remainder immediately
-			const cancelRemainder = remainingShares > 0 && (orderType === 'IOC' || orderType === 'MARKET')
+			const cancelRemainder = remainingShares > 0 && orderType === 'FAK'
 			if (cancelRemainder && remainingReserve > 0) {
 				await tx.user.update({
 					where: { id: authUser.userId },
@@ -295,6 +297,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 		}
 
 		const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+			await expireStaleMarketOrders(tx, marketId)
+
 			const order = await tx.marketOrder.findUnique({ where: { id: parsed.data.orderId } })
 			if (!order || order.marketId !== marketId) {
 				throw new Error('Order not found')
@@ -346,6 +350,7 @@ async function getReservedAskShares(
 			outcome,
 			side: 'ASK',
 			status: { in: ['OPEN', 'PARTIAL'] },
+			...activeOrderWhere(new Date()),
 		},
 		_sum: { remainingShares: true },
 	})
