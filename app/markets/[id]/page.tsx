@@ -367,7 +367,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
   ].sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
         <Button
           size="sm"
@@ -382,8 +382,10 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
       </div>
 
       {/* Header */}
-      <div>
-        <div className="flex flex-wrap items-center gap-2 mb-2">
+      <div className="relative overflow-hidden rounded-2xl border border-gray-200/80 dark:border-gray-800 bg-white/90 dark:bg-gray-900/80 backdrop-blur-sm p-5 sm:p-6">
+        <div className="pointer-events-none absolute -top-16 -right-14 h-44 w-44 rounded-full bg-cyan-300/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-16 -left-12 h-44 w-44 rounded-full bg-indigo-300/20 blur-3xl" />
+        <div className="relative flex flex-wrap items-center gap-2 mb-2">
           <span className={`text-xs px-2 py-0.5 rounded font-medium ${getCategoryColor(market.category)}`}>
             {translateCategory(market.category)}
           </span>
@@ -396,8 +398,8 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
             <span key={tag} className="text-xs bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-2 py-0.5 rounded">#{tag}</span>
           ))}
         </div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{market.title}</h1>
-        <div className="flex flex-wrap gap-4 mt-2 text-sm text-gray-500 dark:text-gray-500">
+        <h1 className="relative text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">{market.title}</h1>
+        <div className="relative flex flex-wrap gap-4 mt-2 text-sm text-gray-500 dark:text-gray-500">
           <span>{t('createdBy')}: <span className="text-gray-600 dark:text-gray-400">@{market.creator.username}</span></span>
           <span>{tAdmin('ends')}: {formatDateTime(market.endDate)} {isExpired ? `(${tCard('expired')})` : ''}</span>
           <span>{market._count.trades} {tCommon('trades')}</span>
@@ -410,7 +412,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
         {/* Left Column */}
         <div className="lg:col-span-2 space-y-6">
           {/* Probability Card */}
-          <div className="bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4">
+          <div className="bg-white/90 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 sm:p-5 shadow-sm">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t('currentProbability')}</h2>
             </div>
@@ -433,7 +435,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
           </div>
 
           {/* Price Chart */}
-          <div className="bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4">
+          <div className="bg-white/90 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 sm:p-5 shadow-sm">
             <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-3">{t('priceHistoryTitle')}</h2>
             <PriceChart data={market.priceHistory} />
           </div>
@@ -444,7 +446,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
           )}
 
           {/* Description */}
-          <div className="bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4">
+          <div className="bg-white/90 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 sm:p-5 shadow-sm">
             <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-2">{t('aboutThisMarket')}</h2>
             <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed whitespace-pre-wrap">{market.description}</p>
             {market.resolutionSource && (
@@ -459,7 +461,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
 
           {/* Resolution Center */}
           {(votingOpen || market.status === 'RESOLVED' || market.status === 'DISPUTED') && (
-            <div className="bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4 space-y-4">
+            <div className="bg-white/90 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 sm:p-5 space-y-4 shadow-sm">
               <div>
                 <h2 className="text-base font-semibold text-gray-900 dark:text-white">{t('resolutionCenter')}</h2>
                 {votingOpen && (
@@ -744,7 +746,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
           <TradePanel market={market} onTradeComplete={fetchMarket} />
 
           {/* Market Stats */}
-          <div className="bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4 text-sm space-y-3">
+          <div className="bg-white/90 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 sm:p-5 text-sm space-y-3 shadow-sm">
             <h3 className="font-semibold text-gray-900 dark:text-white">{t('marketStatsTitle')}</h3>
             <div className="flex justify-between text-gray-600 dark:text-gray-400">
               <span>{t('totalVolumeLabel')}</span>
@@ -830,20 +832,20 @@ function ExchangeHistoryPanel({ orderFills, userOrders }: { orderFills: Fill[]; 
   }
 
   return (
-    <div className="bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4">
+    <div className="bg-white/90 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 sm:p-5 shadow-sm">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-base font-semibold text-gray-900 dark:text-white">{t('exchangeHistoryTitle')}</h2>
-        <div className="inline-flex rounded-lg border border-gray-300 dark:border-gray-700 overflow-hidden text-xs">
+        <div className="inline-flex rounded-xl border border-gray-300 dark:border-gray-700 overflow-hidden text-xs bg-gray-100 dark:bg-gray-800">
           <button
             onClick={() => setTab('fills')}
-            className={`px-3 py-1.5 font-medium ${tab === 'fills' ? 'bg-indigo-600 text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
+            className={`px-3 py-1.5 font-medium transition-colors ${tab === 'fills' ? 'bg-indigo-600 text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700'}`}
           >
             {tTradePanel('recentFills', { outcome: `${tAdmin('yes')}/${tAdmin('no')}` })}
           </button>
           {userOrders.length > 0 && (
             <button
               onClick={() => setTab('orders')}
-              className={`px-3 py-1.5 font-medium ${tab === 'orders' ? 'bg-indigo-600 text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
+              className={`px-3 py-1.5 font-medium transition-colors ${tab === 'orders' ? 'bg-indigo-600 text-white' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700'}`}
             >
               {tTradePanel('openOrders')}
             </button>

@@ -87,22 +87,44 @@ export default function HomePage() {
   }, [fetchMarkets])
 
   return (
-    <div>
+    <div className="space-y-6 sm:space-y-8">
       {/* Hero */}
-      <div className="text-center mb-10">
-        <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-3">
-          {tHome('heroTitle')}{' '}
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">
-            {tHome('heroHighlight')}
-          </span>
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400 text-lg max-w-2xl mx-auto">
-          {tHome('heroSubtitle')}
-        </p>
+      <div className="relative overflow-hidden rounded-2xl border border-gray-200/80 dark:border-gray-800 bg-white/90 dark:bg-gray-900/80 backdrop-blur-sm p-6 sm:p-8">
+        <div className="pointer-events-none absolute -top-24 -right-20 h-56 w-56 rounded-full bg-cyan-300/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 -left-16 h-56 w-56 rounded-full bg-indigo-300/20 blur-3xl" />
+        <div className="relative">
+          <h1 className="text-3xl sm:text-5xl font-bold text-gray-900 dark:text-white mb-3 leading-tight">
+            {tHome('heroTitle')}{' '}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 via-cyan-500 to-emerald-500">
+              {tHome('heroHighlight')}
+            </span>
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 text-base sm:text-lg max-w-3xl">
+            {tHome('heroSubtitle')}
+          </p>
+          <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 max-w-3xl">
+            <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/70 px-3 py-2">
+              <div className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Markets</div>
+              <div className="text-sm font-semibold text-gray-900 dark:text-white">{total}</div>
+            </div>
+            <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/70 px-3 py-2">
+              <div className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Status</div>
+              <div className="text-sm font-semibold text-gray-900 dark:text-white">{status === 'all' ? tStatus('all') : statuses.find((s) => s.value === status)?.label}</div>
+            </div>
+            <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/70 px-3 py-2">
+              <div className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Category</div>
+              <div className="text-sm font-semibold text-gray-900 dark:text-white">{categories.find((c) => c.value === category)?.label}</div>
+            </div>
+            <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/70 px-3 py-2">
+              <div className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Sort</div>
+              <div className="text-sm font-semibold text-gray-900 dark:text-white">{sortOptions.find((s) => s.value === sortBy)?.label}</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 mb-6 space-y-4">
+      <div className="bg-white/90 dark:bg-gray-900/90 border border-gray-200/80 dark:border-gray-800 rounded-2xl p-4 sm:p-5 space-y-4 backdrop-blur-sm">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1">
             <Input
@@ -114,7 +136,7 @@ export default function HomePage() {
           <select
             value={status}
             onChange={(e) => { setStatus(e.target.value); setPage(1) }}
-            className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 min-w-36"
           >
             {statuses.map((s) => (
               <option key={s.value} value={s.value}>{s.label}</option>
@@ -123,7 +145,7 @@ export default function HomePage() {
           <select
             value={sortBy}
             onChange={(e) => { setSortBy(e.target.value); setPage(1) }}
-            className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 min-w-36"
           >
             {sortOptions.map((s) => (
               <option key={s.value} value={s.value}>{s.label}</option>
@@ -137,10 +159,10 @@ export default function HomePage() {
             <button
               key={cat.value}
               onClick={() => { setCategory(cat.value); setPage(1) }}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors border ${
                 category === cat.value
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-gray-600 hover:text-gray-900 dark:hover:text-white'
+                  ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
+                  : 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
               }`}
             >
               {cat.label}
@@ -153,11 +175,11 @@ export default function HomePage() {
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="bg-gray-200/50 dark:bg-gray-800/50 rounded-xl h-48 animate-pulse" />
+            <div key={i} className="rounded-2xl h-56 animate-pulse border border-gray-200 dark:border-gray-800 bg-gradient-to-br from-gray-100 via-white to-gray-100 dark:from-gray-800/70 dark:via-gray-900/80 dark:to-gray-800/70" />
           ))}
         </div>
       ) : markets.length === 0 ? (
-        <div className="text-center py-16 text-gray-500">
+        <div className="text-center py-16 text-gray-500 border border-dashed border-gray-300 dark:border-gray-700 rounded-2xl bg-white/60 dark:bg-gray-900/40">
           <div className="text-5xl mb-4">🔍</div>
           <p className="text-lg">{tHome('noMarkets')}</p>
           <p className="text-sm mt-1">{tHome('noMarketsHint')} <Link href="/markets/create" className="text-indigo-400 hover:underline">{tHome('createOne')}</Link>.</p>
@@ -178,15 +200,15 @@ export default function HomePage() {
               <button
                 disabled={page === 1}
                 onClick={() => setPage(p => p - 1)}
-                className="px-4 py-2 bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg disabled:opacity-50 hover:bg-gray-300 dark:hover:bg-gray-700 text-sm"
+                className="px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 rounded-lg disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
               >
                 {tHome('previous')}
               </button>
-              <span className="px-4 py-2 text-gray-600 dark:text-gray-400 text-sm">{tHome('pageOf', { page, total: Math.ceil(total / 20) })}</span>
+              <span className="px-4 py-2 text-gray-600 dark:text-gray-400 text-sm border border-gray-200 dark:border-gray-800 rounded-lg bg-white/80 dark:bg-gray-900/80">{tHome('pageOf', { page, total: Math.ceil(total / 20) })}</span>
               <button
                 disabled={page >= Math.ceil(total / 20)}
                 onClick={() => setPage(p => p + 1)}
-                className="px-4 py-2 bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg disabled:opacity-50 hover:bg-gray-300 dark:hover:bg-gray-700 text-sm"
+                className="px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 rounded-lg disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
               >
                 {tHome('next')}
               </button>

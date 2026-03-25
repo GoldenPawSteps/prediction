@@ -32,6 +32,16 @@
     background-color: var(--app-bg);
     color: var(--app-text);
     transition: background-color 150ms ease, color 150ms ease;
+    background-image:
+      radial-gradient(900px 450px at 0% 0%, rgb(56 189 248 / 0.08), transparent 55%),
+      radial-gradient(700px 380px at 100% 0%, rgb(99 102 241 / 0.08), transparent 60%);
+    background-attachment: fixed;
+  }
+
+  .dark body {
+    background-image:
+      radial-gradient(900px 450px at 0% 0%, rgb(34 211 238 / 0.09), transparent 55%),
+      radial-gradient(700px 380px at 100% 0%, rgb(99 102 241 / 0.12), transparent 60%);
   }
 
   * {
@@ -76,9 +86,21 @@ html[data-nav-pending='true'] body::before {
   height: 2px;
   transform-origin: left center;
   background: linear-gradient(90deg, #4f46e5 0%, #22d3ee 100%);
-  animation: nav-progress 600ms ease-out forwards;
+  animation: nav-progress 300ms ease-out forwards;
   z-index: 90;
   pointer-events: none;
+}
+
+@keyframes fade-up {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @layer utilities {
@@ -161,5 +183,42 @@ html[data-nav-pending='true'] body::before {
 
   :root:not(.dark) .hover\:text-white:hover {
     color: rgb(15 23 42);
+  }
+
+  .reveal-up {
+    opacity: 0;
+    animation: fade-up 180ms cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+    will-change: transform, opacity;
+  }
+
+  .reveal-delay-1 {
+    animation-delay: 20ms;
+  }
+
+  .reveal-delay-2 {
+    animation-delay: 40ms;
+  }
+
+  .reveal-delay-3 {
+    animation-delay: 60ms;
+  }
+
+  .hover-smooth {
+    transition: transform 90ms ease, box-shadow 90ms ease, border-color 90ms ease, background-color 90ms ease;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reveal-up,
+    .reveal-delay-1,
+    .reveal-delay-2,
+    .reveal-delay-3 {
+      animation: none;
+      opacity: 1;
+      transform: none;
+    }
+
+    .hover-smooth {
+      transition: none;
+    }
   }
 }

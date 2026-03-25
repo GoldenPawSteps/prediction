@@ -113,8 +113,9 @@ export function MarketCard({ market }: MarketCardProps) {
       onFocus={handleIntentPrefetch}
       onTouchStart={handleIntentPrefetch}
       onClick={handleMarketClick}
+      className="block h-full"
     >
-      <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4 hover:border-indigo-500/50 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all duration-200 cursor-pointer group">
+      <div className="h-full bg-white/95 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 hover:border-indigo-500/50 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-indigo-500/10 dark:hover:bg-gray-900 hover-smooth cursor-pointer group">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 mb-3">
           <span className={`text-xs px-2 py-0.5 rounded font-medium ${getCategoryColor(market.category)}`}>
@@ -126,7 +127,7 @@ export function MarketCard({ market }: MarketCardProps) {
         </div>
 
         {/* Title */}
-        <h3 className="text-gray-900 dark:text-white font-semibold text-sm mb-4 line-clamp-2 group-hover:text-indigo-600 dark:group-hover:text-indigo-300 transition-colors">
+        <h3 className="text-gray-900 dark:text-white font-semibold text-sm mb-4 line-clamp-2 group-hover:text-indigo-600 dark:group-hover:text-indigo-300 transition-colors min-h-10">
           {market.title}
         </h3>
 
@@ -145,7 +146,7 @@ export function MarketCard({ market }: MarketCardProps) {
         </div>
 
         {/* Stats */}
-        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-500">
+        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-500 gap-2">
           <span>{tCard('vol')}: <span className="text-gray-700 dark:text-gray-400">{formatCurrency(market.totalVolume)}</span></span>
           <span>{market._count?.trades || 0} {tCommon('trades')}</span>
           {market.status !== 'OPEN' && (

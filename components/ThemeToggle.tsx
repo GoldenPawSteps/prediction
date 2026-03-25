@@ -33,9 +33,12 @@ function applyTheme(mode: ThemeMode) {
 }
 
 export function ThemeToggle({ className = '' }: { className?: string }) {
-  // Lazy initializer reads localStorage on the client (SSR returns 'auto').
-  // suppressHydrationWarning on button/spans silences the expected mismatch.
-  const [mode, setMode] = useState<ThemeMode>(getInitialMode)
+  // Deterministic initial render on server+client; read persisted mode after mount.
+  const [mode, setMode] = useState<ThemeMode>('auto')
+
+  useEffect(() => {
+    setMode(getInitialMode())
+  }, [])
 
   useEffect(() => {
     applyTheme(mode)
@@ -60,13 +63,12 @@ export function ThemeToggle({ className = '' }: { className?: string }) {
     <button
       type="button"
       onClick={cycleMode}
-      suppressHydrationWarning
       className={`inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 ${className}`}
       aria-label={`Theme: ${current.label}`}
       title={`Theme: ${current.label} — click to cycle`}
     >
-      <span suppressHydrationWarning>{current.icon}</span>
-      <span suppressHydrationWarning>{current.label}</span>
+      <span>{current.icon}</span>
+      <span>{current.label}</span>
     </button>
   )
 }
