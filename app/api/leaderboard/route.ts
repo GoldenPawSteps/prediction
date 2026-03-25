@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
       const totalInvested = user.trades
         .filter((t) => t.type === 'BUY')
         .reduce((sum, t) => sum + Math.abs(t.totalCost), 0)
-      const roi = totalInvested > 0 ? (totalRealizedPnl / totalInvested) * 100 : 0
+      const roi = totalInvested > 0 ? totalRealizedPnl / totalInvested : 0
       const totalTrades = user.trades.length
 
       return {

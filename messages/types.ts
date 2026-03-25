@@ -151,6 +151,19 @@ export interface Messages {
     toastCreateFailed: string
     toastNetworkError: string
     submit: string
+    marketTypeLabel: string
+    binaryOption: string
+    multiOption: string
+    outcomesLabel: string
+    addOutcome: string
+    removeOutcome: string
+    outcomeNameLabel: string
+    outcomeNamePlaceholder: string
+    outcomeLiquidityLabel: string
+    outcomePriorLabel: string
+    validationOutcomesMin: string
+    validationOutcomeNameRequired: string
+    multiRiskLocked: string
   }
   admin: {
     title: string
@@ -187,6 +200,8 @@ export interface Messages {
     activityResolvedDescription: string
     activityDisputeTitle: string
     resolutionCenter: string
+    showDetails: string
+    hideDetails: string
     tradingClosedVotingOpen: string
     resolvedAsDisputesOpenUntil: string
     underDisputeRound: string
@@ -247,6 +262,7 @@ export interface Messages {
     totalTradesLabel: string
     endDateLabel: string
     statusLabel: string
+      noOutcomesFound: string
     outcomeLabel: string
     notionalLabel: string
     makerLabel: string
@@ -259,6 +275,9 @@ export interface Messages {
     filledAtLabel: string
     partialFillLabel: string
     cancelledLabel: string
+    outcomesTitle: string
+    parentMarketLabel: string
+    tradeOutcome: string
   }
   tradePanel: {
     placeTrade: string

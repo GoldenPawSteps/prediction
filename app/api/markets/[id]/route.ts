@@ -20,6 +20,77 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       where: { id },
       include: {
         creator: { select: { id: true, username: true, avatar: true } },
+        parent: { select: { id: true, title: true, marketType: true } },
+        children: {
+          select: {
+            id: true,
+            title: true,
+            outcomeName: true,
+            status: true,
+            resolution: true,
+            resolutionTime: true,
+            disputeWindowHours: true,
+            totalVolume: true,
+            endDate: true,
+            yesShares: true,
+            noShares: true,
+            liquidityParam: true,
+            _count: { select: { trades: true, comments: true, disputes: true } },
+            resolutionVotes: {
+              select: {
+                userId: true,
+                outcome: true,
+                createdAt: true,
+              },
+              orderBy: { createdAt: 'desc' },
+            },
+            disputes: {
+              select: {
+                id: true,
+                proposedOutcome: true,
+                status: true,
+                reason: true,
+                createdAt: true,
+                user: { select: { id: true, username: true, avatar: true } },
+              },
+              orderBy: { createdAt: 'desc' },
+              take: 5,
+            },
+            orders: {
+              where: { status: { in: ['OPEN', 'PARTIAL'] }, remainingShares: { gt: 0 }, ...activeOrderWhere(now) },
+              select: {
+                id: true,
+                userId: true,
+                outcome: true,
+                side: true,
+                status: true,
+                orderType: true,
+                price: true,
+                initialShares: true,
+                remainingShares: true,
+                expiresAt: true,
+                createdAt: true,
+                user: { select: { id: true, username: true, avatar: true } },
+              },
+              orderBy: { createdAt: 'desc' },
+              take: 100,
+            },
+            orderFills: {
+              select: {
+                id: true,
+                outcome: true,
+                price: true,
+                shares: true,
+                createdAt: true,
+                makerUser: { select: { id: true, username: true, avatar: true } },
+                takerUser: { select: { id: true, username: true, avatar: true } },
+              },
+              orderBy: { createdAt: 'desc' },
+              take: 20,
+            },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
         orders: {
           where: { status: { in: ['OPEN', 'PARTIAL'] }, remainingShares: { gt: 0 }, ...activeOrderWhere(now) },
           select: {
@@ -140,6 +211,76 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       filledShares: filledSharesByOrderId.get(order.id) ?? 0,
     }))
 
+    // Fetch user orders for each child outcome
+    const outcomeUserOrders = viewer ? await Promise.all(
+      market.children.map(async (child) => ({
+        childId: child.id,
+        orders: await prisma.marketOrder.findMany({
+          where: { marketId: child.id, userId: viewer.userId },
+          select: {
+            id: true,
+            userId: true,
+            outcome: true,
+            side: true,
+            status: true,
+            orderType: true,
+            price: true,
+            initialShares: true,
+            remainingShares: true,
+            expiresAt: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 30,
+        }),
+      }))
+    ) : []
+
+    // Build a map of child ID to user orders with filled shares
+    const outcomeUserOrdersMap = new Map<string, Array<{ id: string; userId: string; outcome: string; side: string; status: string; orderType?: string; price: number; initialShares: number; remainingShares: number; expiresAt?: string | null; createdAt: string; updatedAt?: string; filledShares: number }>>()
+    for (const outcomeOrders of outcomeUserOrders) {
+      // Get filled shares for these orders
+      const orderIds = outcomeOrders.orders.map((o) => o.id)
+      const [makerFills, takerFills] = orderIds.length > 0
+        ? await Promise.all([
+            prisma.marketOrderFill.groupBy({
+              by: ['makerOrderId'],
+              where: { makerOrderId: { in: orderIds } },
+              _sum: { shares: true },
+            }),
+            prisma.marketOrderFill.groupBy({
+              by: ['takerOrderId'],
+              where: { takerOrderId: { in: orderIds } },
+              _sum: { shares: true },
+            }),
+          ])
+        : [[], []]
+
+      const filledMap = new Map<string, number>()
+      for (const fill of makerFills) {
+        filledMap.set(fill.makerOrderId, (filledMap.get(fill.makerOrderId) ?? 0) + (fill._sum.shares ?? 0))
+      }
+      for (const fill of takerFills) {
+        filledMap.set(fill.takerOrderId, (filledMap.get(fill.takerOrderId) ?? 0) + (fill._sum.shares ?? 0))
+      }
+
+      outcomeUserOrdersMap.set(
+        outcomeOrders.childId,
+        outcomeOrders.orders.map((order) => ({
+          ...order,
+          createdAt: order.createdAt.toISOString(),
+          updatedAt: order.updatedAt?.toISOString(),
+          expiresAt: order.expiresAt?.toISOString() ?? null,
+          outcome: order.outcome as string,
+          side: order.side as string,
+          status: order.status as string,
+          orderType: order.orderType as string | undefined,
+          filledShares: filledMap.get(order.id) ?? 0,
+        }))
+      )
+    }
+
     const probabilities = market.resolution === 'YES'
       ? { yes: 1, no: 0 }
       : market.resolution === 'NO'
@@ -148,8 +289,27 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       ? { yes: 0.5, no: 0.5 }
       : getMarketProbabilities(market.yesShares, market.noShares, market.liquidityParam)
 
+    const outcomes = market.children.map((child) => ({
+      ...child,
+      disputeCount: child._count.disputes,
+      probabilities: child.resolution === 'YES'
+        ? { yes: 1, no: 0 }
+        : child.resolution === 'NO'
+        ? { yes: 0, no: 1 }
+        : child.resolution === 'INVALID'
+        ? { yes: 0.5, no: 0.5 }
+        : getMarketProbabilities(child.yesShares, child.noShares, child.liquidityParam),
+      userOrders: outcomeUserOrdersMap.get(child.id) ?? [],
+    }))
+
+    const totalVolume = market.marketType === 'MULTI'
+      ? outcomes.reduce((sum, outcome) => sum + outcome.totalVolume, 0)
+      : market.totalVolume
+
     return apiSuccess({
       ...market,
+      totalVolume,
+      outcomes,
       userOrders: userOrdersWithFilledShares,
       probabilities,
       disputeCount: market._count.disputes,

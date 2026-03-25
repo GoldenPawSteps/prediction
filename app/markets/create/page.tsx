@@ -37,6 +37,7 @@ export default function CreateMarketPage() {
   const { user, optimisticUpdateBalance } = useAuth()
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({
+    marketType: 'BINARY' as 'BINARY' | 'MULTI',
     title: '',
     description: '',
     category: 'Crypto',
@@ -46,6 +47,10 @@ export default function CreateMarketPage() {
     priorProbability: 50,
     disputeWindowHours: 24,
     tags: '',
+    outcomes: [
+      { name: '', initialLiquidity: 100, priorProbability: 50 },
+      { name: '', initialLiquidity: 100, priorProbability: 50 },
+    ],
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -57,11 +62,48 @@ export default function CreateMarketPage() {
     else if (new Date(form.endDate) <= new Date()) errs.endDate = t('validationEndDateFuture')
     if (!form.resolutionSource) errs.resolutionSource = t('validationResolutionRequired')
     else if (!form.resolutionSource.startsWith('http')) errs.resolutionSource = t('validationResolutionUrl')
-    if (form.initialLiquidity < 10 || form.initialLiquidity > 10000) errs.initialLiquidity = t('validationLiquidityRange')
-    if (form.priorProbability < 1 || form.priorProbability > 99) errs.priorProbability = t('validationPriorRange')
+    if (form.marketType === 'BINARY') {
+      if (form.initialLiquidity < 10 || form.initialLiquidity > 10000) errs.initialLiquidity = t('validationLiquidityRange')
+      if (form.priorProbability < 1 || form.priorProbability > 99) errs.priorProbability = t('validationPriorRange')
+    } else {
+      if (form.outcomes.length < 2) errs.outcomes = t('validationOutcomesMin')
+      form.outcomes.forEach((outcome, index) => {
+        if (!outcome.name.trim()) errs[`outcomeName_${index}`] = t('validationOutcomeNameRequired')
+        if (outcome.initialLiquidity < 10 || outcome.initialLiquidity > 10000) errs[`outcomeLiquidity_${index}`] = t('validationLiquidityRange')
+        if (outcome.priorProbability < 1 || outcome.priorProbability > 99) errs[`outcomePrior_${index}`] = t('validationPriorRange')
+      })
+    }
     if (form.disputeWindowHours < 1 || form.disputeWindowHours > 720) errs.disputeWindowHours = t('validationDisputeRange')
     setErrors(errs)
     return Object.keys(errs).length === 0
+  }
+
+  const totalLocked = form.marketType === 'MULTI'
+    ? form.outcomes.reduce((sum, outcome) => sum + Number(outcome.initialLiquidity || 0), 0)
+    : Number(form.initialLiquidity)
+
+  const addOutcome = () => {
+    setForm((prev) => ({
+      ...prev,
+      outcomes: [...prev.outcomes, { name: '', initialLiquidity: 100, priorProbability: 50 }],
+    }))
+  }
+
+  const removeOutcome = (index: number) => {
+    setForm((prev) => {
+      if (prev.outcomes.length <= 2) return prev
+      return {
+        ...prev,
+        outcomes: prev.outcomes.filter((_, i) => i !== index),
+      }
+    })
+  }
+
+  const updateOutcome = (index: number, field: 'name' | 'initialLiquidity' | 'priorProbability', value: string | number) => {
+    setForm((prev) => ({
+      ...prev,
+      outcomes: prev.outcomes.map((outcome, i) => i === index ? { ...outcome, [field]: value } : outcome),
+    }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -81,11 +123,18 @@ export default function CreateMarketPage() {
           tags: form.tags.split(',').map((t) => t.trim()).filter(Boolean),
           initialLiquidity: Number(form.initialLiquidity),
           priorProbability: Number(form.priorProbability) / 100,
+          outcomes: form.marketType === 'MULTI'
+            ? form.outcomes.map((outcome) => ({
+                name: outcome.name.trim(),
+                initialLiquidity: Number(outcome.initialLiquidity),
+                priorProbability: Number(outcome.priorProbability) / 100,
+              }))
+            : [],
         }),
       })
       const data = await res.json()
       if (res.ok) {
-        optimisticUpdateBalance(Number(form.initialLiquidity))
+        optimisticUpdateBalance(totalLocked)
         toast.success(t('toastCreated'))
         router.push(`/markets/${data.market.id}`)
       } else {
@@ -117,10 +166,41 @@ export default function CreateMarketPage() {
       {/* Risk Warning */}
       <div className="bg-yellow-100 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700/30 rounded-xl p-4 mb-6 text-sm text-yellow-900 dark:text-yellow-200">
         ⚠️ <strong>{t('riskWarning')}</strong>{' '}
-        {t('riskLocked', { amount: form.initialLiquidity })}
+        {form.marketType === 'MULTI'
+          ? t('multiRiskLocked', { amount: totalLocked })
+          : t('riskLocked', { amount: form.initialLiquidity })}
       </div>
 
       <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6 space-y-5">
+        {/* Title */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('marketTypeLabel')}</label>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setForm({ ...form, marketType: 'BINARY' })}
+              className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                form.marketType === 'BINARY'
+                  ? 'bg-indigo-600 border-indigo-600 text-white'
+                  : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300'
+              }`}
+            >
+              {t('binaryOption')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setForm({ ...form, marketType: 'MULTI' })}
+              className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                form.marketType === 'MULTI'
+                  ? 'bg-indigo-600 border-indigo-600 text-white'
+                  : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300'
+              }`}
+            >
+              {t('multiOption')}
+            </button>
+          </div>
+        </div>
+
         {/* Title */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -194,42 +274,118 @@ export default function CreateMarketPage() {
           <p className="text-gray-500 dark:text-gray-500 text-xs mt-1">{t('resolutionHint')}</p>
         </div>
 
-        {/* Initial Liquidity */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            {t('liquidityLabel')} <span className="text-red-400">*</span>
-          </label>
-          <input
-            type="number"
-            min="10"
-            max="10000"
-            value={form.initialLiquidity}
-            onChange={(e) => setForm({ ...form, initialLiquidity: Number(e.target.value) })}
-            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-          {errors.initialLiquidity && <p className="text-red-400 text-xs mt-1">{errors.initialLiquidity}</p>}
-          <p className="text-gray-500 dark:text-gray-500 text-xs mt-1">
-            {t('liquidityHint', { balance: user.balance.toFixed(2) })}
-          </p>
-        </div>
+        {form.marketType === 'BINARY' ? (
+          <>
+            {/* Initial Liquidity */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                {t('liquidityLabel')} <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="number"
+                min="10"
+                max="10000"
+                value={form.initialLiquidity}
+                onChange={(e) => setForm({ ...form, initialLiquidity: Number(e.target.value) })}
+                className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              {errors.initialLiquidity && <p className="text-red-400 text-xs mt-1">{errors.initialLiquidity}</p>}
+              <p className="text-gray-500 dark:text-gray-500 text-xs mt-1">
+                {t('liquidityHint', { balance: user.balance.toFixed(2) })}
+              </p>
+            </div>
 
-        {/* AMM Prior Probability */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            {t('priorLabel')} <span className="text-red-400">*</span>
-          </label>
-          <input
-            type="number"
-            min="1"
-            max="99"
-            step="0.1"
-            value={form.priorProbability}
-            onChange={(e) => setForm({ ...form, priorProbability: Number(e.target.value) })}
-            className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-          {errors.priorProbability && <p className="text-red-400 text-xs mt-1">{errors.priorProbability}</p>}
-          <p className="text-gray-500 dark:text-gray-500 text-xs mt-1">{t('priorHint')}</p>
-        </div>
+            {/* AMM Prior Probability */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                {t('priorLabel')} <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="99"
+                step="0.1"
+                value={form.priorProbability}
+                onChange={(e) => setForm({ ...form, priorProbability: Number(e.target.value) })}
+                className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              {errors.priorProbability && <p className="text-red-400 text-xs mt-1">{errors.priorProbability}</p>}
+              <p className="text-gray-500 dark:text-gray-500 text-xs mt-1">{t('priorHint')}</p>
+            </div>
+          </>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                {t('outcomesLabel')} <span className="text-red-400">*</span>
+              </label>
+              <button
+                type="button"
+                onClick={addOutcome}
+                className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+              >
+                + {t('addOutcome')}
+              </button>
+            </div>
+            {errors.outcomes && <p className="text-red-400 text-xs">{errors.outcomes}</p>}
+
+            {form.outcomes.map((outcome, index) => (
+              <div key={`outcome-${index}`} className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t('outcomeNameLabel')} #{index + 1}</span>
+                  {form.outcomes.length > 2 && (
+                    <button
+                      type="button"
+                      onClick={() => removeOutcome(index)}
+                      className="text-xs font-medium text-red-500 hover:underline"
+                    >
+                      {t('removeOutcome')}
+                    </button>
+                  )}
+                </div>
+                <input
+                  value={outcome.name}
+                  onChange={(e) => updateOutcome(index, 'name', e.target.value)}
+                  placeholder={t('outcomeNamePlaceholder')}
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                {errors[`outcomeName_${index}`] && <p className="text-red-400 text-xs">{errors[`outcomeName_${index}`]}</p>}
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">{t('outcomeLiquidityLabel')}</label>
+                    <input
+                      type="number"
+                      min="10"
+                      max="10000"
+                      value={outcome.initialLiquidity}
+                      onChange={(e) => updateOutcome(index, 'initialLiquidity', Number(e.target.value))}
+                      className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    {errors[`outcomeLiquidity_${index}`] && <p className="text-red-400 text-xs mt-1">{errors[`outcomeLiquidity_${index}`]}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">{t('outcomePriorLabel')}</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="99"
+                      step="0.1"
+                      value={outcome.priorProbability}
+                      onChange={(e) => updateOutcome(index, 'priorProbability', Number(e.target.value))}
+                      className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    {errors[`outcomePrior_${index}`] && <p className="text-red-400 text-xs mt-1">{errors[`outcomePrior_${index}`]}</p>}
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            <p className="text-gray-500 dark:text-gray-500 text-xs mt-1">
+              {t('liquidityHint', { balance: user.balance.toFixed(2) })}
+            </p>
+          </div>
+        )}
 
         {/* Dispute Window */}
         <div>
@@ -258,7 +414,7 @@ export default function CreateMarketPage() {
         />
 
         <Button type="submit" className="w-full" size="lg" loading={loading}>
-          {t('submit', { amount: form.initialLiquidity })}
+          {t('submit', { amount: totalLocked })}
         </Button>
       </form>
     </div>

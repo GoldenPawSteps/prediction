@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { use } from 'react'
+import Link from 'next/link'
 import { notFound, useRouter } from 'next/navigation'
 import { PriceChart } from '@/components/PriceChart'
 import { TradePanel } from '@/components/TradePanel'
@@ -40,6 +41,10 @@ function formatRelativeTime(date: string | Date, locale: string): string {
 interface Market {
   id: string
   title: string
+  marketType?: 'BINARY' | 'MULTI'
+  parentMarketId?: string | null
+  outcomeName?: string | null
+  parent?: { id: string; title: string; marketType: 'BINARY' | 'MULTI' } | null
   description: string
   category: string
   status: string
@@ -55,6 +60,74 @@ interface Market {
   noShares: number
   liquidityParam: number
   probabilities: { yes: number; no: number }
+  outcomes?: Array<{
+    id: string
+    title: string
+    outcomeName: string | null
+    status: string
+    resolution: string | null
+    resolutionTime?: string | null
+    disputeWindowHours?: number
+    disputeCount?: number
+    totalVolume: number
+    endDate: string
+    yesShares: number
+    noShares: number
+    liquidityParam: number
+    probabilities: { yes: number; no: number }
+    _count: { trades: number; comments: number; disputes: number }
+    resolutionVotes: Array<{
+      userId: string
+      outcome: 'YES' | 'NO' | 'INVALID'
+      createdAt: string
+    }>
+    disputes: Array<{
+      id: string
+      proposedOutcome: 'YES' | 'NO' | 'INVALID'
+      status: string
+      reason: string
+      createdAt: string
+      user: { id: string; username: string; avatar: string | null }
+    }>
+    orders?: Array<{
+      id: string
+      userId: string
+      outcome: 'YES' | 'NO'
+      side: 'BID' | 'ASK'
+      status: 'OPEN' | 'PARTIAL' | 'FILLED' | 'CANCELLED'
+      orderType?: string
+      price: number
+      initialShares: number
+      remainingShares: number
+      expiresAt?: string | null
+      createdAt: string
+      user: { id: string; username: string; avatar: string | null }
+    }>
+    orderFills?: Array<{
+      id: string
+      outcome: 'YES' | 'NO'
+      price: number
+      shares: number
+      createdAt: string
+      makerUser: { id: string; username: string; avatar: string | null }
+      takerUser: { id: string; username: string; avatar: string | null }
+    }>
+    userOrders?: Array<{
+      id: string
+      userId: string
+      outcome: 'YES' | 'NO'
+      side: 'BID' | 'ASK'
+      status: 'OPEN' | 'PARTIAL' | 'FILLED' | 'CANCELLED'
+      orderType?: string
+      price: number
+      initialShares: number
+      remainingShares: number
+      filledShares?: number
+      expiresAt?: string | null
+      createdAt: string
+      updatedAt?: string
+    }>
+  }>
   resolutionVotes: Array<{
     userId: string
     outcome: 'YES' | 'NO' | 'INVALID'
@@ -110,6 +183,10 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
   const [resolutionActionLoading, setResolutionActionLoading] = useState(false)
   const [disputeReason, setDisputeReason] = useState('')
   const [disputeOutcome, setDisputeOutcome] = useState<'YES' | 'NO' | 'INVALID'>('YES')
+  const [outcomeResolutionLoadingId, setOutcomeResolutionLoadingId] = useState<string | null>(null)
+  const [outcomeDisputeReason, setOutcomeDisputeReason] = useState<Record<string, string>>({})
+  const [outcomeDisputeOutcome, setOutcomeDisputeOutcome] = useState<Record<string, 'YES' | 'NO' | 'INVALID'>>({})
+  const [expandedOutcomeResolution, setExpandedOutcomeResolution] = useState<Record<string, boolean>>({})
   const [commentRefreshKey, setCommentRefreshKey] = useState(0)
   const hasLoggedNavMetricRef = useRef(false)
 
@@ -278,6 +355,105 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
     }
   }
 
+  const handleOutcomeVote = async (outcomeMarketId: string, outcome: 'YES' | 'NO' | 'INVALID') => {
+    if (!user) {
+      toast.error(t('loginToVote'))
+      return
+    }
+
+    setOutcomeResolutionLoadingId(outcomeMarketId)
+    try {
+      const res = await fetch(`/api/markets/${outcomeMarketId}/vote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ outcome }),
+      })
+      const data = await res.json()
+
+      if (res.ok) {
+        if (data.autoResolved && data.majorityOutcome) {
+          toast.success(t('voteRecordedAutoResolved', { outcome: translateOutcome(data.majorityOutcome) }))
+          await refreshUser()
+        } else {
+          toast.success(t('voteRecordedFor', { outcome: translateOutcome(outcome) }))
+        }
+        await fetchMarket()
+      } else {
+        toast.error(data.error || t('voteFailed'))
+      }
+    } catch {
+      toast.error(t('networkError'))
+    } finally {
+      setOutcomeResolutionLoadingId(null)
+    }
+  }
+
+  const handleOutcomeAdminResolve = async (outcomeMarketId: string, outcome: 'YES' | 'NO' | 'INVALID') => {
+    if (!user?.isAdmin) return
+
+    setOutcomeResolutionLoadingId(outcomeMarketId)
+    try {
+      const res = await fetch(`/api/markets/${outcomeMarketId}/resolve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ outcome }),
+      })
+      const data = await res.json()
+
+      if (res.ok) {
+        toast.success(t('marketResolvedAs', { outcome: translateOutcome(outcome) }))
+        await refreshUser()
+        await fetchMarket()
+      } else {
+        toast.error(data.error || t('resolutionFailed'))
+      }
+    } catch {
+      toast.error(t('networkError'))
+    } finally {
+      setOutcomeResolutionLoadingId(null)
+    }
+  }
+
+  const handleOutcomeDispute = async (outcomeMarketId: string) => {
+    if (!user) {
+      toast.error(t('loginToDispute'))
+      return
+    }
+
+    const reason = outcomeDisputeReason[outcomeMarketId]?.trim() || ''
+    if (reason.length < 20) {
+      toast.error(t('disputeReasonMin'))
+      return
+    }
+
+    const proposedOutcome = outcomeDisputeOutcome[outcomeMarketId] || 'YES'
+
+    setOutcomeResolutionLoadingId(outcomeMarketId)
+    try {
+      const res = await fetch(`/api/markets/${outcomeMarketId}/dispute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ proposedOutcome, reason }),
+      })
+      const data = await res.json()
+
+      if (res.ok) {
+        toast.success(data.message || t('disputeFiledSuccessfully'))
+        setOutcomeDisputeReason((prev) => ({ ...prev, [outcomeMarketId]: '' }))
+        await fetchMarket()
+      } else {
+        toast.error(data.error || t('disputeFailed'))
+      }
+    } catch {
+      toast.error(t('networkError'))
+    } finally {
+      setOutcomeResolutionLoadingId(null)
+    }
+  }
+
   if (loading) {
     return (
       <div className="animate-pulse space-y-4">
@@ -293,8 +469,14 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
 
   if (!market) return notFound()
 
+  const isMultiMarket = market.marketType === 'MULTI'
+  const outcomeMarkets = market.outcomes ?? []
+  const aggregateTrades = isMultiMarket
+    ? outcomeMarkets.reduce((sum, outcome) => sum + outcome._count.trades, 0)
+    : market._count.trades
+
   const isExpired = new Date(market.endDate) < new Date()
-  const votingOpen = isExpired && (market.status === 'CLOSED' || market.status === 'OPEN' || market.status === 'DISPUTED')
+  const votingOpen = !isMultiMarket && isExpired && (market.status === 'CLOSED' || market.status === 'OPEN' || market.status === 'DISPUTED')
   const myVote = user ? market.resolutionVotes.find((vote) => vote.userId === user.id)?.outcome : null
   const voteCounts = market.resolutionVotes.reduce(
     (counts, vote) => {
@@ -399,10 +581,15 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
           ))}
         </div>
         <h1 className="relative text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">{market.title}</h1>
+        {market.parent && (
+          <div className="relative mt-2 text-sm text-gray-500 dark:text-gray-500">
+            {t('parentMarketLabel')}: <Link href={`/markets/${market.parent.id}`} className="text-indigo-500 dark:text-indigo-300 hover:underline">{market.parent.title}</Link>
+          </div>
+        )}
         <div className="relative flex flex-wrap gap-4 mt-2 text-sm text-gray-500 dark:text-gray-500">
           <span>{t('createdBy')}: <span className="text-gray-600 dark:text-gray-400">@{market.creator.username}</span></span>
           <span>{tAdmin('ends')}: {formatDateTime(market.endDate)} {isExpired ? `(${tCard('expired')})` : ''}</span>
-          <span>{market._count.trades} {tCommon('trades')}</span>
+          <span>{aggregateTrades} {tCommon('trades')}</span>
           <span>{tCard('vol')}: {formatCurrency(market.totalVolume)}</span>
         </div>
       </div>
@@ -411,34 +598,352 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Probability Card */}
-          <div className="bg-white/90 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 sm:p-5 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t('currentProbability')}</h2>
-            </div>
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div className="bg-green-900/30 border border-green-700/30 rounded-lg p-3 text-center">
-                <div className="text-3xl font-bold text-green-400">{formatPercent(market.probabilities.yes)}</div>
-                <div className="text-sm text-green-600 mt-1">{tAdmin('yes')}</div>
-              </div>
-              <div className="bg-red-900/30 border border-red-700/30 rounded-lg p-3 text-center">
-                <div className="text-3xl font-bold text-red-400">{formatPercent(market.probabilities.no)}</div>
-                <div className="text-sm text-red-600 mt-1">{tAdmin('no')}</div>
-              </div>
-            </div>
-            <div className="h-2 bg-gray-300 dark:bg-gray-700 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full transition-all duration-500"
-                style={{ width: `${market.probabilities.yes * 100}%` }}
-              />
-            </div>
-          </div>
+          {isMultiMarket ? (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t('outcomesTitle')}</h2>
+                {outcomeMarkets.length === 0 ? (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">{t('noOutcomesFound')}</p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-6">
+                    {outcomeMarkets.map((outcome) => {
+                      const outcomeIsExpired = new Date(outcome.endDate) < new Date()
+                      const outcomeVotingOpen = outcomeIsExpired
+                        && (outcome.status === 'CLOSED' || outcome.status === 'OPEN' || outcome.status === 'DISPUTED')
+                      const outcomeMyVote = user
+                        ? outcome.resolutionVotes.find((vote) => vote.userId === user.id)?.outcome
+                        : null
+                      const outcomeVoteCounts = outcome.resolutionVotes.reduce(
+                        (counts, vote) => {
+                          counts[vote.outcome] += 1
+                          return counts
+                        },
+                        { YES: 0, NO: 0, INVALID: 0 }
+                      )
+                      const outcomeDisputeCount = outcome.disputeCount ?? outcome._count.disputes
+                      const outcomeTotalVotes = outcomeVoteCounts.YES + outcomeVoteCounts.NO + outcomeVoteCounts.INVALID
+                      const outcomeImmediateResolutionRound = isImmediateResolutionRound(outcomeDisputeCount)
+                      const outcomeResolutionQuorum = getResolutionQuorum(outcomeDisputeCount)
+                      const outcomeQualifiedMajorityThreshold = getQualifiedMajorityThreshold(outcomeDisputeCount)
+                      const outcomeQualifiedMajorityFractionLabel = formatQualifiedMajorityLabel(outcomeDisputeCount)
+                      const outcomeQualifiedMajorityPercentLabel = (outcomeQualifiedMajorityThreshold * 100).toFixed(1)
+                      const outcomeLeadingOutcome = outcomeVoteCounts.YES === outcomeVoteCounts.NO
+                        ? null
+                        : outcomeVoteCounts.YES > outcomeVoteCounts.NO
+                        ? 'YES'
+                        : 'NO'
+                      const outcomeLeadingVoteCount = outcomeLeadingOutcome ? outcomeVoteCounts[outcomeLeadingOutcome] : 0
+                      const outcomeQuorumReached = outcomeTotalVotes >= outcomeResolutionQuorum
+                      const outcomeVotesNeededForQuorum = Math.max(0, outcomeResolutionQuorum - outcomeTotalVotes)
+                      const outcomeValidMajorityReached = outcomeImmediateResolutionRound
+                        ? Boolean(outcomeTotalVotes > 0 && outcomeLeadingOutcome)
+                        : Boolean(
+                            outcomeQuorumReached
+                            && outcomeLeadingOutcome
+                            && outcomeLeadingVoteCount / outcomeTotalVotes > outcomeQualifiedMajorityThreshold
+                          )
+                      const outcomeInvalidMajorityReached = outcomeImmediateResolutionRound
+                        ? outcomeVoteCounts.INVALID > 0
+                        : outcomeQuorumReached && outcomeVoteCounts.INVALID / outcomeTotalVotes > outcomeQualifiedMajorityThreshold
+                      const outcomeInvalidProgressPercent = outcomeTotalVotes > 0
+                        ? (outcomeVoteCounts.INVALID / outcomeTotalVotes) * 100
+                        : 0
+                      const outcomeDisputeWindowEndsAt = outcome.resolutionTime && outcome.disputeWindowHours
+                        ? new Date(new Date(outcome.resolutionTime).getTime() + outcome.disputeWindowHours * 60 * 60 * 1000)
+                        : null
+                      const outcomeDisputeWindowOpen = Boolean(
+                        outcome.status === 'RESOLVED' && outcomeDisputeWindowEndsAt && outcomeDisputeWindowEndsAt.getTime() > Date.now()
+                      )
+                      const outcomeResolutionExpanded = Boolean(expandedOutcomeResolution[outcome.id])
 
-          {/* Price Chart */}
-          <div className="bg-white/90 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 sm:p-5 shadow-sm">
-            <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-3">{t('priceHistoryTitle')}</h2>
-            <PriceChart data={market.priceHistory} />
-          </div>
+                      return (
+                      <div key={outcome.id} className="bg-white/90 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 sm:p-5 shadow-sm">
+                        <div className="mb-4">
+                          <h3 className="text-base font-semibold text-gray-900 dark:text-white">{outcome.outcomeName || outcome.title}</h3>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex flex-wrap items-center gap-2">
+                            <span>{tCard('vol')}: {formatCurrency(outcome.totalVolume)} · {outcome._count.trades} {tCommon('trades')}</span>
+                            {outcome.status !== 'OPEN' && (
+                              <Badge variant={outcome.status === 'RESOLVED' ? 'info' : outcome.status === 'INVALID' ? 'danger' : 'warning'}>
+                                {translateStatus(outcome.status)} {outcome.resolution ? `(${translateOutcome(outcome.resolution)})` : ''}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        <div className="mb-4">
+                          <div className="flex justify-between text-xs mb-2">
+                            <span className="text-green-400 font-semibold">{tAdmin('yes')} {formatPercent(outcome.probabilities.yes)}</span>
+                            <span className="text-red-400 font-semibold">{tAdmin('no')} {formatPercent(outcome.probabilities.no)}</span>
+                          </div>
+                          <div className="h-2 bg-gray-300 dark:bg-gray-700 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full transition-all duration-500"
+                              style={{ width: `${outcome.probabilities.yes * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                        <TradePanel
+                          market={{
+                            id: outcome.id,
+                            status: outcome.status,
+                            endDate: outcome.endDate,
+                            yesShares: outcome.yesShares,
+                            noShares: outcome.noShares,
+                            liquidityParam: outcome.liquidityParam,
+                            probabilities: outcome.probabilities,
+                            orders: outcome.orders,
+                            orderFills: outcome.orderFills,
+                            userOrders: outcome.userOrders,
+                          }}
+                          onTradeComplete={fetchMarket}
+                        />
+
+                        {(outcomeVotingOpen || outcome.status === 'RESOLVED' || outcome.status === 'DISPUTED') && (
+                          <div className="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4 space-y-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <h4 className="text-sm font-semibold text-gray-900 dark:text-white">{t('resolutionCenter')}</h4>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => setExpandedOutcomeResolution((prev) => ({ ...prev, [outcome.id]: !prev[outcome.id] }))}
+                              >
+                                {outcomeResolutionExpanded ? t('hideDetails') : t('showDetails')}
+                              </Button>
+                            </div>
+
+                            {!outcomeResolutionExpanded && (
+                              <p className="text-xs text-gray-500 dark:text-gray-500">
+                                {t('totalVotesCast', { count: outcomeTotalVotes })}
+                              </p>
+                            )}
+
+                            {outcomeResolutionExpanded && (
+                              <>
+
+                            {outcome.status === 'DISPUTED' && (
+                              <p className="text-xs text-yellow-400">
+                                {t('underDisputeRound', {
+                                  round: getOrdinalLabel(outcomeDisputeCount),
+                                  quorum: outcomeResolutionQuorum,
+                                  threshold: outcomeQualifiedMajorityFractionLabel,
+                                })}
+                              </p>
+                            )}
+
+                            <div className="grid grid-cols-3 gap-2 text-xs">
+                              <div className="rounded-lg bg-green-900/20 border border-green-700/30 p-2 text-center">
+                                <div className="text-green-400 font-semibold">{tAdmin('yes')}</div>
+                                <div className="text-gray-900 dark:text-white text-base font-bold">{outcomeVoteCounts.YES}</div>
+                              </div>
+                              <div className="rounded-lg bg-red-900/20 border border-red-700/30 p-2 text-center">
+                                <div className="text-red-400 font-semibold">{tAdmin('no')}</div>
+                                <div className="text-gray-900 dark:text-white text-base font-bold">{outcomeVoteCounts.NO}</div>
+                              </div>
+                              <div className="rounded-lg bg-gray-200 dark:bg-gray-700/40 border border-gray-300 dark:border-gray-600/40 p-2 text-center">
+                                <div className="text-gray-700 dark:text-gray-300 font-semibold">{tAdmin('invalid')}</div>
+                                <div className="text-gray-900 dark:text-white text-base font-bold">{outcomeVoteCounts.INVALID}</div>
+                              </div>
+                            </div>
+
+                            <div className="rounded-lg bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700/60 p-3 space-y-2">
+                              <div className="flex items-center justify-between gap-3 text-xs">
+                                <span className="text-gray-600 dark:text-gray-400">{t('leadingOutcome')}</span>
+                                <span className="text-gray-900 dark:text-white font-medium">
+                                  {outcomeInvalidMajorityReached
+                                    ? t('invalidHasMajority', { invalid: outcomeVoteCounts.INVALID, total: outcomeTotalVotes })
+                                    : outcomeLeadingOutcome
+                                    ? t('leadingOutcomeVotes', {
+                                        outcome: translateOutcome(outcomeLeadingOutcome),
+                                        leading: outcomeLeadingVoteCount,
+                                        total: outcomeTotalVotes,
+                                        percent: outcomeTotalVotes > 0 ? Math.round(outcomeLeadingVoteCount / outcomeTotalVotes * 100) : 0,
+                                      })
+                                    : outcomeTotalVotes > 0
+                                    ? t('noOutcomeMajorityYet')
+                                    : t('noVotesYet')}
+                                </span>
+                              </div>
+                              {outcomeTotalVotes > 0 && (
+                                <>
+                                  <div className="h-3 bg-gray-300 dark:bg-gray-700 rounded-full overflow-hidden flex">
+                                    <div className="h-full bg-green-500 transition-all duration-500" style={{ width: `${(outcomeVoteCounts.YES / outcomeTotalVotes) * 100}%` }} />
+                                    <div className="h-full bg-red-500 transition-all duration-500" style={{ width: `${(outcomeVoteCounts.NO / outcomeTotalVotes) * 100}%` }} />
+                                    <div className="h-full bg-gray-400 transition-all duration-500" style={{ width: `${outcomeInvalidProgressPercent}%` }} />
+                                  </div>
+                                  <div className="relative h-1">
+                                    <div
+                                      className="absolute top-0 w-0.5 h-3 bg-yellow-400 -translate-y-1"
+                                      style={{ left: `${outcomeQualifiedMajorityThreshold * 100}%` }}
+                                      title={t('qualifiedMajorityThresholdTooltip', { percent: outcomeQualifiedMajorityPercentLabel })}
+                                    />
+                                  </div>
+                                  <p className="text-xs text-gray-500 dark:text-gray-500">
+                                    {outcomeImmediateResolutionRound
+                                      ? t('firstVoteResolvesMarket')
+                                      : !outcomeQuorumReached
+                                      ? t('quorumNotReachedYet', { count: outcomeVotesNeededForQuorum })
+                                      : outcomeValidMajorityReached
+                                      ? t('outcomeWillAutoResolve', { outcome: translateOutcome(outcomeLeadingOutcome || 'INVALID') })
+                                      : outcomeInvalidMajorityReached
+                                      ? t('invalidWillAutoResolve')
+                                      : t('noOutcomeExceededThresholdYet', {
+                                          threshold: outcomeQualifiedMajorityFractionLabel,
+                                          percent: outcomeQualifiedMajorityPercentLabel,
+                                        })}
+                                  </p>
+                                </>
+                              )}
+                            </div>
+
+                            <div className="rounded-lg bg-indigo-950/20 border border-indigo-700/30 p-3">
+                              <h5 className="text-xs font-semibold text-indigo-300">{t('howAutoResolutionWorks')}</h5>
+                              <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+                                {outcomeImmediateResolutionRound
+                                  ? t('initialRoundFirstVoteRule')
+                                  : t('disputeRoundThresholdRule', {
+                                      quorum: outcomeResolutionQuorum,
+                                      threshold: outcomeQualifiedMajorityFractionLabel,
+                                      percent: outcomeQualifiedMajorityPercentLabel,
+                                      yes: tAdmin('yes'),
+                                      no: tAdmin('no'),
+                                      invalid: tAdmin('invalid'),
+                                    })}
+                                {!outcomeImmediateResolutionRound && ` ${t('exactThresholdNotEnough')}`} {t('invalidVotesDiluteShares', { yes: tAdmin('yes'), no: tAdmin('no') })}
+                              </p>
+                            </div>
+
+                            {outcomeMyVote && (
+                              <p className="text-xs text-indigo-300">{t('yourCurrentVote')} <span className="font-semibold">{translateOutcome(outcomeMyVote)}</span></p>
+                            )}
+
+                            {outcomeVotingOpen && (
+                              user ? (
+                                <div className="flex flex-wrap gap-2">
+                                  <Button variant="primary" size="sm" onClick={() => handleOutcomeVote(outcome.id, 'YES')} loading={outcomeResolutionLoadingId === outcome.id}>
+                                    {t('voteYes')}
+                                  </Button>
+                                  <Button variant="danger" size="sm" onClick={() => handleOutcomeVote(outcome.id, 'NO')} loading={outcomeResolutionLoadingId === outcome.id}>
+                                    {t('voteNo')}
+                                  </Button>
+                                  <Button variant="secondary" size="sm" onClick={() => handleOutcomeVote(outcome.id, 'INVALID')} loading={outcomeResolutionLoadingId === outcome.id}>
+                                    {t('voteInvalid')}
+                                  </Button>
+                                </div>
+                              ) : (
+                                <p className="text-xs text-gray-600 dark:text-gray-400">{t('loginToVoteAfterEnd')}</p>
+                              )
+                            )}
+
+                            {user?.isAdmin && outcome.status === 'DISPUTED' && (
+                              <div className="rounded-lg bg-yellow-900/20 border border-yellow-700/40 p-3">
+                                <p className="text-xs text-yellow-300 mb-2">{t('adminOverrideTitle')}</p>
+                                <div className="flex flex-wrap gap-2">
+                                  <Button variant="primary" size="sm" onClick={() => handleOutcomeAdminResolve(outcome.id, 'YES')} loading={outcomeResolutionLoadingId === outcome.id}>
+                                    {t('resolveYes')}
+                                  </Button>
+                                  <Button variant="danger" size="sm" onClick={() => handleOutcomeAdminResolve(outcome.id, 'NO')} loading={outcomeResolutionLoadingId === outcome.id}>
+                                    {t('resolveNo')}
+                                  </Button>
+                                  <Button variant="secondary" size="sm" onClick={() => handleOutcomeAdminResolve(outcome.id, 'INVALID')} loading={outcomeResolutionLoadingId === outcome.id}>
+                                    {t('resolveInvalid')}
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+
+                            {outcome.status === 'RESOLVED' && outcomeDisputeWindowOpen && (
+                              user ? (
+                                <div className="space-y-2">
+                                  <div>
+                                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('disputeProposedOutcome')}</label>
+                                    <select
+                                      value={outcomeDisputeOutcome[outcome.id] || 'YES'}
+                                      onChange={(e) => setOutcomeDisputeOutcome((prev) => ({ ...prev, [outcome.id]: e.target.value as 'YES' | 'NO' | 'INVALID' }))}
+                                      className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    >
+                                      <option value="YES">{tAdmin('yes')}</option>
+                                      <option value="NO">{tAdmin('no')}</option>
+                                      <option value="INVALID">{tAdmin('invalid')}</option>
+                                    </select>
+                                  </div>
+                                  <textarea
+                                    value={outcomeDisputeReason[outcome.id] || ''}
+                                    onChange={(e) => setOutcomeDisputeReason((prev) => ({ ...prev, [outcome.id]: e.target.value }))}
+                                    rows={3}
+                                    placeholder={t('disputeReasonPlaceholder')}
+                                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                                  />
+                                  <Button variant="outline" size="sm" onClick={() => handleOutcomeDispute(outcome.id)} loading={outcomeResolutionLoadingId === outcome.id}>
+                                    {t('fileDispute')}
+                                  </Button>
+                                  {outcomeDisputeWindowEndsAt && (
+                                    <p className="text-xs text-gray-500 dark:text-gray-500">
+                                      {t('resolvedAsDisputesOpenUntil', {
+                                        outcome: translateOutcome(outcome.resolution || 'INVALID'),
+                                        date: formatDateTime(outcomeDisputeWindowEndsAt.toISOString()),
+                                      })}
+                                    </p>
+                                  )}
+                                </div>
+                              ) : (
+                                <p className="text-xs text-gray-600 dark:text-gray-400">{t('loginToDisputeOpenWindow')}</p>
+                              )
+                            )}
+
+                            {outcome.disputes.length > 0 && (
+                              <div className="rounded-lg bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700/60 p-3 text-xs">
+                                <p className="text-gray-700 dark:text-gray-300">
+                                  {t('recentDisputes')}: {outcome.disputes[0].reason}
+                                </p>
+                                <p className="text-gray-500 dark:text-gray-500 mt-1">
+                                  @{outcome.disputes[0].user.username} · {formatRelativeTime(outcome.disputes[0].createdAt, locale)} · {t('proposed')} {translateOutcome(outcome.disputes[0].proposedOutcome)}
+                                </p>
+                              </div>
+                            )}
+
+                            <p className="text-xs text-gray-500 dark:text-gray-500">{t('totalVotesCast', { count: outcomeTotalVotes })}</p>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Probability Card */}
+              <div className="bg-white/90 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 sm:p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t('currentProbability')}</h2>
+                </div>
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div className="bg-green-900/30 border border-green-700/30 rounded-lg p-3 text-center">
+                    <div className="text-3xl font-bold text-green-400">{formatPercent(market.probabilities.yes)}</div>
+                    <div className="text-sm text-green-600 mt-1">{tAdmin('yes')}</div>
+                  </div>
+                  <div className="bg-red-900/30 border border-red-700/30 rounded-lg p-3 text-center">
+                    <div className="text-3xl font-bold text-red-400">{formatPercent(market.probabilities.no)}</div>
+                    <div className="text-sm text-red-600 mt-1">{tAdmin('no')}</div>
+                  </div>
+                </div>
+                <div className="h-2 bg-gray-300 dark:bg-gray-700 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full transition-all duration-500"
+                    style={{ width: `${market.probabilities.yes * 100}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Price Chart */}
+              <div className="bg-white/90 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 sm:p-5 shadow-sm">
+                <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-3">{t('priceHistoryTitle')}</h2>
+                <PriceChart data={market.priceHistory} />
+              </div>
+            </>
+          )}
 
           {/* Exchange Order History */}
           {((market.orderFills && market.orderFills.length > 0) || (market.userOrders && market.userOrders.length > 0)) && (
@@ -460,7 +965,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
           </div>
 
           {/* Resolution Center */}
-          {(votingOpen || market.status === 'RESOLVED' || market.status === 'DISPUTED') && (
+          {!isMultiMarket && (votingOpen || market.status === 'RESOLVED' || market.status === 'DISPUTED') && (
             <div className="bg-white/90 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 sm:p-5 space-y-4 shadow-sm">
               <div>
                 <h2 className="text-base font-semibold text-gray-900 dark:text-white">{t('resolutionCenter')}</h2>
@@ -743,7 +1248,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
 
         {/* Right Column */}
         <div className="space-y-4">
-          <TradePanel market={market} onTradeComplete={fetchMarket} />
+          {!isMultiMarket && <TradePanel market={market} onTradeComplete={fetchMarket} />}
 
           {/* Market Stats */}
           <div className="bg-white/90 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 sm:p-5 text-sm space-y-3 shadow-sm">
@@ -762,7 +1267,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
             </div>
             <div className="flex justify-between text-gray-600 dark:text-gray-400">
               <span>{t('totalTradesLabel')}</span>
-              <span className="text-gray-900 dark:text-white">{market._count.trades}</span>
+              <span className="text-gray-900 dark:text-white">{aggregateTrades}</span>
             </div>
             <div className="flex justify-between text-gray-600 dark:text-gray-400">
               <span>{t('endDateLabel')}</span>

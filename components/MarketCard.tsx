@@ -67,11 +67,17 @@ function translateStatus(status: string, tStatus: ReturnType<typeof useT<'status
 interface Market {
   id: string
   title: string
+  marketType?: 'BINARY' | 'MULTI'
   category: string
   status: string
   totalVolume: number
   endDate: string
   probabilities: { yes: number; no: number }
+  outcomes?: Array<{
+    id: string
+    outcomeName: string | null
+    probabilities: { yes: number; no: number }
+  }>
   _count?: { trades: number; comments: number }
   creator?: { username: string; avatar: string | null }
 }
@@ -91,6 +97,7 @@ export function MarketCard({ market }: MarketCardProps) {
   const tAdmin = useT('admin')
   const detailHref = `/markets/${market.id}`
   const marketApiKey = `market:${market.id}`
+  const isMulti = market.marketType === 'MULTI'
   const yesProb = market.probabilities.yes
   const noProb = market.probabilities.no
   const isExpired = new Date(market.endDate) < new Date()
@@ -131,18 +138,36 @@ export function MarketCard({ market }: MarketCardProps) {
           {market.title}
         </h3>
 
-        {/* Probability Bar */}
+        {/* Probability / Outcomes */}
         <div className="mb-3">
-          <div className="flex justify-between text-xs mb-1">
-            <span className="text-green-400 font-semibold">{tAdmin('yes')} {formatPercent(yesProb)}</span>
-            <span className="text-red-400 font-semibold">{tAdmin('no')} {formatPercent(noProb)}</span>
-          </div>
-          <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full transition-all duration-500"
-              style={{ width: `${yesProb * 100}%` }}
-            />
-          </div>
+          {isMulti ? (
+            <div className="space-y-1.5">
+              {(market.outcomes ?? []).slice(0, 3).map((outcome) => (
+                <div key={outcome.id} className="text-xs flex items-center justify-between gap-2">
+                  <span className="text-gray-600 dark:text-gray-400 truncate">{outcome.outcomeName || 'Outcome'}</span>
+                  <span className="text-indigo-500 dark:text-indigo-300 font-semibold">{formatPercent(outcome.probabilities.yes)}</span>
+                </div>
+              ))}
+              {(market.outcomes?.length ?? 0) > 3 && (
+                <div className="text-[11px] text-gray-500 dark:text-gray-500">
+                  +{(market.outcomes?.length ?? 0) - 3} outcomes
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="flex justify-between text-xs mb-1">
+                <span className="text-green-400 font-semibold">{tAdmin('yes')} {formatPercent(yesProb)}</span>
+                <span className="text-red-400 font-semibold">{tAdmin('no')} {formatPercent(noProb)}</span>
+              </div>
+              <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full transition-all duration-500"
+                  style={{ width: `${yesProb * 100}%` }}
+                />
+              </div>
+            </>
+          )}
         </div>
 
         {/* Stats */}

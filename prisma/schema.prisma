@@ -14,6 +14,11 @@ enum MarketStatus {
   DISPUTED
 }
 
+enum MarketType {
+  BINARY
+  MULTI
+}
+
 enum ResolutionOutcome {
   YES
   NO
@@ -78,6 +83,9 @@ model Market {
   title            String
   description      String
   category         String
+  marketType       MarketType       @default(BINARY)
+  parentMarketId   String?
+  outcomeName      String?
   status           MarketStatus     @default(OPEN)
   resolution       ResolutionOutcome?
   resolutionSource String?
@@ -85,6 +93,8 @@ model Market {
   endDate          DateTime
   creatorId        String
   creator          User             @relation(fields: [creatorId], references: [id])
+  parent           Market?          @relation("MarketChildren", fields: [parentMarketId], references: [id])
+  children         Market[]         @relation("MarketChildren")
   yesShares        Float            @default(0)
   noShares         Float            @default(0)
   liquidityParam   Float            @default(100.0)

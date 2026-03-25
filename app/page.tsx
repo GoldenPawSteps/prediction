@@ -9,11 +9,17 @@ import { useT } from '@/context/I18nContext'
 interface Market {
   id: string
   title: string
+  marketType?: 'BINARY' | 'MULTI'
   category: string
   status: string
   totalVolume: number
   endDate: string
   probabilities: { yes: number; no: number }
+  outcomes?: Array<{
+    id: string
+    outcomeName: string | null
+    probabilities: { yes: number; no: number }
+  }>
   _count?: { trades: number; comments: number }
   creator?: { username: string; avatar: string | null }
 }
