@@ -145,8 +145,10 @@ export function usePageSection<T>({
     if (shouldConsume && data === null) {
       const prefetched = consumePrefetchedSection<T>(key)
       if (prefetched) {
+        dataJsonRef.current = JSON.stringify(prefetched)
         setData(prefetched)
         setIsLoading(false)
+        setError(null)
         return
       }
     }
@@ -161,7 +163,7 @@ export function usePageSection<T>({
 
   // Set up background revalidation if interval specified
   useEffect(() => {
-    if (revalidateInterval <= 0 || !data) return
+    if (revalidateInterval <= 0) return
 
     // Start revalidation and store cleanup function
     revalidateCleanupRef.current = startSectionRevalidation(
@@ -183,7 +185,7 @@ export function usePageSection<T>({
         revalidateCleanupRef.current = null
       }
     }
-  }, [revalidateInterval, key, data, fetchData, debug])
+  }, [revalidateInterval, key]) // Only depend on revalidateInterval and key, not data/fetchData
 
   // Cleanup on unmount
   useEffect(() => {

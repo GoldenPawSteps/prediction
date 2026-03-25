@@ -489,6 +489,7 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
                 value={gtdExpiresAt}
                 onChange={(e) => setGtdExpiresAt(e.target.value)}
                 min={getLocalDateTimeInputValue(new Date(Date.now() + 60_000))}
+                className="text-xs px-1 py-1"
               />
             )}
 

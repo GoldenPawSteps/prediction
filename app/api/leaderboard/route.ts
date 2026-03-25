@@ -23,6 +23,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const sortBy = searchParams.get('sortBy') || 'profit'
 
+    // Fetch top 100 users ordered by basic metrics to avoid loading entire table
     const users: LeaderboardUser[] = await prisma.user.findMany({
       select: {
         id: true,
@@ -40,6 +41,7 @@ export async function GET(req: NextRequest) {
           select: { totalCost: true, type: true },
         },
       },
+      take: 150, // Fetch slightly more than we'll return to sort accurately
     })
 
     const leaderboard = users.map((user) => {
