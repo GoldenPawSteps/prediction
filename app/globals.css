@@ -69,11 +69,11 @@
   }
 
   70% {
-    transform: scaleX(0.8);
+    transform: scaleX(0.9);
   }
 
   100% {
-    transform: scaleX(1);
+    transform: scaleX(0.97);
   }
 }
 
@@ -86,7 +86,8 @@ html[data-nav-pending='true'] body::before {
   height: 2px;
   transform-origin: left center;
   background: linear-gradient(90deg, #4f46e5 0%, #22d3ee 100%);
-  animation: nav-progress 300ms ease-out forwards;
+  animation: nav-progress 180ms ease-out forwards;
+  opacity: 0.95;
   z-index: 90;
   pointer-events: none;
 }
