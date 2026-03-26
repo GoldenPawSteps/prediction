@@ -1,6 +1,6 @@
 'use client'
 
-import { startTransition, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/Button'
@@ -136,9 +136,12 @@ export default function CreateMarketPage() {
       if (res.ok) {
         optimisticUpdateBalance(totalLocked)
         toast.success(t('toastCreated'))
-        startTransition(() => {
-          router.push(`/markets/${data.market.id}`)
-        })
+        // Hard navigation avoids stalled client-side transitions on mobile
+        // when router.push fires from a deep async callback.
+        // Brief delay lets the success toast render before the page unloads.
+        const dest = `/markets/${data.market.id}`
+        setTimeout(() => { window.location.href = dest }, 600)
+        return
       } else {
         toast.error(data.error || t('toastCreateFailed'))
       }

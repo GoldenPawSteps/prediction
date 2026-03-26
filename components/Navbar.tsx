@@ -35,7 +35,8 @@ export function Navbar() {
       // Hard navigation clears all in-memory state (caches, polling, stale
       // auth data) and avoids a client-side router transition that can stall
       // on mobile when fired from an async callback outside the user gesture.
-      window.location.href = '/auth/login'
+      // Brief delay lets the "Logged out" toast render before the page unloads.
+      setTimeout(() => { window.location.href = '/auth/login' }, 600)
     } finally {
       setLoggingOut(false)
     }
