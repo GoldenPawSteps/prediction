@@ -122,7 +122,7 @@ export const ja: Messages = {
     riskWarning: 'リスク警告：予測マーケットには財務リスクが伴います。損失を許容できる資金のみ使用してください。',
     riskLocked: '初期流動性 ${amount} はマーケット解決まで固定されます。',
     questionLabel: 'マーケットの質問',
-    questionPlaceholder: 'ビットコインは2026年12月31日までに$100,000を超えるか？',
+    questionPlaceholder: 'BTCは2026年までに$100k超?',
     descriptionLabel: '説明',
     descriptionPlaceholder: 'マーケット、判定基準、関連背景を説明してください...',
     categoryLabel: 'カテゴリ',

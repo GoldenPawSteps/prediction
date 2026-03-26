@@ -122,7 +122,7 @@ export const de: Messages = {
     riskWarning: 'Risikohinweis: Vorhersagemärkte beinhalten finanzielle Risiken. Verwenden Sie nur Mittel, die Sie sich leisten können zu verlieren.',
     riskLocked: 'Ihre anfängliche Liquidität von ${amount} wird bis zur Marktauflösung gesperrt.',
     questionLabel: 'Marktfrage',
-    questionPlaceholder: 'Wird Bitcoin bis 31. Dez. 2026 $100.000 übersteigen?',
+    questionPlaceholder: 'BTC >$100k bis 2026?',
     descriptionLabel: 'Beschreibung',
     descriptionPlaceholder: 'Beschreiben Sie den Markt, Auflösungskriterien und relevanten Kontext...',
     categoryLabel: 'Kategorie',

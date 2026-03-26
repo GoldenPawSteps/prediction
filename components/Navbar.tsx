@@ -15,6 +15,11 @@ import { startAdminNavMetric } from '@/lib/client-nav-metrics'
 import { beginNavFeedback, endNavFeedback } from '@/lib/client-nav-feedback'
 
 export function Navbar() {
+    // Ensure nav loading bar is cleared on initial mount (refresh or same-route nav)
+    useEffect(() => {
+      endNavFeedback()
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
   const pathname = usePathname()
   const router = useRouter()
   const { user, logout } = useAuth()
@@ -246,6 +251,9 @@ export function Navbar() {
             {user ? (
               <>
                 <div className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400">{t('balance')}: <span className="text-green-400 font-semibold">{formatCurrency(user.balance)}</span></div>
+                <Link href="/markets/create" onClick={() => setMobileOpen(false)}>
+                  <Button size="sm" className="w-full mb-2">{t('createMarket')}</Button>
+                </Link>
                 <button
                   onClick={async () => {
                     await handleLogout()

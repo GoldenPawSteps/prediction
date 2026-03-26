@@ -1,5 +1,5 @@
 const NAV_PENDING_ATTR = 'data-nav-pending'
-const NAV_FEEDBACK_TIMEOUT_MS = 6000
+const NAV_FEEDBACK_TIMEOUT_MS = 1000
 
 function getNavWindow() {
   if (typeof window === 'undefined') return null

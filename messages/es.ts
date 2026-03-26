@@ -122,7 +122,7 @@ export const es: Messages = {
     riskWarning: 'Aviso de riesgo: Los mercados de predicción implican riesgo financiero. Solo usa fondos que puedas permitirte perder.',
     riskLocked: 'Tu liquidez inicial de ${amount} quedará bloqueada hasta la resolución del mercado.',
     questionLabel: 'Pregunta del mercado',
-    questionPlaceholder: '¿Superará Bitcoin los $100,000 antes del 31 de dic. de 2026?',
+    questionPlaceholder: '¿BTC >$100k en 2026?',
     descriptionLabel: 'Descripción',
     descriptionPlaceholder: 'Describe el mercado, criterios de resolución y contexto relevante...',
     categoryLabel: 'Categoría',

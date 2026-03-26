@@ -122,7 +122,7 @@ export const zh: Messages = {
     riskWarning: '风险提示：预测市场涉及财务风险。请只使用您能够承受损失的资金。',
     riskLocked: '您的初始流动性 ${amount} 将被锁定至市场结算。',
     questionLabel: '市场问题',
-    questionPlaceholder: '比特币会在 2026 年 12 月 31 日前超过 $100,000 吗？',
+    questionPlaceholder: 'BTC 2026年前超$100k？',
     descriptionLabel: '描述',
     descriptionPlaceholder: '描述市场、结算标准及相关背景信息...',
     categoryLabel: '类别',

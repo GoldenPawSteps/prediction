@@ -232,7 +232,7 @@ export default function CreateMarketPage() {
         </div>
 
         {/* Category & End Date */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('categoryLabel')}</label>
             <select
@@ -252,7 +252,7 @@ export default function CreateMarketPage() {
               value={form.endDate}
               onChange={(e) => setForm({ ...form, endDate: e.target.value })}
               min={getLocalDateTimeString(new Date())}
-              className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full max-w-xs mx-auto text-xs px-1 py-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
             {errors.endDate && <p className="text-red-400 text-xs mt-1">{errors.endDate}</p>}
           </div>
