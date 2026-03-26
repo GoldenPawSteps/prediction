@@ -10,6 +10,7 @@ import { TableSkeleton } from '@/components/SectionSkeletons'
 import { SectionErrorBoundary } from '@/components/SectionErrorBoundary'
 import { formatCurrency } from '@/lib/utils'
 import { useT } from '@/context/I18nContext'
+import { useErrorToast } from '@/lib/useErrorToast'
 
 interface PortfolioStats {
   positions: Array<{
@@ -52,12 +53,13 @@ export function PortfolioSummarySection({ isPrefetched = false }: { isPrefetched
   const t = useT('portfolio')
 
   // Load portfolio data with frequent refresh (user-facing)
-  const { data, isLoading } = usePageSection<PortfolioStats>({
+  const { data, isLoading, error } = usePageSection<PortfolioStats>({
     key: 'portfolio-summary',
     url: '/api/portfolio',
     revalidateInterval: 8000, // Refresh every 8 seconds for user-facing stats
     shouldConsume: isPrefetched,
   })
+  useErrorToast(error, t('fetchError') || 'Failed to load portfolio summary')
 
   if (isLoading) return <TableSkeleton rows={4} />
 
@@ -75,15 +77,15 @@ export function PortfolioSummarySection({ isPrefetched = false }: { isPrefetched
 
   return (
     <SectionErrorBoundary sectionName="portfolio-summary">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 sm:p-4">
           <p className="text-sm text-gray-600 dark:text-gray-400">{t('portfolioValue')}</p>
           <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
             {formatCurrency(stats.totalValue)}
           </p>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 sm:p-4">
           <p className="text-sm text-gray-600 dark:text-gray-400">{t('unrealizedPnl')}</p>
           <p
             className={`text-2xl font-bold mt-1 ${
@@ -96,7 +98,7 @@ export function PortfolioSummarySection({ isPrefetched = false }: { isPrefetched
           </p>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 sm:p-4">
           <p className="text-sm text-gray-600 dark:text-gray-400">{t('totalPnl')}</p>
           <p
             className={`text-2xl font-bold mt-1 ${
@@ -109,7 +111,7 @@ export function PortfolioSummarySection({ isPrefetched = false }: { isPrefetched
           </p>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 sm:p-4">
           <p className="text-sm text-gray-600 dark:text-gray-400">{t('openPositions')}</p>
           <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{stats.totalPositions}</p>
         </div>

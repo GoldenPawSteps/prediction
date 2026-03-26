@@ -15,7 +15,7 @@ import { formatCurrency, formatPercent, formatDateTime, getCategoryColor } from 
 import { consumePrefetchedJson } from '@/lib/client-prefetch'
 import { finishAdminNavMetric } from '@/lib/client-nav-metrics'
 import { MarketCommentsSection } from '@/components/sections/MarketCommentsSection'
-import toast from 'react-hot-toast'
+import { useErrorToast } from '@/lib/useErrorToast'
 
 function formatRelativeTime(date: string | Date, locale: string): string {
   const target = new Date(date).getTime()
@@ -180,6 +180,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
   const { user, refreshUser } = useAuth()
   const [market, setMarket] = useState<Market | null>(null)
   const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState<unknown>(null)
   const [resolutionActionLoading, setResolutionActionLoading] = useState(false)
   const [disputeReason, setDisputeReason] = useState('')
   const [disputeOutcome, setDisputeOutcome] = useState<'YES' | 'NO' | 'INVALID'>('YES')
@@ -240,13 +241,18 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
       if (res.ok) {
         const data = await res.json()
         setMarket(data)
+      } else {
+        setFetchError('Failed to fetch market')
       }
     } catch (err) {
+      setFetchError(err)
       console.error('Failed to fetch market:', err)
     } finally {
       setLoading(false)
     }
   }, [id])
+
+  useErrorToast(fetchError, t('fetchError') || 'Failed to fetch market')
 
   useEffect(() => { fetchMarket() }, [fetchMarket])
 
@@ -564,7 +570,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
       </div>
 
       {/* Header */}
-      <div className="relative overflow-hidden rounded-2xl border border-gray-200/80 dark:border-gray-800 bg-white/90 dark:bg-gray-900/80 backdrop-blur-sm p-5 sm:p-6">
+      <div className="relative overflow-hidden rounded-2xl border border-gray-200/80 dark:border-gray-800 bg-white/90 dark:bg-gray-900/80 backdrop-blur-sm p-4 sm:p-6">
         <div className="pointer-events-none absolute -top-16 -right-14 h-44 w-44 rounded-full bg-cyan-300/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-16 -left-12 h-44 w-44 rounded-full bg-indigo-300/20 blur-3xl" />
         <div className="relative flex flex-wrap items-center gap-2 mb-2">
@@ -580,13 +586,13 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
             <span key={tag} className="text-xs bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-2 py-0.5 rounded">#{tag}</span>
           ))}
         </div>
-        <h1 className="relative text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">{market.title}</h1>
+        <h1 className="relative text-xl sm:text-3xl font-bold text-gray-900 dark:text-white break-words leading-snug">{market.title}</h1>
         {market.parent && (
           <div className="relative mt-2 text-sm text-gray-500 dark:text-gray-500">
             {t('parentMarketLabel')}: <Link href={`/markets/${market.parent.id}`} className="text-indigo-500 dark:text-indigo-300 hover:underline">{market.parent.title}</Link>
           </div>
         )}
-        <div className="relative flex flex-wrap gap-4 mt-2 text-sm text-gray-500 dark:text-gray-500">
+        <div className="relative flex flex-wrap gap-2 mt-2 text-xs sm:text-sm text-gray-500 dark:text-gray-500">
           <span>{t('createdBy')}: <span className="text-gray-600 dark:text-gray-400">@{market.creator.username}</span></span>
           <span>{tAdmin('ends')}: {formatDateTime(market.endDate)} {isExpired ? `(${tCard('expired')})` : ''}</span>
           <span>{aggregateTrades} {tCommon('trades')}</span>
@@ -595,9 +601,9 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
       </div>
 
       {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Left Column */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-4 sm:space-y-6">
           {isMultiMarket ? (
             <div className="space-y-6">
               <div>
@@ -605,7 +611,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                 {outcomeMarkets.length === 0 ? (
                   <p className="text-sm text-gray-500 dark:text-gray-400">{t('noOutcomesFound')}</p>
                 ) : (
-                  <div className="grid grid-cols-1 gap-6">
+                  <div className="grid grid-cols-1 gap-4 sm:gap-6">
                     {outcomeMarkets.map((outcome) => {
                       const outcomeIsExpired = new Date(outcome.endDate) < new Date()
                       const outcomeVotingOpen = outcomeIsExpired
@@ -657,8 +663,8 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                       const outcomeResolutionExpanded = Boolean(expandedOutcomeResolution[outcome.id])
 
                       return (
-                      <div key={outcome.id} className="bg-white/90 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 sm:p-5 shadow-sm">
-                        <div className="mb-4">
+                      <div key={outcome.id} className="bg-white/90 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 rounded-2xl p-3 sm:p-5 shadow-sm">
+                        <div className="mb-3 sm:mb-4">
                           <h3 className="text-base font-semibold text-gray-900 dark:text-white">{outcome.outcomeName || outcome.title}</h3>
                           <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex flex-wrap items-center gap-2">
                             <span>{tCard('vol')}: {formatCurrency(outcome.totalVolume)} · {outcome._count.trades} {tCommon('trades')}</span>
@@ -669,12 +675,12 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                             )}
                           </div>
                         </div>
-                        <div className="mb-4">
-                          <div className="flex justify-between text-xs mb-2">
+                        <div className="mb-3 sm:mb-4">
+                          <div className="flex flex-col sm:flex-row sm:justify-between text-xs mb-2 gap-1 sm:gap-0">
                             <span className="text-green-400 font-semibold">{tAdmin('yes')} {formatPercent(outcome.probabilities.yes)}</span>
                             <span className="text-red-400 font-semibold">{tAdmin('no')} {formatPercent(outcome.probabilities.no)}</span>
                           </div>
-                          <div className="h-2 bg-gray-300 dark:bg-gray-700 rounded-full overflow-hidden">
+                          <div className="h-2 bg-gray-300 dark:bg-gray-700 rounded-full overflow-hidden mt-1">
                             <div
                               className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full transition-all duration-500"
                               style={{ width: `${outcome.probabilities.yes * 100}%` }}
@@ -915,11 +921,11 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
           ) : (
             <>
               {/* Probability Card */}
-              <div className="bg-white/90 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 sm:p-5 shadow-sm">
+              <div className="bg-white/90 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 rounded-2xl p-3 sm:p-5 shadow-sm">
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t('currentProbability')}</h2>
                 </div>
-                <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="grid grid-cols-2 gap-2 sm:gap-4 mb-4">
                   <div className="bg-green-900/30 border border-green-700/30 rounded-lg p-3 text-center">
                     <div className="text-3xl font-bold text-green-400">{formatPercent(market.probabilities.yes)}</div>
                     <div className="text-sm text-green-600 mt-1">{tAdmin('yes')}</div>
@@ -938,7 +944,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
               </div>
 
               {/* Price Chart */}
-              <div className="bg-white/90 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 sm:p-5 shadow-sm">
+              <div className="bg-white/90 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 rounded-2xl p-3 sm:p-5 shadow-sm">
                 <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-3">{t('priceHistoryTitle')}</h2>
                 <PriceChart data={market.priceHistory} />
               </div>
@@ -951,7 +957,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
           )}
 
           {/* Description */}
-          <div className="bg-white/90 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 sm:p-5 shadow-sm">
+          <div className="bg-white/90 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 rounded-2xl p-3 sm:p-5 shadow-sm">
             <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-2">{t('aboutThisMarket')}</h2>
             <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed whitespace-pre-wrap">{market.description}</p>
             {market.resolutionSource && (
@@ -966,7 +972,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
 
           {/* Resolution Center */}
           {!isMultiMarket && (votingOpen || market.status === 'RESOLVED' || market.status === 'DISPUTED') && (
-            <div className="bg-white/90 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 sm:p-5 space-y-4 shadow-sm">
+            <div className="bg-white/90 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 rounded-2xl p-3 sm:p-5 space-y-3 sm:space-y-4 shadow-sm">
               <div>
                 <h2 className="text-base font-semibold text-gray-900 dark:text-white">{t('resolutionCenter')}</h2>
                 {votingOpen && (
@@ -990,7 +996,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                 )}
               </div>
 
-              <div className="grid grid-cols-3 gap-2 text-sm">
+              <div className="grid grid-cols-3 gap-1 sm:gap-2 text-xs sm:text-sm">
                 <div className="rounded-lg bg-green-900/20 border border-green-700/30 p-3 text-center">
                   <div className="text-green-400 font-semibold">{tAdmin('yes')}</div>
                   <div className="text-gray-900 dark:text-white text-lg font-bold">{voteCounts.YES}</div>
@@ -1005,8 +1011,8 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                 </div>
               </div>
 
-              <div className="rounded-lg bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700/60 p-3 space-y-2">
-                <div className="flex items-center justify-between gap-3 text-sm">
+              <div className="rounded-lg bg-white dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700/60 p-2 sm:p-3 space-y-2">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1 sm:gap-3 text-xs sm:text-sm">
                   <span className="text-gray-600 dark:text-gray-400">{t('leadingOutcome')}</span>
                   <span className="text-gray-900 dark:text-white font-medium">
                     {invalidMajorityReached
@@ -1039,7 +1045,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                         title={t('qualifiedMajorityThresholdTooltip', { percent: qualifiedMajorityPercentLabel })}
                       />
                     </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-500">
+                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
                       {immediateResolutionRound
                         ? t('firstVoteResolvesMarket')
                         : !quorumReached
@@ -1058,7 +1064,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                 <p className="text-xs text-gray-500 dark:text-gray-500">{t('totalVotesCast', { count: totalVoteCount })}</p>
               </div>
 
-              <div className="rounded-lg bg-indigo-950/20 border border-indigo-700/30 p-3">
+              <div className="rounded-lg bg-indigo-950/20 border border-indigo-700/30 p-2 sm:p-3">
                 <h3 className="text-sm font-semibold text-indigo-300">{t('howAutoResolutionWorks')}</h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
                   {immediateResolutionRound
@@ -1076,14 +1082,14 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
               </div>
 
               {myVote && (
-                <p className="text-sm text-indigo-300">
+                <p className="text-xs sm:text-sm text-indigo-300">
                   {t('yourCurrentVote')} <span className="font-semibold">{myVote}</span>
                 </p>
               )}
 
               {votingOpen && (
                 user ? (
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1 sm:gap-2">
                     <Button variant="primary" size="sm" onClick={() => handleVote('YES')} loading={resolutionActionLoading}>
                       {t('voteYes')}
                     </Button>
@@ -1095,7 +1101,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                     </Button>
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{t('loginToVoteAfterEnd')}</p>
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">{t('loginToVoteAfterEnd')}</p>
                 )
               )}
 
@@ -1176,7 +1182,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                     </Button>
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-600 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 pt-4">
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 pt-4">
                     {t('loginToDisputeOpenWindow')}
                   </p>
                 )
@@ -1251,7 +1257,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
           {!isMultiMarket && <TradePanel market={market} onTradeComplete={fetchMarket} />}
 
           {/* Market Stats */}
-          <div className="bg-white/90 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 sm:p-5 text-sm space-y-3 shadow-sm">
+          <div className="bg-white/90 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 rounded-2xl p-3 sm:p-5 text-xs sm:text-sm space-y-2 sm:space-y-3 shadow-sm">
             <h3 className="font-semibold text-gray-900 dark:text-white">{t('marketStatsTitle')}</h3>
             <div className="flex justify-between text-gray-600 dark:text-gray-400">
               <span>{t('totalVolumeLabel')}</span>

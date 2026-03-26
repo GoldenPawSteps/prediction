@@ -5,6 +5,7 @@ import { TableSkeleton } from '@/components/SectionSkeletons'
 import { SectionErrorBoundary } from '@/components/SectionErrorBoundary'
 import { formatCurrency, formatRelativeTime, getCategoryColor } from '@/lib/utils'
 import { useT } from '@/context/I18nContext'
+import { useErrorToast } from '@/lib/useErrorToast'
 import { Badge } from '@/components/ui/Badge'
 import Link from 'next/link'
 
@@ -61,12 +62,13 @@ export function PortfolioTradesSection({ isPrefetched = false }: { isPrefetched?
   }
 
   // Load trades with lower refresh rate (historical data)
-  const { data, isLoading } = usePageSection<PortfolioTradesData>({
+  const { data, isLoading, error } = usePageSection<PortfolioTradesData>({
     key: 'portfolio-trades',
     url: '/api/portfolio',
     revalidateInterval: 30000, // Refresh every 30 seconds
     shouldConsume: isPrefetched,
   })
+  useErrorToast(error, t('fetchError') || 'Failed to load trades')
 
   if (isLoading) return <TableSkeleton rows={5} />
 
@@ -83,80 +85,67 @@ export function PortfolioTradesSection({ isPrefetched = false }: { isPrefetched?
   return (
     <SectionErrorBoundary sectionName="portfolio-trades">
       <div className="rounded-lg border border-gray-200 dark:border-gray-800">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t('tradeHistory')}</h3>
-
+        <div className="flex items-center justify-between px-2 sm:px-4 py-2 sm:py-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
+          <h3 className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white">{t('tradeHistory')}</h3>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
-            <tr>
-              <th className="px-6 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">
-                {t('market')}
-              </th>
-              <th className="px-6 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">
-                {t('type')}
-              </th>
-              <th className="px-6 py-3 text-right font-semibold text-gray-700 dark:text-gray-300">
-                {t('shares')}
-              </th>
-              <th className="px-6 py-3 text-right font-semibold text-gray-700 dark:text-gray-300">
-                {t('price')}
-              </th>
-              <th className="px-6 py-3 text-right font-semibold text-gray-700 dark:text-gray-300">
-                {t('total')}
-              </th>
-              <th className="px-6 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">
-                {t('date')}
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
-            {trades.map((trade) => (
-              <tr
-                key={trade.id}
-                className="hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
-              >
-                <td className="px-6 py-4">
-                  <Link
-                    href={`/markets/${trade.market.id}`}
-                    className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline truncate max-w-xs"
-                  >
-                    {trade.market.title}
-                  </Link>
-                  <br />
-                  <Badge
-                    variant="info"
-                    className={`mt-1 text-xs ${getCategoryColor(trade.market.category)}`}
-                  >
-                    {translateCategory(trade.market.category)}
-                  </Badge>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-2">
-                    <Badge variant={trade.outcome === 'YES' ? 'success' : 'danger'}>
-                      {translateOutcome(trade.outcome)}
-                    </Badge>
-                    <Badge variant={trade.type === 'BUY' ? 'success' : 'danger'}>
-                      {translateTradeType(trade.type)}
-                    </Badge>
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-right text-gray-900 dark:text-white font-medium">
-                  {trade.shares.toFixed(2)}
-                </td>
-                <td className="px-6 py-4 text-right text-gray-600 dark:text-gray-400">
-                  {formatCurrency(trade.price)}
-                </td>
-                <td className="px-6 py-4 text-right font-semibold text-gray-900 dark:text-white">
-                  {formatCurrency(Math.abs(trade.totalCost))}
-                </td>
-                <td className="px-6 py-4 text-left text-gray-600 dark:text-gray-400 text-xs">
-                  {formatRelativeTime(trade.createdAt)}
-                </td>
+          <table className="w-full text-xs sm:text-sm">
+            <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+              <tr>
+                <th className="px-2 sm:px-6 py-2 sm:py-3 text-left font-semibold text-gray-700 dark:text-gray-300">{t('market')}</th>
+                <th className="px-2 sm:px-6 py-2 sm:py-3 text-left font-semibold text-gray-700 dark:text-gray-300">{t('type')}</th>
+                <th className="px-2 sm:px-6 py-2 sm:py-3 text-right font-semibold text-gray-700 dark:text-gray-300">{t('shares')}</th>
+                <th className="px-2 sm:px-6 py-2 sm:py-3 text-right font-semibold text-gray-700 dark:text-gray-300">{t('price')}</th>
+                <th className="px-2 sm:px-6 py-2 sm:py-3 text-right font-semibold text-gray-700 dark:text-gray-300">{t('total')}</th>
+                <th className="px-2 sm:px-6 py-2 sm:py-3 text-left font-semibold text-gray-700 dark:text-gray-300">{t('date')}</th>
               </tr>
-            ))}
-          </tbody>
+            </thead>
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
+              {trades.map((trade) => (
+                <tr
+                  key={trade.id}
+                  className="hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
+                >
+                  <td className="px-2 sm:px-6 py-2 sm:py-4">
+                    <Link
+                      href={`/markets/${trade.market.id}`}
+                      className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline truncate max-w-xs"
+                    >
+                      {trade.market.title}
+                    </Link>
+                    <br />
+                    <Badge
+                      variant="info"
+                      className={`mt-1 text-xs ${getCategoryColor(trade.market.category)}`}
+                    >
+                      {translateCategory(trade.market.category)}
+                    </Badge>
+                  </td>
+                  <td className="px-2 sm:px-6 py-2 sm:py-4">
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      <Badge variant={trade.outcome === 'YES' ? 'success' : 'danger'}>
+                        {translateOutcome(trade.outcome)}
+                      </Badge>
+                      <Badge variant={trade.type === 'BUY' ? 'success' : 'danger'}>
+                        {translateTradeType(trade.type)}
+                      </Badge>
+                    </div>
+                  </td>
+                  <td className="px-2 sm:px-6 py-2 sm:py-4 text-right text-gray-900 dark:text-white font-medium">
+                    {trade.shares.toFixed(2)}
+                  </td>
+                  <td className="px-2 sm:px-6 py-2 sm:py-4 text-right text-gray-600 dark:text-gray-400">
+                    {formatCurrency(trade.price)}
+                  </td>
+                  <td className="px-2 sm:px-6 py-2 sm:py-4 text-right font-semibold text-gray-900 dark:text-white">
+                    {formatCurrency(Math.abs(trade.totalCost))}
+                  </td>
+                  <td className="px-2 sm:px-6 py-2 sm:py-4 text-left text-gray-600 dark:text-gray-400 text-xs">
+                    {formatRelativeTime(trade.createdAt)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
           </table>
         </div>
       </div>

@@ -10,6 +10,7 @@ import { TableSkeleton } from '@/components/SectionSkeletons'
 import { SectionErrorBoundary } from '@/components/SectionErrorBoundary'
 import { formatCurrency, getCategoryColor } from '@/lib/utils'
 import { useT } from '@/context/I18nContext'
+import { useErrorToast } from '@/lib/useErrorToast'
 import { Badge } from '@/components/ui/Badge'
 import Link from 'next/link'
 
@@ -65,12 +66,13 @@ export function PortfolioPositionsSection({ isPrefetched = false }: { isPrefetch
   }
 
   // Load positions with medium refresh rate
-  const { data, isLoading } = usePageSection<PortfolioPositionsData>({
+  const { data, isLoading, error } = usePageSection<PortfolioPositionsData>({
     key: 'portfolio-positions',
     url: '/api/portfolio',
     revalidateInterval: 15000, // Refresh every 15 seconds
     shouldConsume: isPrefetched,
   })
+  useErrorToast(error, t('fetchError') || 'Failed to load positions')
 
   if (isLoading) return <TableSkeleton rows={5} />
 
@@ -90,83 +92,70 @@ export function PortfolioPositionsSection({ isPrefetched = false }: { isPrefetch
   return (
     <SectionErrorBoundary sectionName="portfolio-positions">
       <div className="rounded-lg border border-gray-200 dark:border-gray-800">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t('openPositions')}</h3>
-
+        <div className="flex items-center justify-between px-2 sm:px-4 py-2 sm:py-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
+          <h3 className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white">{t('openPositions')}</h3>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
-            <tr>
-              <th className="px-6 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">
-                {t('market')}
-              </th>
-              <th className="px-6 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">
-                Outcome
-              </th>
-              <th className="px-6 py-3 text-right font-semibold text-gray-700 dark:text-gray-300">
-                {t('shares')}
-              </th>
-              <th className="px-6 py-3 text-right font-semibold text-gray-700 dark:text-gray-300">
-                {t('avgEntry')}
-              </th>
-              <th className="px-6 py-3 text-right font-semibold text-gray-700 dark:text-gray-300">
-                Value
-              </th>
-              <th className="px-6 py-3 text-right font-semibold text-gray-700 dark:text-gray-300">
-                {t('unrealizedPnl')}
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
-            {positions.map((position) => (
-              <tr
-                key={position.id}
-                className="hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
-              >
-                <td className="px-6 py-4">
-                  <Link
-                    href={`/markets/${position.market.id}`}
-                    className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline truncate max-w-xs"
-                  >
-                    {position.market.title}
-                  </Link>
-                  <br />
-                  <Badge
-                    variant="info"
-                    className={`mt-1 text-xs ${getCategoryColor(position.market.category)}`}
-                  >
-                    {translateCategory(position.market.category)}
-                  </Badge>
-                </td>
-                <td className="px-6 py-4">
-                  <Badge variant={position.outcome === 'YES' ? 'success' : 'danger'}>
-                    {translateOutcome(position.outcome)}
-                  </Badge>
-                </td>
-                <td className="px-6 py-4 text-right text-gray-900 dark:text-white font-medium">
-                  {position.shares.toFixed(2)}
-                </td>
-                <td className="px-6 py-4 text-right text-gray-600 dark:text-gray-400">
-                  {formatCurrency(position.avgEntryPrice)}
-                </td>
-                <td className="px-6 py-4 text-right font-semibold text-gray-900 dark:text-white">
-                  {formatCurrency(position.currentValue)}
-                </td>
-                <td className="px-6 py-4 text-right font-semibold">
-                  <span
-                    className={
-                      position.unrealizedPnl >= 0
-                        ? 'text-green-600 dark:text-green-400'
-                        : 'text-red-600 dark:text-red-400'
-                    }
-                  >
-                    {formatCurrency(position.unrealizedPnl)}
-                  </span>
-                </td>
+          <table className="w-full text-xs sm:text-sm">
+            <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+              <tr>
+                <th className="px-2 sm:px-6 py-2 sm:py-3 text-left font-semibold text-gray-700 dark:text-gray-300">{t('market')}</th>
+                <th className="px-2 sm:px-6 py-2 sm:py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Outcome</th>
+                <th className="px-2 sm:px-6 py-2 sm:py-3 text-right font-semibold text-gray-700 dark:text-gray-300">{t('shares')}</th>
+                <th className="px-2 sm:px-6 py-2 sm:py-3 text-right font-semibold text-gray-700 dark:text-gray-300">{t('avgEntry')}</th>
+                <th className="px-2 sm:px-6 py-2 sm:py-3 text-right font-semibold text-gray-700 dark:text-gray-300">Value</th>
+                <th className="px-2 sm:px-6 py-2 sm:py-3 text-right font-semibold text-gray-700 dark:text-gray-300">{t('unrealizedPnl')}</th>
               </tr>
-            ))}
-          </tbody>
+            </thead>
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
+              {positions.map((position) => (
+                <tr
+                  key={position.id}
+                  className="hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
+                >
+                  <td className="px-2 sm:px-6 py-2 sm:py-4">
+                    <Link
+                      href={`/markets/${position.market.id}`}
+                      className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline truncate max-w-xs"
+                    >
+                      {position.market.title}
+                    </Link>
+                    <br />
+                    <Badge
+                      variant="info"
+                      className={`mt-1 text-xs ${getCategoryColor(position.market.category)}`}
+                    >
+                      {translateCategory(position.market.category)}
+                    </Badge>
+                  </td>
+                  <td className="px-2 sm:px-6 py-2 sm:py-4">
+                    <Badge variant={position.outcome === 'YES' ? 'success' : 'danger'}>
+                      {translateOutcome(position.outcome)}
+                    </Badge>
+                  </td>
+                  <td className="px-2 sm:px-6 py-2 sm:py-4 text-right text-gray-900 dark:text-white font-medium">
+                    {position.shares.toFixed(2)}
+                  </td>
+                  <td className="px-2 sm:px-6 py-2 sm:py-4 text-right text-gray-600 dark:text-gray-400">
+                    {formatCurrency(position.avgEntryPrice)}
+                  </td>
+                  <td className="px-2 sm:px-6 py-2 sm:py-4 text-right font-semibold text-gray-900 dark:text-white">
+                    {formatCurrency(position.currentValue)}
+                  </td>
+                  <td className="px-2 sm:px-6 py-2 sm:py-4 text-right font-semibold">
+                    <span
+                      className={
+                        position.unrealizedPnl >= 0
+                          ? 'text-green-600 dark:text-green-400'
+                          : 'text-red-600 dark:text-red-400'
+                      }
+                    >
+                      {formatCurrency(position.unrealizedPnl)}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
           </table>
         </div>
       </div>

@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useErrorToast } from '@/lib/useErrorToast'
 import Link from 'next/link'
 import { MarketCard } from '@/components/MarketCard'
 import { Input } from '@/components/ui/Input'
 import { useT } from '@/context/I18nContext'
+import { MarketListSkeleton } from '@/components/SectionSkeletons/MarketListSkeleton'
 
 interface Market {
   id: string
@@ -36,6 +38,7 @@ export default function HomePage() {
   const [status, setStatus] = useState('OPEN')
   const [sortBy, setSortBy] = useState('createdAt')
   const [page, setPage] = useState(1)
+  const [fetchError, setFetchError] = useState<unknown>(null)
 
   const categories = [
     { value: 'All', label: tCategories('all') },
@@ -65,6 +68,7 @@ export default function HomePage() {
 
   const fetchMarkets = useCallback(async () => {
     setLoading(true)
+    setFetchError(null)
     try {
       const params = new URLSearchParams({
         ...(search && { search }),
@@ -79,13 +83,18 @@ export default function HomePage() {
         const data = await res.json()
         setMarkets(data.markets)
         setTotal(data.total)
+      } else {
+        setFetchError('Failed to fetch markets')
       }
     } catch (err) {
+      setFetchError(err)
       console.error('Failed to fetch markets:', err)
     } finally {
       setLoading(false)
     }
   }, [search, category, status, sortBy, page])
+
+  useErrorToast(fetchError, tHome('fetchError') || 'Failed to fetch markets')
 
   useEffect(() => {
     const debounce = setTimeout(fetchMarkets, 300)
@@ -93,9 +102,9 @@ export default function HomePage() {
   }, [fetchMarkets])
 
   return (
-    <div className="space-y-6 sm:space-y-8">
+    <div className="space-y-6 sm:space-y-8 px-2 sm:px-0">
       {/* Hero */}
-      <div className="relative overflow-hidden rounded-2xl border border-gray-200/80 dark:border-gray-800 bg-white/90 dark:bg-gray-900/80 backdrop-blur-sm p-6 sm:p-8">
+      <div className="relative overflow-hidden rounded-2xl border border-gray-200/80 dark:border-gray-800 bg-white/90 dark:bg-gray-900/80 backdrop-blur-sm p-4 sm:p-8">
         <div className="pointer-events-none absolute -top-24 -right-20 h-56 w-56 rounded-full bg-cyan-300/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-24 -left-16 h-56 w-56 rounded-full bg-indigo-300/20 blur-3xl" />
         <div className="relative">
@@ -130,19 +139,18 @@ export default function HomePage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white/90 dark:bg-gray-900/90 border border-gray-200/80 dark:border-gray-800 rounded-2xl p-4 sm:p-5 space-y-4 backdrop-blur-sm">
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="flex-1">
-            <Input
-              placeholder={tHome('searchPlaceholder')}
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1) }}
-            />
-          </div>
+      <div className="bg-white/90 dark:bg-gray-900/90 border border-gray-200/80 dark:border-gray-800 rounded-2xl p-3 sm:p-5 space-y-4 backdrop-blur-sm">
+        <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
+          <Input
+            placeholder={tHome('searchPlaceholder')}
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+            className="w-full sm:w-auto"
+          />
           <select
             value={status}
             onChange={(e) => { setStatus(e.target.value); setPage(1) }}
-            className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 min-w-36"
+            className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 min-w-28 sm:min-w-36"
           >
             {statuses.map((s) => (
               <option key={s.value} value={s.value}>{s.label}</option>
@@ -151,7 +159,7 @@ export default function HomePage() {
           <select
             value={sortBy}
             onChange={(e) => { setSortBy(e.target.value); setPage(1) }}
-            className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 min-w-36"
+            className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 min-w-28 sm:min-w-36"
           >
             {sortOptions.map((s) => (
               <option key={s.value} value={s.value}>{s.label}</option>
@@ -160,16 +168,17 @@ export default function HomePage() {
         </div>
 
         {/* Category Filter */}
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap overflow-x-auto pb-1 -mx-1">
           {categories.map((cat) => (
             <button
               key={cat.value}
               onClick={() => { setCategory(cat.value); setPage(1) }}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors border ${
+              className={`px-3 py-2 rounded-full text-xs font-medium transition-colors border whitespace-nowrap ${
                 category === cat.value
                   ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
                   : 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
               }`}
+              style={{ minWidth: 80 }}
             >
               {cat.label}
             </button>
@@ -179,11 +188,7 @@ export default function HomePage() {
 
       {/* Markets Grid */}
       {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="rounded-2xl h-56 animate-pulse border border-gray-200 dark:border-gray-800 bg-gradient-to-br from-gray-100 via-white to-gray-100 dark:from-gray-800/70 dark:via-gray-900/80 dark:to-gray-800/70" />
-          ))}
-        </div>
+        <MarketListSkeleton count={8} />
       ) : markets.length === 0 ? (
         <div className="text-center py-16 text-gray-500 border border-dashed border-gray-300 dark:border-gray-700 rounded-2xl bg-white/60 dark:bg-gray-900/40">
           <div className="text-5xl mb-4">🔍</div>
@@ -195,7 +200,7 @@ export default function HomePage() {
           <div className="flex items-center justify-between mb-4">
             <p className="text-gray-600 dark:text-gray-400 text-sm">{tHome('marketsFound', { count: total })}</p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {markets.map((market) => (
               <MarketCard key={market.id} market={market} />
             ))}

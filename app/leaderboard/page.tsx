@@ -28,21 +28,21 @@ export default function LeaderboardPage() {
   }, [user?.isAdmin])
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="rounded-2xl border border-gray-200/80 dark:border-gray-800 bg-white/90 dark:bg-gray-900/80 backdrop-blur-sm p-5 sm:p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6">
+      <div className="rounded-2xl border border-gray-200/80 dark:border-gray-800 bg-white/90 dark:bg-gray-900/80 backdrop-blur-sm p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">{t('title')}</h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">{t('subtitle')}</p>
+            <h1 className="text-xl sm:text-3xl font-bold text-gray-900 dark:text-white break-words leading-snug">{t('title')}</h1>
+            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">{t('subtitle')}</p>
           </div>
-          <div className="inline-flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1 border border-gray-200 dark:border-gray-700">
+          <div className="inline-flex gap-0.5 sm:gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-0.5 sm:p-1 border border-gray-200 dark:border-gray-700">
           {sortOptions.map((opt) => (
             <button
               key={opt.value}
               onClick={() => {
                 setSortBy(opt.value)
               }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 sortBy === opt.value
                   ? 'bg-indigo-600 text-white shadow-sm'
                   : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-gray-700'
