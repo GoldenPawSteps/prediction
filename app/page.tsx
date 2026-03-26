@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useErrorToast } from '@/lib/useErrorToast'
 import Link from 'next/link'
@@ -47,7 +47,22 @@ function HomePageContent() {
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState<unknown>(null)
 
+  // Local buffer for the search input so typing is never blocked by URL/fetch updates
   const search = searchParams.get('search') ?? ''
+  const [searchInput, setSearchInput] = useState(search)
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Tracks the last value WE pushed to the URL so we can distinguish our own
+  // updates from external ones (browser back/forward).
+  const lastPushedSearchRef = useRef(search)
+
+  // Only sync from URL → input when the change was NOT initiated by us
+  // (e.g. browser back/forward), to avoid clobbering mid-typing input.
+  useEffect(() => {
+    if (search !== lastPushedSearchRef.current) {
+      setSearchInput(search)
+      lastPushedSearchRef.current = search
+    }
+  }, [search])
   const category = searchParams.get('category') ?? 'All'
   const status = searchParams.get('status') ?? 'OPEN'
   const sortBy = searchParams.get('sortBy') ?? 'createdAt'
@@ -173,8 +188,19 @@ function HomePageContent() {
         <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
           <Input
             placeholder={tHome('searchPlaceholder')}
-            value={search}
-            onChange={(e) => updateQuery({ search: e.target.value, page: 1 })}
+            value={searchInput}
+            onChange={(e) => {
+              const val = e.target.value
+              setSearchInput(val)
+              if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current)
+              searchDebounceRef.current = setTimeout(() => {
+                lastPushedSearchRef.current = val
+                updateQuery({ search: val, page: 1 })
+              }, 350)
+            }}
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             className="w-full sm:w-auto"
           />
           <select
