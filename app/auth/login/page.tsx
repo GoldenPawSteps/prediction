@@ -10,7 +10,7 @@ import { useT } from '@/context/I18nContext'
 
 export default function LoginPage() {
   const t = useT('auth')
-  const { user, loading: authLoading, login } = useAuth()
+  const { user, loading: authLoading, login, refreshUser } = useAuth()
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -30,7 +30,10 @@ export default function LoginPage() {
     e.preventDefault()
     setLoading(true)
     const success = await login(email, password)
-    if (success) router.push('/')
+    if (success) {
+      await refreshUser()
+      router.push('/')
+    }
     setLoading(false)
   }
 

@@ -10,7 +10,7 @@ import { useT } from '@/context/I18nContext'
 
 export default function RegisterPage() {
   const t = useT('auth')
-  const { user, loading: authLoading, register } = useAuth()
+  const { user, loading: authLoading, register, refreshUser } = useAuth()
   const router = useRouter()
   const [form, setForm] = useState({ email: '', username: '', password: '' })
   const [loading, setLoading] = useState(false)
@@ -29,7 +29,10 @@ export default function RegisterPage() {
     e.preventDefault()
     setLoading(true)
     const success = await register(form.email, form.username, form.password)
-    if (success) router.push('/')
+    if (success) {
+      await refreshUser()
+      router.push('/')
+    }
     setLoading(false)
   }
 
