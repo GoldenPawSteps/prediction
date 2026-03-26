@@ -17,6 +17,8 @@ import { finishAdminNavMetric } from '@/lib/client-nav-metrics'
 import { MarketCommentsSection } from '@/components/sections/MarketCommentsSection'
 import { useErrorToast } from '@/lib/useErrorToast'
 
+const MARKET_FETCH_TIMEOUT_MS = 12000
+
 function formatRelativeTime(date: string | Date, locale: string): string {
   const target = new Date(date).getTime()
   const diffMs = target - Date.now()
@@ -236,16 +238,27 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
     }
 
     try {
-      const res = await fetch(`/api/markets/${id}`, hasPrefetched ? { cache: 'no-store' } : undefined)
+      const controller = new AbortController()
+      const timeoutId = window.setTimeout(() => controller.abort(), MARKET_FETCH_TIMEOUT_MS)
+      const res = await fetch(`/api/markets/${id}`, {
+        ...(hasPrefetched ? { cache: 'no-store' as const } : {}),
+        signal: controller.signal,
+      })
+      window.clearTimeout(timeoutId)
       if (res.status === 404) { notFound(); return }
       if (res.ok) {
         const data = await res.json()
+        setFetchError(null)
         setMarket(data)
       } else {
         setFetchError('Failed to fetch market')
       }
     } catch (err) {
-      setFetchError(err)
+      if (err instanceof Error && err.name === 'AbortError') {
+        setFetchError(new Error('Timed out while fetching market'))
+      } else {
+        setFetchError(err)
+      }
       console.error('Failed to fetch market:', err)
     } finally {
       setLoading(false)
@@ -255,6 +268,10 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
   useErrorToast(fetchError, t('fetchError') || 'Failed to fetch market')
 
   useEffect(() => { fetchMarket() }, [fetchMarket])
+
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [])
 
   useEffect(() => {
     if (loading || !market || hasLoggedNavMetricRef.current) return

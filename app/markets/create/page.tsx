@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { startTransition, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/Button'
@@ -136,7 +136,9 @@ export default function CreateMarketPage() {
       if (res.ok) {
         optimisticUpdateBalance(totalLocked)
         toast.success(t('toastCreated'))
-        router.push(`/markets/${data.market.id}`)
+        startTransition(() => {
+          router.push(`/markets/${data.market.id}`)
+        })
       } else {
         toast.error(data.error || t('toastCreateFailed'))
       }

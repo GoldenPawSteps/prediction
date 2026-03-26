@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useErrorToast } from '@/lib/useErrorToast'
 import Link from 'next/link'
 import { MarketCard } from '@/components/MarketCard'
@@ -27,18 +28,23 @@ interface Market {
 }
 
 export default function HomePage() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const tHome = useT('home')
   const tCategories = useT('categories')
   const tStatus = useT('status')
   const [markets, setMarkets] = useState<Market[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-  const [category, setCategory] = useState('All')
-  const [status, setStatus] = useState('OPEN')
-  const [sortBy, setSortBy] = useState('createdAt')
-  const [page, setPage] = useState(1)
   const [fetchError, setFetchError] = useState<unknown>(null)
+
+  const search = searchParams.get('search') ?? ''
+  const category = searchParams.get('category') ?? 'All'
+  const status = searchParams.get('status') ?? 'OPEN'
+  const sortBy = searchParams.get('sortBy') ?? 'createdAt'
+  const pageParam = Number.parseInt(searchParams.get('page') ?? '1', 10)
+  const page = Number.isNaN(pageParam) || pageParam < 1 ? 1 : pageParam
 
   const categories = [
     { value: 'All', label: tCategories('all') },
@@ -65,6 +71,22 @@ export default function HomePage() {
     { value: 'createdAt', label: tHome('sortNewest') },
     { value: 'volume', label: tHome('sortVolume') },
   ]
+
+  const updateQuery = useCallback((updates: Record<string, string | number | null>) => {
+    const nextParams = new URLSearchParams(searchParams.toString())
+
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value === null || value === '' || value === 'All' || (key === 'status' && value === 'OPEN') || (key === 'sortBy' && value === 'createdAt') || (key === 'page' && Number(value) === 1)) {
+        nextParams.delete(key)
+        return
+      }
+
+      nextParams.set(key, String(value))
+    })
+
+    const queryString = nextParams.toString()
+    router.replace(queryString ? `${pathname}?${queryString}` : pathname, { scroll: false })
+  }, [pathname, router, searchParams])
 
   const fetchMarkets = useCallback(async () => {
     setLoading(true)
@@ -144,12 +166,12 @@ export default function HomePage() {
           <Input
             placeholder={tHome('searchPlaceholder')}
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+            onChange={(e) => updateQuery({ search: e.target.value, page: 1 })}
             className="w-full sm:w-auto"
           />
           <select
             value={status}
-            onChange={(e) => { setStatus(e.target.value); setPage(1) }}
+            onChange={(e) => updateQuery({ status: e.target.value, page: 1 })}
             className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 min-w-28 sm:min-w-36"
           >
             {statuses.map((s) => (
@@ -158,7 +180,7 @@ export default function HomePage() {
           </select>
           <select
             value={sortBy}
-            onChange={(e) => { setSortBy(e.target.value); setPage(1) }}
+            onChange={(e) => updateQuery({ sortBy: e.target.value, page: 1 })}
             className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 min-w-28 sm:min-w-36"
           >
             {sortOptions.map((s) => (
@@ -172,7 +194,7 @@ export default function HomePage() {
           {categories.map((cat) => (
             <button
               key={cat.value}
-              onClick={() => { setCategory(cat.value); setPage(1) }}
+              onClick={() => updateQuery({ category: cat.value, page: 1 })}
               className={`px-3 py-2 rounded-full text-xs font-medium transition-colors border whitespace-nowrap ${
                 category === cat.value
                   ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
@@ -210,7 +232,7 @@ export default function HomePage() {
             <div className="flex justify-center gap-2 mt-8">
               <button
                 disabled={page === 1}
-                onClick={() => setPage(p => p - 1)}
+                onClick={() => updateQuery({ page: page - 1 })}
                 className="px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 rounded-lg disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
               >
                 {tHome('previous')}
@@ -218,7 +240,7 @@ export default function HomePage() {
               <span className="px-4 py-2 text-gray-600 dark:text-gray-400 text-sm border border-gray-200 dark:border-gray-800 rounded-lg bg-white/80 dark:bg-gray-900/80">{tHome('pageOf', { page, total: Math.ceil(total / 20) })}</span>
               <button
                 disabled={page >= Math.ceil(total / 20)}
-                onClick={() => setPage(p => p + 1)}
+                onClick={() => updateQuery({ page: page + 1 })}
                 className="px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 rounded-lg disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
               >
                 {tHome('next')}

@@ -5,6 +5,7 @@
 
 'use client'
 
+import { startTransition } from 'react'
 import { usePageSection } from '@/lib/client-page-section'
 import { TableSkeleton } from '@/components/SectionSkeletons'
 import { SectionErrorBoundary } from '@/components/SectionErrorBoundary'
@@ -13,6 +14,7 @@ import { useT } from '@/context/I18nContext'
 import { useErrorToast } from '@/lib/useErrorToast'
 import { Badge } from '@/components/ui/Badge'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 interface Position {
   id: string
@@ -38,6 +40,7 @@ interface PortfolioPositionsData {
 }
 
 export function PortfolioPositionsSection({ isPrefetched = false }: { isPrefetched?: boolean }) {
+  const router = useRouter()
   const t = useT('portfolio')
   const tCategories = useT('categories')
   const tAdmin = useT('admin')
@@ -116,6 +119,12 @@ export function PortfolioPositionsSection({ isPrefetched = false }: { isPrefetch
                   <td className="px-2 sm:px-6 py-2 sm:py-4">
                     <Link
                       href={`/markets/${position.market.id}`}
+                      onClick={(event) => {
+                        event.preventDefault()
+                        startTransition(() => {
+                          router.push(`/markets/${position.market.id}`)
+                        })
+                      }}
                       className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline truncate max-w-xs"
                     >
                       {position.market.title}
