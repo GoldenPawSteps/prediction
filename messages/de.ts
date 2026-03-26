@@ -79,6 +79,12 @@ export const de: Messages = {
     trader: 'Händler',
     portfolio: 'Portfolio',
     createMarket: 'Markt erstellen',
+    username: 'Benutzername',
+    bio: 'Biografie',
+    save: 'Speichern',
+    saving: 'Speichern…',
+    cancel: 'Abbrechen',
+    editProfile: 'Profil bearbeiten',
   },
   leaderboard: {
     title: 'Bestenliste',

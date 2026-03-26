@@ -79,6 +79,12 @@ export const ja: Messages = {
     trader: 'トレーダー',
     portfolio: 'ポートフォリオ',
     createMarket: 'マーケット作成',
+    username: 'ユーザー名',
+    bio: '自己紹介',
+    save: '保存',
+    saving: '保存中…',
+    cancel: 'キャンセル',
+    editProfile: 'プロフィールを編集',
   },
   leaderboard: {
     title: 'ランキング',

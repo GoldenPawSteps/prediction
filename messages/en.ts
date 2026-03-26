@@ -79,6 +79,12 @@ export const en: Messages = {
     trader: 'Trader',
     portfolio: 'Portfolio',
     createMarket: 'Create Market',
+    username: 'Username',
+    bio: 'Bio',
+    save: 'Save',
+    saving: 'Saving…',
+    cancel: 'Cancel',
+    editProfile: 'Edit Profile',
   },
   leaderboard: {
     title: 'Leaderboard',

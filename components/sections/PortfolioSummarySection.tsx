@@ -59,7 +59,7 @@ export function PortfolioSummarySection({ isPrefetched = false }: { isPrefetched
     revalidateInterval: 8000, // Refresh every 8 seconds for user-facing stats
     shouldConsume: isPrefetched,
   })
-  useErrorToast(error, t('fetchError') || 'Failed to load portfolio summary')
+  useErrorToast(error, 'Failed to load portfolio summary')
 
   if (isLoading) return <TableSkeleton rows={4} />
 

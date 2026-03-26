@@ -75,7 +75,7 @@ export function PortfolioPositionsSection({ isPrefetched = false }: { isPrefetch
     revalidateInterval: 15000, // Refresh every 15 seconds
     shouldConsume: isPrefetched,
   })
-  useErrorToast(error, t('fetchError') || 'Failed to load positions')
+  useErrorToast(error, 'Failed to load positions')
 
   if (isLoading) return <TableSkeleton rows={5} />
 

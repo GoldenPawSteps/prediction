@@ -24,34 +24,6 @@ interface AuthContextType {
   optimisticUpdateBalance: (amount: number) => () => void
   updateProfile: (fields: { username?: string; bio?: string }) => Promise<boolean>
 }
-  const updateProfile = async (fields: { username?: string; bio?: string }): Promise<boolean> => {
-    try {
-      const res = await fetch('/api/auth/me', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(fields),
-      })
-      const raw = await res.text()
-      let data: { user?: User; error?: string } = {}
-      try {
-        data = raw ? JSON.parse(raw) : {}
-      } catch {
-        data = {}
-      }
-      if (res.ok && data.user) {
-        setUser(data.user)
-        toast.success('Profile updated!')
-        return true
-      } else {
-        toast.error(data.error || `Profile update failed (${res.status})`)
-        return false
-      }
-    } catch {
-      toast.error('Network error')
-      return false
-    }
-  }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
@@ -234,6 +206,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Return rollback function
     return () => {
       if (previousUser) setUser(previousUser)
+    }
+  }
+
+  const updateProfile = async (fields: { username?: string; bio?: string }): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/auth/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(fields),
+      })
+      const raw = await res.text()
+      let data: { user?: User; error?: string } = {}
+      try {
+        data = raw ? JSON.parse(raw) : {}
+      } catch {
+        data = {}
+      }
+      if (res.ok && data.user) {
+        setUser(data.user)
+        toast.success('Profile updated!')
+        return true
+      } else {
+        toast.error(data.error || `Profile update failed (${res.status})`)
+        return false
+      }
+    } catch {
+      toast.error('Network error')
+      return false
     }
   }
 

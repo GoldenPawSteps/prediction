@@ -68,7 +68,7 @@ export function PortfolioTradesSection({ isPrefetched = false }: { isPrefetched?
     revalidateInterval: 30000, // Refresh every 30 seconds
     shouldConsume: isPrefetched,
   })
-  useErrorToast(error, t('fetchError') || 'Failed to load trades')
+  useErrorToast(error, 'Failed to load trades')
 
   if (isLoading) return <TableSkeleton rows={5} />
 

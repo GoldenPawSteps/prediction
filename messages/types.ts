@@ -77,6 +77,12 @@ export interface Messages {
     trader: string
     portfolio: string
     createMarket: string
+    username: string
+    bio: string
+    save: string
+    saving: string
+    cancel: string
+    editProfile: string
   }
   leaderboard: {
     title: string

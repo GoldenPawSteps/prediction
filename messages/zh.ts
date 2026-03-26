@@ -79,6 +79,12 @@ export const zh: Messages = {
     trader: '交易员',
     portfolio: '投资组合',
     createMarket: '创建市场',
+    username: '用户名',
+    bio: '个人简介',
+    save: '保存',
+    saving: '保存中…',
+    cancel: '取消',
+    editProfile: '编辑资料',
   },
   leaderboard: {
     title: '排行榜',

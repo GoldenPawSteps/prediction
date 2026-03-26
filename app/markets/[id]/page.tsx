@@ -16,6 +16,7 @@ import { consumePrefetchedJson } from '@/lib/client-prefetch'
 import { finishAdminNavMetric } from '@/lib/client-nav-metrics'
 import { MarketCommentsSection } from '@/components/sections/MarketCommentsSection'
 import { useErrorToast } from '@/lib/useErrorToast'
+import toast from 'react-hot-toast'
 
 const MARKET_FETCH_TIMEOUT_MS = 12000
 
@@ -183,6 +184,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
   const [market, setMarket] = useState<Market | null>(null)
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState<unknown>(null)
+  const [isNotFound, setIsNotFound] = useState(false)
   const [resolutionActionLoading, setResolutionActionLoading] = useState(false)
   const [disputeReason, setDisputeReason] = useState('')
   const [disputeOutcome, setDisputeOutcome] = useState<'YES' | 'NO' | 'INVALID'>('YES')
@@ -245,7 +247,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
         signal: controller.signal,
       })
       window.clearTimeout(timeoutId)
-      if (res.status === 404) { notFound(); return }
+      if (res.status === 404) { setIsNotFound(true); return }
       if (res.ok) {
         const data = await res.json()
         setFetchError(null)
@@ -265,7 +267,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
     }
   }, [id])
 
-  useErrorToast(fetchError, t('fetchError') || 'Failed to fetch market')
+  useErrorToast(fetchError, 'Failed to fetch market')
 
   useEffect(() => { fetchMarket() }, [fetchMarket])
 
@@ -490,7 +492,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
     )
   }
 
-  if (!market) return notFound()
+  if (isNotFound || !market) return notFound()
 
   const isMultiMarket = market.marketType === 'MULTI'
   const outcomeMarkets = market.outcomes ?? []

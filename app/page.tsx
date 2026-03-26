@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useErrorToast } from '@/lib/useErrorToast'
 import Link from 'next/link'
@@ -28,6 +28,14 @@ interface Market {
 }
 
 export default function HomePage() {
+  return (
+    <Suspense fallback={<MarketListSkeleton count={8} />}>
+      <HomePageContent />
+    </Suspense>
+  )
+}
+
+function HomePageContent() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -116,7 +124,7 @@ export default function HomePage() {
     }
   }, [search, category, status, sortBy, page])
 
-  useErrorToast(fetchError, tHome('fetchError') || 'Failed to fetch markets')
+  useErrorToast(fetchError, 'Failed to fetch markets')
 
   useEffect(() => {
     const debounce = setTimeout(fetchMarkets, 300)
