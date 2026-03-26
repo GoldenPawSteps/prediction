@@ -32,7 +32,10 @@ export function Navbar() {
     setLoggingOut(true)
     try {
       await logout()
-      router.replace('/auth/login')
+      // Hard navigation clears all in-memory state (caches, polling, stale
+      // auth data) and avoids a client-side router transition that can stall
+      // on mobile when fired from an async callback outside the user gesture.
+      window.location.href = '/auth/login'
     } finally {
       setLoggingOut(false)
     }
