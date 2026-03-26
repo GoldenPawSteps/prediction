@@ -575,19 +575,6 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
 
   return (
     <div className="space-y-8">
-      <div>
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={() => {
-            if (window.history.length > 1) router.back()
-            else router.push('/')
-          }}
-        >
-          ← {tCommon('back')}
-        </Button>
-      </div>
-
       {/* Header */}
       <div className="relative overflow-hidden rounded-2xl border border-gray-200/80 dark:border-gray-800 bg-white/90 dark:bg-gray-900/80 backdrop-blur-sm p-4 sm:p-6">
         <div className="pointer-events-none absolute -top-16 -right-14 h-44 w-44 rounded-full bg-cyan-300/20 blur-3xl" />
