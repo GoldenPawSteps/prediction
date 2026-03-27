@@ -56,7 +56,6 @@ export const pt: Messages = {
     signIn: 'Entrar',
     noAccount: 'Não tem uma conta?',
     signUpLink: 'Cadastrar-se',
-    demoAccount: 'Conta demonstração:',
     createAccount: 'Criar uma conta',
     registerSubtitle: 'Comece a negociar no Predictify hoje',
     username: 'Nome de usuário',

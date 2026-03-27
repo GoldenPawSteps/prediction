@@ -56,7 +56,6 @@ export const ja: Messages = {
     signIn: 'ログイン',
     noAccount: 'アカウントをお持ちでない方は',
     signUpLink: '新規登録',
-    demoAccount: 'デモアカウント：',
     createAccount: 'アカウント作成',
     registerSubtitle: '今日からPredictifyでトレードを始めよう',
     username: 'ユーザー名',

@@ -56,7 +56,6 @@ export const zh: Messages = {
     signIn: '登录',
     noAccount: '没有账户？',
     signUpLink: '注册',
-    demoAccount: '演示账户：',
     createAccount: '创建账户',
     registerSubtitle: '今天就在 Predictify 开始交易',
     username: '用户名',

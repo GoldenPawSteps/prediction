@@ -90,13 +90,6 @@ export default function LoginPage() {
             {t('signUpLink')}
           </Link>
         </div>
-
-        {/* Demo credentials */}
-        <div className="mt-4 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg text-xs text-gray-600 dark:text-gray-500">
-          <p className="font-medium text-gray-700 dark:text-gray-400 mb-1">{t('demoAccount')}</p>
-          <p>Email: demo@predictify.com</p>
-          <p>Password: demo1234</p>
-        </div>
       </div>
     </div>
   )

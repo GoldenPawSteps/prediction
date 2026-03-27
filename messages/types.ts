@@ -54,7 +54,6 @@ export interface Messages {
     signIn: string
     noAccount: string
     signUpLink: string
-    demoAccount: string
     createAccount: string
     registerSubtitle: string
     username: string

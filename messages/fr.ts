@@ -56,7 +56,6 @@ export const fr: Messages = {
     signIn: 'Se connecter',
     noAccount: "Vous n'avez pas de compte ?",
     signUpLink: "S'inscrire",
-    demoAccount: 'Compte démo :',
     createAccount: 'Créer un compte',
     registerSubtitle: "Commencez à trader sur Predictify aujourd'hui",
     username: "Nom d'utilisateur",
