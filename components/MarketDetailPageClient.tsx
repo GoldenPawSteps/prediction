@@ -50,6 +50,27 @@ function shouldPollMarket(market: Market | null): boolean {
   return market.status === 'OPEN' || countActiveUserOrders(market) > 0
 }
 
+function getNextUserGtdExpiryDelayMs(market: Market): number | null {
+  const now = Date.now()
+
+  const collectDelays = (orders: Array<{ status: string; orderType?: string; remainingShares: number; expiresAt?: string | null }>) =>
+    orders
+      .filter((order) => {
+        if (!['OPEN', 'PARTIAL'].includes(order.status)) return false
+        if (order.orderType !== 'GTD') return false
+        if (order.remainingShares <= 0) return false
+        return Boolean(order.expiresAt)
+      })
+      .map((order) => Math.max(0, new Date(order.expiresAt as string).getTime() - now))
+
+  const parentDelays = collectDelays(market.userOrders ?? [])
+  const outcomeDelays = (market.outcomes ?? []).flatMap((outcome) => collectDelays(outcome.userOrders ?? []))
+  const allDelays = [...parentDelays, ...outcomeDelays]
+
+  if (allDelays.length === 0) return null
+  return Math.min(...allDelays)
+}
+
 function formatRelativeTime(date: string | Date, locale: string): string {
   const target = new Date(date).getTime()
   const diffMs = target - Date.now()
@@ -343,6 +364,27 @@ export function MarketDetailPageClient({
       window.clearInterval(intervalId)
     }
   }, [fetchMarket, market])
+
+  useEffect(() => {
+    if (!market || !user) {
+      return
+    }
+
+    const nextExpiryDelay = getNextUserGtdExpiryDelayMs(market)
+    if (nextExpiryDelay === null) {
+      return
+    }
+
+    // Trigger right after expected GTD expiry so cancelled orders and refunds
+    // are reflected without waiting for periodic polling.
+    const timeoutId = window.setTimeout(() => {
+      void fetchMarket()
+    }, nextExpiryDelay + 200)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [fetchMarket, market, user])
 
   useEffect(() => {
     window.scrollTo(0, 0)

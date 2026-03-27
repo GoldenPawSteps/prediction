@@ -4,6 +4,8 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode,
 import toast from 'react-hot-toast'
 import { endNavFeedback } from '@/lib/client-nav-feedback'
 
+const AUTH_REFRESH_INTERVAL_MS = 10000
+
 interface User {
   id: string
   email: string
@@ -92,10 +94,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refreshUser])
 
   useEffect(() => {
-    // Keep auth-dependent UI (like balance) in sync when background events resolve markets.
+    // Keep auth-dependent UI (like balance) in sync with market events and order expirations.
     const intervalId = window.setInterval(() => {
       void refreshUser()
-    }, 30000)
+    }, AUTH_REFRESH_INTERVAL_MS)
 
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') {

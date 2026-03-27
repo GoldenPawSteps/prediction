@@ -2,12 +2,18 @@ import type { Prisma } from '@prisma/client'
 
 type TransactionClient = Prisma.TransactionClient
 
-export async function expireStaleMarketOrders(tx: TransactionClient, marketId?: string) {
+type ExpireStaleOrdersFilter = {
+  marketId?: string
+  userId?: string
+}
+
+async function expireStaleOrders(tx: TransactionClient, filter: ExpireStaleOrdersFilter = {}) {
   const now = new Date()
 
   const staleOrders = await tx.marketOrder.findMany({
     where: {
-      ...(marketId ? { marketId } : {}),
+      ...(filter.marketId ? { marketId: filter.marketId } : {}),
+      ...(filter.userId ? { userId: filter.userId } : {}),
       orderType: 'GTD',
       status: { in: ['OPEN', 'PARTIAL'] },
       remainingShares: { gt: 0 },
@@ -40,6 +46,14 @@ export async function expireStaleMarketOrders(tx: TransactionClient, marketId?: 
   }
 
   return staleOrders.length
+}
+
+export async function expireStaleMarketOrders(tx: TransactionClient, marketId?: string) {
+  return expireStaleOrders(tx, { marketId })
+}
+
+export async function expireStaleUserOrders(tx: TransactionClient, userId: string) {
+  return expireStaleOrders(tx, { userId })
 }
 
 export function activeOrderWhere(now: Date) {
