@@ -108,8 +108,11 @@ export interface Messages {
     noPositions: string
     browseMarkets: string
     noTrades: string
+    outcome: string
     shares: string
     avgEntry: string
+    currentPrice: string
+    value: string
     current: string
     unrealizedPnlLabel: string
     market: string

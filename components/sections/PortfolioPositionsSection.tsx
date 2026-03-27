@@ -101,10 +101,11 @@ export function PortfolioPositionsSection({ isPrefetched = false }: { isPrefetch
             <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
               <tr>
                 <th className="px-2 sm:px-6 py-2 sm:py-3 text-left font-semibold text-gray-700 dark:text-gray-300">{t('market')}</th>
-                <th className="px-2 sm:px-6 py-2 sm:py-3 text-left font-semibold text-gray-700 dark:text-gray-300">Outcome</th>
+                <th className="px-2 sm:px-6 py-2 sm:py-3 text-left font-semibold text-gray-700 dark:text-gray-300">{t('outcome')}</th>
                 <th className="px-2 sm:px-6 py-2 sm:py-3 text-right font-semibold text-gray-700 dark:text-gray-300">{t('shares')}</th>
                 <th className="px-2 sm:px-6 py-2 sm:py-3 text-right font-semibold text-gray-700 dark:text-gray-300">{t('avgEntry')}</th>
-                <th className="px-2 sm:px-6 py-2 sm:py-3 text-right font-semibold text-gray-700 dark:text-gray-300">Value</th>
+                <th className="px-2 sm:px-6 py-2 sm:py-3 text-right font-semibold text-gray-700 dark:text-gray-300">{t('currentPrice')}</th>
+                <th className="px-2 sm:px-6 py-2 sm:py-3 text-right font-semibold text-gray-700 dark:text-gray-300">{t('value')}</th>
                 <th className="px-2 sm:px-6 py-2 sm:py-3 text-right font-semibold text-gray-700 dark:text-gray-300">{t('unrealizedPnl')}</th>
               </tr>
             </thead>
@@ -140,6 +141,9 @@ export function PortfolioPositionsSection({ isPrefetched = false }: { isPrefetch
                   </td>
                   <td className="px-2 sm:px-6 py-2 sm:py-4 text-right text-gray-600 dark:text-gray-400">
                     {formatCurrency(position.avgEntryPrice)}
+                  </td>
+                  <td className="px-2 sm:px-6 py-2 sm:py-4 text-right text-gray-600 dark:text-gray-400">
+                    {formatCurrency(position.currentPrice)}
                   </td>
                   <td className="px-2 sm:px-6 py-2 sm:py-4 text-right font-semibold text-gray-900 dark:text-white">
                     {formatCurrency(position.currentValue)}
