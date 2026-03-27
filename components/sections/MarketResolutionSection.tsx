@@ -27,6 +27,12 @@ interface ResolutionData {
     createdAt: string
     user: { id: string; username: string; avatar: string | null }
   }>
+  voteHistory?: Array<{
+    userId: string
+    outcome: string
+    createdAt: string
+    user: { id: string; username: string; avatar: string | null }
+  }>
   disputes: Array<{
     id: string
     proposedOutcome: string
@@ -133,7 +139,7 @@ export function MarketResolutionSection({
           <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
             <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">{t('resolutionActivity')}</h3>
             <div className="space-y-1 max-h-32 overflow-y-auto">
-              {resolution.resolutionVotes.slice(0, 5).map((vote) => (
+              {(resolution.voteHistory?.length ? resolution.voteHistory : resolution.resolutionVotes).slice(0, 5).map((vote) => (
                 <div key={`${vote.userId}-${vote.createdAt}`} className="text-xs text-gray-600 dark:text-gray-400 flex justify-between">
                   <span>
                     @{vote.user.username} voted{' '}

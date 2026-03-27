@@ -13,6 +13,12 @@ interface ResolutionData {
     createdAt: string
     user: { id: string; username: string; avatar: string | null }
   }>
+  voteHistory: Array<{
+    userId: string
+    outcome: string
+    createdAt: string
+    user: { id: string; username: string; avatar: string | null }
+  }>
   disputes: Array<{
     id: string
     proposedOutcome: string
@@ -53,6 +59,19 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       orderBy: { createdAt: 'desc' },
     })
 
+    // Fetch full vote history for the activity timeline
+    const voteHistory = await prisma.marketVoteHistory.findMany({
+      where: { marketId: id },
+      select: {
+        userId: true,
+        outcome: true,
+        createdAt: true,
+        user: { select: { id: true, username: true, avatar: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    })
+
     // Fetch disputes separately
     const disputes = await prisma.marketDispute.findMany({
       where: { marketId: id },
@@ -76,6 +95,12 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       disputeWindowHours: market.disputeWindowHours,
       endDate: market.endDate.toISOString(),
       resolutionVotes: resolutionVotes.map(vote => ({
+        userId: vote.userId,
+        outcome: vote.outcome,
+        createdAt: vote.createdAt.toISOString(),
+        user: vote.user,
+      })),
+      voteHistory: voteHistory.map(vote => ({
         userId: vote.userId,
         outcome: vote.outcome,
         createdAt: vote.createdAt.toISOString(),

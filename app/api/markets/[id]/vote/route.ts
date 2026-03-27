@@ -63,6 +63,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       },
     })
 
+    // Append an immutable history entry so the activity timeline shows every
+    // vote cast, including changed votes.
+    await prisma.marketVoteHistory.create({
+      data: {
+        userId: authUser.userId,
+        marketId,
+        outcome,
+      },
+    })
+
     // Check if we should auto-resolve based on vote count
     const votes = await prisma.marketResolutionVote.groupBy({
       by: ['outcome'],

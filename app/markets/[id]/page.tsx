@@ -137,6 +137,12 @@ interface Market {
     createdAt: string
     user: { id: string; username: string; avatar: string | null }
   }>
+  voteHistory: Array<{
+    userId: string
+    outcome: 'YES' | 'NO' | 'INVALID'
+    createdAt: string
+    user: { id: string; username: string; avatar: string | null }
+  }>
   disputes: Array<{
     id: string
     proposedOutcome: 'YES' | 'NO' | 'INVALID'
@@ -548,7 +554,10 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
     market.status === 'RESOLVED' && disputeWindowEndsAt && disputeWindowEndsAt.getTime() > Date.now()
   )
   const resolutionActivity = [
-    ...market.resolutionVotes.map((vote) => ({
+    // Use the immutable vote history so changed votes both appear in the
+    // timeline. Fall back to resolutionVotes for markets that predate the
+    // history table (no history rows yet).
+    ...(market.voteHistory?.length ? market.voteHistory : market.resolutionVotes).map((vote) => ({
       id: `vote-${vote.userId}-${vote.createdAt}`,
       createdAt: vote.createdAt,
       tone: vote.outcome === 'YES' ? 'green' : vote.outcome === 'NO' ? 'red' : 'gray',

@@ -132,6 +132,16 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
           },
           orderBy: { createdAt: 'desc' },
         },
+        voteHistory: {
+          select: {
+            userId: true,
+            outcome: true,
+            createdAt: true,
+            user: { select: { id: true, username: true, avatar: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 50,
+        },
         disputes: {
           select: {
             id: true,

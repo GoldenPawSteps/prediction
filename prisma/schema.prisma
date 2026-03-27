@@ -72,6 +72,7 @@ model User {
   markets            Market[]
   comments           Comment[]
   resolutionVotes    MarketResolutionVote[]
+  voteHistory        MarketVoteHistory[]
   disputes           MarketDispute[]
   marketOrders       MarketOrder[]
   makerOrderFills    MarketOrderFill[]     @relation("MarketOrderFillMaker")
@@ -112,6 +113,7 @@ model Market {
   comments         Comment[]
   priceHistory     PriceHistory[]
   resolutionVotes  MarketResolutionVote[]
+  voteHistory      MarketVoteHistory[]
   disputes         MarketDispute[]
   orders           MarketOrder[]
   orderFills       MarketOrderFill[]
@@ -177,6 +179,21 @@ model MarketResolutionVote {
   createdAt DateTime         @default(now())
 
   @@unique([userId, marketId])
+}
+
+/// Immutable log of every vote cast. One row per vote event; a user can have
+/// multiple rows (one per time they changed their choice). Use
+/// MarketResolutionVote for current-state counting.
+model MarketVoteHistory {
+  id        String            @id @default(cuid())
+  userId    String
+  user      User              @relation(fields: [userId], references: [id])
+  marketId  String
+  market    Market            @relation(fields: [marketId], references: [id])
+  outcome   ResolutionOutcome
+  createdAt DateTime          @default(now())
+
+  @@index([marketId, createdAt])
 }
 
 model MarketDispute {
