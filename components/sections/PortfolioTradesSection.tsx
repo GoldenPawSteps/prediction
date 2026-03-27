@@ -90,7 +90,7 @@ export function PortfolioTradesSection({ isPrefetched = false }: { isPrefetched?
           <h3 className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white">{t('tradeHistory')}</h3>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-xs sm:text-sm">
+          <table className="w-full text-xs sm:text-sm border-separate border-spacing-0">
             <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
               <tr>
                 <th className="px-2 sm:px-6 py-2 sm:py-3 text-left font-semibold text-gray-700 dark:text-gray-300">{t('market')}</th>
@@ -101,11 +101,11 @@ export function PortfolioTradesSection({ isPrefetched = false }: { isPrefetched?
                 <th className="px-2 sm:px-6 py-2 sm:py-3 text-left font-semibold text-gray-700 dark:text-gray-300">{t('date')}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
+            <tbody>
               {trades.map((trade) => (
                 <tr
                   key={trade.id}
-                  className="hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
+                  className="border-b border-gray-200 dark:border-gray-800 last:border-b-0 bg-white dark:bg-gray-950 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
                 >
                   <td className="px-2 sm:px-6 py-2 sm:py-4">
                     <Link
