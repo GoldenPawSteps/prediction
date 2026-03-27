@@ -49,6 +49,8 @@
     scrollbar-color: var(--scroll-thumb) transparent;
   }
 
+
+
   *::-webkit-scrollbar {
     width: 6px;
   }
@@ -221,5 +223,14 @@ html[data-nav-pending='true'] body::before {
     .hover-smooth {
       transition: none;
     }
+  }
+}
+
+/* Prevent iOS Safari from auto-zooming focused inputs.
+   Must be outside any @layer so unlayered CSS wins over Tailwind utilities.
+   !important ensures it also beats inline utility styles. */
+@media screen and (max-width: 768px) {
+  input, textarea, select {
+    font-size: max(16px, 1em) !important;
   }
 }
