@@ -95,34 +95,44 @@ export async function GET(req: NextRequest) {
     // Apply pagination after sorting
     const paginatedMarkets = sortedMarkets.slice((page - 1) * limit, page * limit)
 
-    const marketsWithPrices = paginatedMarkets.map((m) => ({
-      ...m,
-      totalVolume: m.actualTotalVolume,
-      probabilities: m.resolution === 'YES'
-        ? { yes: 1, no: 0 }
-        : m.resolution === 'NO'
-        ? { yes: 0, no: 1 }
-        : m.resolution === 'INVALID'
-        ? { yes: 0.5, no: 0.5 }
-        : getMarketProbabilities(m.yesShares, m.noShares, m.liquidityParam),
-      outcomes: m.children.map((child) => ({
-        id: child.id,
-        title: child.title,
-        outcomeName: child.outcomeName,
-        status: child.status,
-        resolution: child.resolution,
-        totalVolume: child.totalVolume,
-        endDate: child.endDate,
-        _count: child._count,
-        probabilities: child.resolution === 'YES'
+    const marketsWithPrices = paginatedMarkets.map((m) => {
+      const actualTradeCount = m.marketType === 'MULTI'
+        ? m.children.reduce((sum, child) => sum + (child._count?.trades || 0), 0)
+        : m._count?.trades || 0
+
+      return {
+        ...m,
+        totalVolume: m.actualTotalVolume,
+        _count: {
+          ...m._count,
+          trades: actualTradeCount,
+        },
+        probabilities: m.resolution === 'YES'
           ? { yes: 1, no: 0 }
-          : child.resolution === 'NO'
+          : m.resolution === 'NO'
           ? { yes: 0, no: 1 }
-          : child.resolution === 'INVALID'
+          : m.resolution === 'INVALID'
           ? { yes: 0.5, no: 0.5 }
-          : getMarketProbabilities(child.yesShares, child.noShares, child.liquidityParam),
-      })),
-    }))
+          : getMarketProbabilities(m.yesShares, m.noShares, m.liquidityParam),
+        outcomes: m.children.map((child) => ({
+          id: child.id,
+          title: child.title,
+          outcomeName: child.outcomeName,
+          status: child.status,
+          resolution: child.resolution,
+          totalVolume: child.totalVolume,
+          endDate: child.endDate,
+          _count: child._count,
+          probabilities: child.resolution === 'YES'
+            ? { yes: 1, no: 0 }
+            : child.resolution === 'NO'
+            ? { yes: 0, no: 1 }
+            : child.resolution === 'INVALID'
+            ? { yes: 0.5, no: 0.5 }
+            : getMarketProbabilities(child.yesShares, child.noShares, child.liquidityParam),
+        })),
+      }
+    })
 
     const total = sortedMarkets.length
 
