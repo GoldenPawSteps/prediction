@@ -20,7 +20,7 @@ interface RevalidationConfig {
 }
 
 interface ActiveRevalidation {
-  timeoutId: NodeJS.Timeout | number
+  timeoutId: ReturnType<typeof setTimeout> | null
   isRunning: boolean
   failureCount: number
 }
@@ -52,7 +52,7 @@ export function startSectionRevalidation(
   stopSectionRevalidation(sectionKey)
 
   const revalidation: ActiveRevalidation = {
-    timeoutId: 0,
+    timeoutId: null,
     isRunning: true,
     failureCount: 0,
   }
@@ -140,10 +140,9 @@ export function stopSectionRevalidation(sectionKey: string): void {
   if (!revalidation) return
 
   revalidation.isRunning = false
-  if (typeof globalThis !== 'undefined') {
-    globalThis.clearTimeout(revalidation.timeoutId as any)
-  } else {
-    clearTimeout(revalidation.timeoutId as any)
+  if (revalidation.timeoutId !== null) {
+    clearTimeout(revalidation.timeoutId)
+    revalidation.timeoutId = null
   }
 
   ACTIVE_REVALIDATIONS.delete(sectionKey)

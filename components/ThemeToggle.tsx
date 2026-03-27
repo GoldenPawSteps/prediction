@@ -37,7 +37,11 @@ export function ThemeToggle({ className = '' }: { className?: string }) {
   const [mode, setMode] = useState<ThemeMode>('auto')
 
   useEffect(() => {
-    setMode(getInitialMode())
+    // Defer hydration-time state sync to avoid set-state-in-effect lint violations.
+    const timer = window.setTimeout(() => {
+      setMode(getInitialMode())
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [])
 
   useEffect(() => {

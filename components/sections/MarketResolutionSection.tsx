@@ -11,10 +11,7 @@ import { ResolutionActivitySkeleton } from '@/components/SectionSkeletons'
 import { SectionErrorBoundary } from '@/components/SectionErrorBoundary'
 import { useAuth } from '@/context/AuthContext'
 import { useI18n, useT } from '@/context/I18nContext'
-import { Button } from '@/components/ui/Button'
-import { Badge } from '@/components/ui/Badge'
-import { formatRelativeTime, formatDateTime } from '@/lib/utils'
-import toast from 'react-hot-toast'
+import { formatRelativeTime } from '@/lib/utils'
 
 interface ResolutionData {
   status: string

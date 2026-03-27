@@ -39,7 +39,6 @@ export function MarketCommentsSection({
   const { user } = useAuth()
   const { locale } = useI18n()
   const t = useT('marketDetail')
-  const tCommon = useT('common')
 
   const [comment, setComment] = useState('')
   const [submittingComment, setSubmittingComment] = useState(false)
@@ -73,7 +72,7 @@ export function MarketCommentsSection({
         const data = await res.json()
         toast.error(data.error || t('commentPostFailed'))
       }
-    } catch (err) {
+    } catch {
       toast.error(t('networkError'))
     } finally {
       setSubmittingComment(false)

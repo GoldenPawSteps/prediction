@@ -8,9 +8,9 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { consumePrefetchedSection, prefetchSection } from '@/lib/client-section-prefetch'
-import { startSectionRevalidation, stopSectionRevalidation } from '@/lib/client-section-revalidation'
+import { startSectionRevalidation } from '@/lib/client-section-revalidation'
 
-interface UseSectionOptions<T> {
+interface UseSectionOptions {
   // Unique cache/revalidation key for this section
   key: string
   // URL to fetch data from
@@ -62,7 +62,7 @@ export function usePageSection<T>({
   shouldConsume = true,
   fetchInit,
   debug = false,
-}: UseSectionOptions<T>): UseSectionReturn<T> {
+}: UseSectionOptions): UseSectionReturn<T> {
   const [data, setData] = useState<T | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isStale] = useState(false)
@@ -72,17 +72,19 @@ export function usePageSection<T>({
   const revalidateCleanupRef = useRef<(() => void) | null>(null)
   // Tracks serialized last-known data to skip re-renders when response is unchanged
   const dataJsonRef = useRef<string | null>(null)
+  const hasLoadedDataRef = useRef(false)
 
   // Fetch function that can be called manually or by revalidation
   const fetchData = useCallback(async () => {
     try {
       // First: try to consume prefetched data
-      if (shouldConsume && data === null) {
+      if (shouldConsume && !hasLoadedDataRef.current) {
         const prefetched = consumePrefetchedSection<T>(key)
         if (prefetched) {
           if (isMountedRef.current) {
             // Prefetch succeeded before first fetch
             dataJsonRef.current = JSON.stringify(prefetched)
+            hasLoadedDataRef.current = true
             setData(prefetched)
             setIsLoading(false)
             setError(null)
@@ -95,7 +97,7 @@ export function usePageSection<T>({
       // background revalidations are silent to avoid flickering)
       const res = await fetch(url, {
         ...fetchInit,
-        cache: data ? 'no-store' : undefined, // Bypass cache after first load
+        cache: hasLoadedDataRef.current ? 'no-store' : undefined, // Bypass cache after first load
       })
 
       if (!res.ok) {
@@ -110,6 +112,7 @@ export function usePageSection<T>({
         const newJson = JSON.stringify(newData)
         if (newJson !== dataJsonRef.current) {
           dataJsonRef.current = newJson
+          hasLoadedDataRef.current = true
           setData(newData)
         }
         setIsLoading(false)
@@ -135,31 +138,19 @@ export function usePageSection<T>({
 
       throw error
     }
-  }, [key, url, data, shouldConsume, fetchInit, debug])
+  }, [key, url, shouldConsume, fetchInit, debug])
 
   // Initial load on mount
   useEffect(() => {
     isMountedRef.current = true
 
-    // Try prefetch cache first if not already loaded
-    if (shouldConsume && data === null) {
-      const prefetched = consumePrefetchedSection<T>(key)
-      if (prefetched) {
-        dataJsonRef.current = JSON.stringify(prefetched)
-        setData(prefetched)
-        setIsLoading(false)
-        setError(null)
-        return
-      }
-    }
-
-    // Fetch from network
-    fetchData()
+    // Fetch from cache or network.
+    void fetchData()
 
     return () => {
       isMountedRef.current = false
     }
-  }, [key]) // Only depend on key for initial setup
+  }, [fetchData])
 
   // Set up background revalidation if interval specified
   useEffect(() => {
@@ -185,7 +176,7 @@ export function usePageSection<T>({
         revalidateCleanupRef.current = null
       }
     }
-  }, [revalidateInterval, key]) // Only depend on revalidateInterval and key, not data/fetchData
+  }, [revalidateInterval, key, fetchData, debug])
 
   // Cleanup on unmount
   useEffect(() => {

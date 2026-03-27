@@ -387,7 +387,7 @@ async function ammSection(users, markets) {
 }
 
 // -- 4  Exchange Orders -----------------------------------------------------
-async function exchangeSection(users, markets) {
+async function exchangeSection(users) {
   const { alice, bob } = users;
   // Create a fresh market for clean order-book testing
   const market = await createBinaryMarket(alice.jar, 'Exchange Test');
@@ -404,7 +404,6 @@ async function exchangeSection(users, markets) {
     assert(afterBal < beforeBal, 'BID should reserve balance');
   });
 
-  let askOrderId;
   await step('Place GTC ASK order that does NOT match', async () => {
     // Bob buys YES shares via AMM first so he has shares to ask
     await request('POST', `/api/markets/${market.id}/trade`, {
@@ -416,7 +415,6 @@ async function exchangeSection(users, markets) {
     }, bob.jar);
     assert(r.ok, `GTC ASK failed: ${JSON.stringify(r.data)}`);
     assert(r.data.filledShares === 0, 'should not match with 0.40 bid');
-    askOrderId = r.data.order.id;
   });
 
   await step('Place matching BID that fills existing ASK', async () => {
@@ -596,7 +594,7 @@ async function dataSection(markets) {
 
 // -- 7  Portfolio -----------------------------------------------------------
 async function portfolioSection(users) {
-  const { alice, bob } = users;
+  const { alice } = users;
 
   await step('GET portfolio for Alice (has trades)', async () => {
     const r = await request('GET', '/api/portfolio', null, alice.jar);
@@ -651,20 +649,7 @@ async function leaderboardSection() {
 async function resolutionSection(users) {
   const { alice, bob } = users;
 
-  // Create a market with a past endDate so it's eligible for resolution
-  const market = await createBinaryMarket(alice.jar, 'Resolve Me', {
-    endDate: new Date(Date.now() - 1000).toISOString(),
-    initialLiquidity: 100,
-  });
-
-  // Fetch the market to trigger close-expired logic
-  await request('GET', '/api/markets');
-  await new Promise(r => setTimeout(r, 200));
-
-  // Both users trade
-  // (Trades may fail if market is already closed — that's OK, we may still test resolution)
-  // We need to buy shares BEFORE the market closes, so let's create a fresh one with
-  // a slightly future end date, trade, then manually wait and close.
+  // Create a market with a near-future end date, trade, then let it close for resolution tests.
   const resMarket = await createBinaryMarket(alice.jar, 'Resolve2', {
     endDate: new Date(Date.now() + 5000).toISOString(), // 5 s from now
     initialLiquidity: 100,
@@ -760,9 +745,6 @@ async function disputeSection(users) {
   }, alice.jar);
   assert(vote1.ok, `initial vote failed: ${JSON.stringify(vote1.data)}`);
 
-  const aliceBalAfterResolve = await getBalance(alice.jar);
-  const bobBalAfterResolve = await getBalance(bob.jar);
-
   await step('File dispute on resolved market', async () => {
     const r = await request('POST', `/api/markets/${mkt.id}/dispute`, {
       reason: 'The resolution is incorrect and should be re-evaluated by the community.',
@@ -825,7 +807,7 @@ async function disputeSection(users) {
 
 // -- 11  Edge Cases ---------------------------------------------------------
 async function edgeCaseSection(users) {
-  const { alice, bob } = users;
+  const { alice } = users;
 
   await step('Invalid JSON body returns error', async () => {
     const res = await fetch(`${BASE_URL}/api/auth/login`, {
@@ -972,7 +954,7 @@ async function main() {
 
   // 4. Exchange Orders
   if (shouldRun('exchange')) {
-    await section('4 — Exchange Orders', () => exchangeSection(users, markets));
+    await section('4 — Exchange Orders', () => exchangeSection(users));
   }
 
   // 5. Comments

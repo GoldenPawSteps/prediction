@@ -163,14 +163,20 @@ Core scripts:
 
 Exchange and resolution tests:
 
+- `npm run test:deploy:smoke`
 - `npm run test:exchange`
 - `npm run test:exchange:bid-maker`
 - `npm run test:exchange:ask-maker`
 - `npm run test:exchange:gtd`
 - `npm run test:exchange:fok`
 - `npm run test:exchange:fak`
+- `npm run test:homepage:ssr`
 - `npm run test:resolution-refund`
 - `npm run test:resolution-reresolution-refund`
+
+`npm run test:deploy:smoke` is self-contained by default: it builds the app, starts a temporary production server on `http://127.0.0.1:3100`, runs the smoke checks, and stops the server.
+
+To point the smoke suite at an already-running server instead, set `SMOKE_USE_EXISTING_SERVER=1` and optionally override `BASE_URL`.
 
 ## API Surface
 

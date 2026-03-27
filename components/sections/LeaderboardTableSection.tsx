@@ -93,6 +93,8 @@ export function LeaderboardTableSection({
                   <td className="px-2 sm:px-6 py-2 sm:py-4">
                     <div className="flex items-center gap-1 sm:gap-2">
                       {entry.avatar && (
+                        // Avatar URLs can be dynamic; keep img to avoid brittle remote image config.
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={entry.avatar}
                           alt={entry.username}

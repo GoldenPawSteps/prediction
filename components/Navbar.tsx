@@ -18,7 +18,6 @@ export function Navbar() {
     // Ensure nav loading bar is cleared on initial mount (refresh or same-route nav)
     useEffect(() => {
       endNavFeedback()
-      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
   const pathname = usePathname()
   const router = useRouter()

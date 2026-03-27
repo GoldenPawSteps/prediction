@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { use } from 'react'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { PriceChart } from '@/components/PriceChart'
@@ -19,6 +18,14 @@ import { useErrorToast } from '@/lib/useErrorToast'
 import toast from 'react-hot-toast'
 
 const MARKET_FETCH_TIMEOUT_MS = 12000
+
+async function readJsonResponse<T>(response: Response): Promise<T> {
+  const contentType = response.headers.get('content-type') || ''
+  if (!contentType.includes('application/json')) {
+    throw new Error(`Expected JSON response, received: ${contentType || 'unknown content type'}`)
+  }
+  return response.json() as Promise<T>
+}
 
 function formatRelativeTime(date: string | Date, locale: string): string {
   const target = new Date(date).getTime()
@@ -41,7 +48,7 @@ function formatRelativeTime(date: string | Date, locale: string): string {
   return rtf.format(Math.round(diffMs / year), 'year')
 }
 
-interface Market {
+export interface Market {
   id: string
   title: string
   marketType?: 'BINARY' | 'MULTI'
@@ -176,7 +183,14 @@ interface Market {
   }>
 }
 
-export default function MarketPage({ params }: { params: Promise<{ id: string }> }) {
+export function MarketDetailPageClient({
+  marketId,
+  initialMarket = null,
+}: {
+  marketId: string
+  initialMarket?: Market | null
+}) {
+  const id = marketId
   const { locale } = useI18n()
   const t = useT('marketDetail')
   const tCategories = useT('categories')
@@ -184,10 +198,9 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
   const tAdmin = useT('admin')
   const tCard = useT('marketCard')
   const tCommon = useT('common')
-  const { id } = use(params)
   const { user, refreshUser } = useAuth()
-  const [market, setMarket] = useState<Market | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [market, setMarket] = useState<Market | null>(initialMarket)
+  const [loading, setLoading] = useState(!initialMarket)
   const [fetchError, setFetchError] = useState<unknown>(null)
   const [isNotFound, setIsNotFound] = useState(false)
   const [resolutionActionLoading, setResolutionActionLoading] = useState(false)
@@ -254,7 +267,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
       window.clearTimeout(timeoutId)
       if (res.status === 404) { setIsNotFound(true); return }
       if (res.ok) {
-        const data = await res.json()
+        const data = await readJsonResponse<Market>(res)
         setFetchError(null)
         setMarket(data)
       } else {

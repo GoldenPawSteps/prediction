@@ -10,8 +10,20 @@ interface CacheEntry<T> {
   expiresAt: number
 }
 
+type SectionPrefetchPromiseMap = Partial<Record<string, Promise<void>>>
+
 const SECTION_CACHE = new Map<string, CacheEntry<unknown>>()
 const CACHE_TTL_MS = 45_000 // Slightly longer than full-page cache (30s) to support section refresh
+
+function getSectionPrefetchPromiseMap(): SectionPrefetchPromiseMap {
+  const scopedGlobal = globalThis as typeof globalThis & {
+    __sectionPrefetchPromises?: SectionPrefetchPromiseMap
+  }
+  if (!scopedGlobal.__sectionPrefetchPromises) {
+    scopedGlobal.__sectionPrefetchPromises = {}
+  }
+  return scopedGlobal.__sectionPrefetchPromises
+}
 
 export interface SectionPrefetchOptions {
   /** Cache key for deduplication */
@@ -41,8 +53,9 @@ export async function prefetchSection<T>(
   }
 
   // If prefetch is already in-flight, wait for it
-  if ((globalThis as any)._sectionPrefetchPromises?.[key]) {
-    return (globalThis as any)._sectionPrefetchPromises[key]
+  const inFlight = getSectionPrefetchPromiseMap()
+  if (inFlight[key]) {
+    return inFlight[key]
   }
 
   // Start new prefetch
@@ -64,18 +77,12 @@ export async function prefetchSection<T>(
     })
     .finally(() => {
       // Clear promise reference
-      if ((globalThis as any)._sectionPrefetchPromises) {
-        delete (globalThis as any)._sectionPrefetchPromises[key]
-      }
+      const pending = getSectionPrefetchPromiseMap()
+      delete pending[key]
     })
 
   // Track in-flight promise to deduplicate
-  if (typeof globalThis !== 'undefined') {
-    if (!(globalThis as any)._sectionPrefetchPromises) {
-      (globalThis as any)._sectionPrefetchPromises = {}
-    }
-    (globalThis as any)._sectionPrefetchPromises[key] = promise
-  }
+  inFlight[key] = promise
 
   return promise
 }
@@ -106,9 +113,10 @@ export function consumePrefetchedSection<T>(key: string): T | undefined {
  */
 export function clearSectionCache(): void {
   SECTION_CACHE.clear()
-  if ((globalThis as any)._sectionPrefetchPromises) {
-    (globalThis as any)._sectionPrefetchPromises = {}
-  }
+  const inFlight = getSectionPrefetchPromiseMap()
+  Object.keys(inFlight).forEach((key) => {
+    delete inFlight[key]
+  })
 }
 
 /**
