@@ -19,7 +19,6 @@ import toast from 'react-hot-toast'
 
 const MARKET_FETCH_TIMEOUT_MS = 12000
 const MARKET_ACTIVE_POLL_MS = 5000
-const MARKET_FETCH_RETRY_DELAYS_MS = [300, 900]
 
 async function readJsonResponse<T>(response: Response): Promise<T> {
   const contentType = response.headers.get('content-type') || ''
@@ -315,72 +314,41 @@ export function MarketDetailPageClient({
       setLoading(false)
     }
 
-    let lastError: unknown = null
-
     try {
-      for (let attempt = 0; attempt <= MARKET_FETCH_RETRY_DELAYS_MS.length; attempt += 1) {
-        const controller = new AbortController()
-        const timeoutId = window.setTimeout(() => controller.abort(), MARKET_FETCH_TIMEOUT_MS)
+      const controller = new AbortController()
+      const timeoutId = window.setTimeout(() => controller.abort(), MARKET_FETCH_TIMEOUT_MS)
+      const res = await fetch(`/api/markets/${id}`, {
+        ...(hasPrefetched ? { cache: 'no-store' as const } : {}),
+        signal: controller.signal,
+      })
+      window.clearTimeout(timeoutId)
+      if (res.status === 404) { setIsNotFound(true); return }
+      if (res.ok) {
+        const data = await readJsonResponse<Market>(res)
+        const activeUserOrders = countActiveUserOrders(data)
+        const marketJustClosed = previousStatusRef.current === 'OPEN' && data.status !== 'OPEN'
+        const userOrdersReleased = previousActiveUserOrdersRef.current !== null
+          && previousActiveUserOrdersRef.current > activeUserOrders
 
-        try {
-          const res = await fetch(`/api/markets/${id}`, {
-            ...(hasPrefetched ? { cache: 'no-store' as const } : {}),
-            signal: controller.signal,
-          })
+        previousStatusRef.current = data.status
+        previousActiveUserOrdersRef.current = activeUserOrders
 
-          if (res.status === 404) {
-            setIsNotFound(true)
-            setFetchError(null)
-            return
-          }
+        setFetchError(null)
+        setMarket(data)
 
-          if (res.ok) {
-            const data = await readJsonResponse<Market>(res)
-            const activeUserOrders = countActiveUserOrders(data)
-            const marketJustClosed = previousStatusRef.current === 'OPEN' && data.status !== 'OPEN'
-            const userOrdersReleased = previousActiveUserOrdersRef.current !== null
-              && previousActiveUserOrdersRef.current > activeUserOrders
-
-            previousStatusRef.current = data.status
-            previousActiveUserOrdersRef.current = activeUserOrders
-
-            setFetchError(null)
-            setMarket(data)
-
-            if (user && (marketJustClosed || userOrdersReleased)) {
-              void refreshUser()
-            }
-            return
-          }
-
-          const isRetryableStatus = res.status === 429 || res.status >= 500
-          if (isRetryableStatus && attempt < MARKET_FETCH_RETRY_DELAYS_MS.length) {
-            await new Promise((resolve) => window.setTimeout(resolve, MARKET_FETCH_RETRY_DELAYS_MS[attempt]))
-            continue
-          }
-
-          setFetchError('Failed to fetch market')
-          return
-        } catch (err) {
-          if (err instanceof Error && err.name === 'AbortError') {
-            // Ignore expected aborts (timeout or route change) to avoid noisy UX.
-            return
-          }
-
-          lastError = err
-          if (attempt < MARKET_FETCH_RETRY_DELAYS_MS.length) {
-            await new Promise((resolve) => window.setTimeout(resolve, MARKET_FETCH_RETRY_DELAYS_MS[attempt]))
-            continue
-          }
-        } finally {
-          window.clearTimeout(timeoutId)
+        if (user && (marketJustClosed || userOrdersReleased)) {
+          void refreshUser()
         }
+      } else {
+        setFetchError('Failed to fetch market')
       }
-
-      if (lastError) {
-        setFetchError(lastError)
-        console.error('Failed to fetch market:', lastError)
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        setFetchError(new Error('Timed out while fetching market'))
+      } else {
+        setFetchError(err)
       }
+      console.error('Failed to fetch market:', err)
     } finally {
       setLoading(false)
     }
