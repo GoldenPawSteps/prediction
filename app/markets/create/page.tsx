@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/Button'
@@ -53,6 +53,44 @@ export default function CreateMarketPage() {
     ],
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const formRef = useRef<HTMLFormElement>(null)
+
+  const revealFirstInvalidField = (errs: Record<string, string>) => {
+    const keys = Object.keys(errs)
+    if (keys.length === 0) return
+
+    const key = keys[0]
+    const formEl = formRef.current
+
+    const focusField = (selector: string) => {
+      const field = formEl?.querySelector<HTMLElement>(selector)
+      if (!field) return false
+      field.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement) {
+        field.focus({ preventScroll: true })
+      }
+      return true
+    }
+
+    let handled = false
+    if (key === 'title') handled = focusField('[name="title"]')
+    else if (key === 'description') handled = focusField('[name="description"]')
+    else if (key === 'endDate') handled = focusField('[name="endDate"]')
+    else if (key === 'resolutionSource') handled = focusField('[name="resolutionSource"]')
+    else if (key === 'initialLiquidity') handled = focusField('[name="initialLiquidity"]')
+    else if (key === 'priorProbability') handled = focusField('[name="priorProbability"]')
+    else if (key === 'disputeWindowHours') handled = focusField('[name="disputeWindowHours"]')
+    else if (key === 'outcomes') handled = focusField('[data-field="outcomes-section"]')
+    else if (key.startsWith('outcomeName_') || key.startsWith('outcomeLiquidity_') || key.startsWith('outcomePrior_')) {
+      const index = key.split('_')[1]
+      const type = key.startsWith('outcomeName_') ? 'name' : key.startsWith('outcomeLiquidity_') ? 'liquidity' : 'prior'
+      handled = focusField(`[name="outcome-${index}-${type}"]`)
+    }
+
+    if (!handled) {
+      formEl?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
 
   const validate = () => {
     const errs: Record<string, string> = {}
@@ -75,6 +113,10 @@ export default function CreateMarketPage() {
     }
     if (form.disputeWindowHours < 1 || form.disputeWindowHours > 720) errs.disputeWindowHours = t('validationDisputeRange')
     setErrors(errs)
+    if (Object.keys(errs).length > 0) {
+      // Wait for error messages to paint before scrolling/focusing.
+      requestAnimationFrame(() => revealFirstInvalidField(errs))
+    }
     return Object.keys(errs).length === 0
   }
 
@@ -176,7 +218,7 @@ export default function CreateMarketPage() {
           : t('riskLocked', { amount: form.initialLiquidity })}
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6 space-y-5">
+      <form ref={formRef} onSubmit={handleSubmit} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6 space-y-5">
         {/* Title */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('marketTypeLabel')}</label>
@@ -212,6 +254,7 @@ export default function CreateMarketPage() {
             {t('questionLabel')} <span className="text-red-400">*</span>
           </label>
           <input
+            name="title"
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
             placeholder={t('questionPlaceholder')}
@@ -227,6 +270,7 @@ export default function CreateMarketPage() {
             {t('descriptionLabel')} <span className="text-red-400">*</span>
           </label>
           <textarea
+            name="description"
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
             placeholder={t('descriptionPlaceholder')}
@@ -254,6 +298,7 @@ export default function CreateMarketPage() {
             </label>
             <input
               type="datetime-local"
+              name="endDate"
               value={form.endDate}
               onChange={(e) => setForm({ ...form, endDate: e.target.value })}
               min={getLocalDateTimeString(new Date())}
@@ -270,6 +315,7 @@ export default function CreateMarketPage() {
           </label>
           <input
             type="url"
+            name="resolutionSource"
             value={form.resolutionSource}
             onChange={(e) => setForm({ ...form, resolutionSource: e.target.value })}
             placeholder={t('resolutionPlaceholder')}
@@ -288,6 +334,7 @@ export default function CreateMarketPage() {
               </label>
               <input
                 type="number"
+                name="initialLiquidity"
                 min="10"
                 max="10000"
                 value={form.initialLiquidity}
@@ -307,6 +354,7 @@ export default function CreateMarketPage() {
               </label>
               <input
                 type="number"
+                name="priorProbability"
                 min="1"
                 max="99"
                 step="0.1"
@@ -319,7 +367,7 @@ export default function CreateMarketPage() {
             </div>
           </>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3" data-field="outcomes-section">
             <div className="flex items-center justify-between">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 {t('outcomesLabel')} <span className="text-red-400">*</span>
@@ -349,6 +397,7 @@ export default function CreateMarketPage() {
                   )}
                 </div>
                 <input
+                  name={`outcome-${index}-name`}
                   value={outcome.name}
                   onChange={(e) => updateOutcome(index, 'name', e.target.value)}
                   placeholder={t('outcomeNamePlaceholder')}
@@ -361,6 +410,7 @@ export default function CreateMarketPage() {
                     <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">{t('outcomeLiquidityLabel')}</label>
                     <input
                       type="number"
+                      name={`outcome-${index}-liquidity`}
                       min="10"
                       max="10000"
                       value={outcome.initialLiquidity}
@@ -373,6 +423,7 @@ export default function CreateMarketPage() {
                     <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">{t('outcomePriorLabel')}</label>
                     <input
                       type="number"
+                      name={`outcome-${index}-prior`}
                       min="1"
                       max="99"
                       step="0.1"
@@ -399,6 +450,7 @@ export default function CreateMarketPage() {
           </label>
           <input
             type="number"
+            name="disputeWindowHours"
             min="1"
             max="720"
             value={form.disputeWindowHours}

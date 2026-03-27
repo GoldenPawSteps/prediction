@@ -14,6 +14,14 @@ export default function ProfilePage() {
   const [bio, setBio] = useState(user?.bio || '')
   const [loading, setLoading] = useState(false)
 
+  const handleInvalidField = (target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) return
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) {
+      target.focus({ preventScroll: true })
+    }
+  }
+
   if (!user) {
     return (
       <div className="text-center py-16">
@@ -32,6 +40,7 @@ export default function ProfilePage() {
         {editMode ? (
           <form
             className="space-y-3"
+            onInvalidCapture={(e) => handleInvalidField(e.target)}
             onSubmit={async (e) => {
               e.preventDefault()
               setLoading(true)

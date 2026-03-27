@@ -15,6 +15,14 @@ export default function RegisterPage() {
   const [form, setForm] = useState({ email: '', username: '', password: '' })
   const [loading, setLoading] = useState(false)
 
+  const handleInvalidField = (target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) return
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) {
+      target.focus({ preventScroll: true })
+    }
+  }
+
   useEffect(() => {
     if (!authLoading && user) {
       router.replace('/')
@@ -47,7 +55,11 @@ export default function RegisterPage() {
       </div>
 
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form
+          onSubmit={handleSubmit}
+          onInvalidCapture={(e) => handleInvalidField(e.target)}
+          className="space-y-4"
+        >
           <Input
             id="email"
             label={t('email')}
