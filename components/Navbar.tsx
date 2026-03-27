@@ -31,10 +31,19 @@ export function Navbar() {
     setLoggingOut(true)
     // Cancel any pending navigation watchdog before navigating away.
     endNavFeedback()
-    // Synchronous hard navigation to the server-side logout endpoint.
-    // The server clears cookies, bumps session version, and 302-redirects
-    // to /auth/login — no async gaps, no fetch races, no watchdog issues.
-    window.location.href = '/api/auth/logout?next=/auth/login'
+    // Fire-and-forget: POST invalidates session + clears cookies server-side.
+    // keepalive ensures the request completes even as the page unloads.
+    try {
+      fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+        keepalive: true,
+      })
+    } catch {
+      // Swallow — hard navigation below is the source of truth.
+    }
+    // Immediate hard navigation. No async gaps, no waiting for the POST.
+    window.location.replace('/auth/login')
   }
 
   const navLinks = [
