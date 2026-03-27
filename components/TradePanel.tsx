@@ -593,23 +593,25 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
             {myOrders.length > 0 && (
               <div className="bg-gray-50 dark:bg-gray-900/60 rounded-lg p-3 border border-gray-200 dark:border-gray-700 space-y-2">
                 <div className="text-xs text-gray-600 dark:text-gray-400">{t('openOrders')}</div>
-                {myOrders.slice(0, 6).map((order) => (
-                  <div key={order.id} className="flex items-center justify-between gap-2 text-xs">
-                    <span className="text-gray-700 dark:text-gray-300">
-                      {order.side} {order.outcome} {order.remainingShares.toFixed(2)}/{order.initialShares.toFixed(2)} @ {formatPercent(order.price)}
-                      {order.orderType === 'GTD' && order.expiresAt && (
-                        <span className="text-indigo-300"> · {t('gtdLabel', { time: timeUntil(order.expiresAt) })}</span>
-                      )}
-                    </span>
-                    <button
-                      className="text-red-400 hover:text-red-300"
-                      onClick={() => handleCancelOrder(order.id)}
-                      disabled={orderLoading}
-                    >
-                      {t('cancelBtn')}
-                    </button>
-                  </div>
-                ))}
+                <div className="max-h-40 sm:max-h-48 lg:max-h-56 overflow-y-auto space-y-2 pr-1">
+                  {myOrders.map((order) => (
+                    <div key={order.id} className="flex items-center justify-between gap-2 text-xs">
+                      <span className="text-gray-700 dark:text-gray-300">
+                        {order.side} {order.outcome} {order.remainingShares.toFixed(2)}/{order.initialShares.toFixed(2)} @ {formatPercent(order.price)}
+                        {order.orderType === 'GTD' && order.expiresAt && (
+                          <span className="text-indigo-300"> · {t('gtdLabel', { time: timeUntil(order.expiresAt) })}</span>
+                        )}
+                      </span>
+                      <button
+                        className="text-red-400 hover:text-red-300"
+                        onClick={() => handleCancelOrder(order.id)}
+                        disabled={orderLoading}
+                      >
+                        {t('cancelBtn')}
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
