@@ -20,25 +20,36 @@ async function cancelOpenOrdersForMarkets(tx: Prisma.TransactionClient, marketId
     },
   })
 
-  for (const order of openOrders) {
-    if (order.side === 'BID' && order.reservedAmount > 0) {
-      await tx.user.update({
-        where: { id: order.userId },
-        data: { balance: { increment: order.reservedAmount } },
-      })
-    }
+  let cancelled = 0
 
-    await tx.marketOrder.update({
-      where: { id: order.id },
+  for (const order of openOrders) {
+    // Use updateMany with a status guard so only one concurrent transaction
+    // (this one vs. expireStaleUserOrders in auth/me) actually refunds.
+    const result = await tx.marketOrder.updateMany({
+      where: {
+        id: order.id,
+        status: { in: ['OPEN', 'PARTIAL'] },
+        remainingShares: { gt: 0 },
+      },
       data: {
         status: 'CANCELLED',
         remainingShares: 0,
         reservedAmount: 0,
       },
     })
+
+    if (result.count > 0) {
+      cancelled++
+      if (order.side === 'BID' && order.reservedAmount > 0) {
+        await tx.user.update({
+          where: { id: order.userId },
+          data: { balance: { increment: order.reservedAmount } },
+        })
+      }
+    }
   }
 
-  return openOrders.length
+  return cancelled
 }
 
 export async function closeExpiredOpenMarkets() {

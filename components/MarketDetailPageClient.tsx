@@ -71,6 +71,15 @@ function getNextUserGtdExpiryDelayMs(market: Market): number | null {
   return Math.min(...allDelays)
 }
 
+function getMarketCloseDelayMs(market: Market): number | null {
+  if (market.status !== 'OPEN') return null
+  if (countActiveUserOrders(market) === 0) return null
+  const now = Date.now()
+  const endDateMs = new Date(market.endDate).getTime()
+  if (!Number.isFinite(endDateMs) || endDateMs <= now) return null
+  return endDateMs - now
+}
+
 function formatRelativeTime(date: string | Date, locale: string): string {
   const target = new Date(date).getTime()
   const diffMs = target - Date.now()
@@ -375,16 +384,39 @@ export function MarketDetailPageClient({
       return
     }
 
-    // Trigger right after expected GTD expiry so cancelled orders and refunds
-    // are reflected without waiting for periodic polling.
+    // refreshUser() processes all stale orders (GTD + market-expired)
+    // server-side, so balance is fresh in the response.
     const timeoutId = window.setTimeout(() => {
+      void refreshUser()
       void fetchMarket()
     }, nextExpiryDelay + 200)
 
     return () => {
       window.clearTimeout(timeoutId)
     }
-  }, [fetchMarket, market, user])
+  }, [fetchMarket, market, refreshUser, user])
+
+  useEffect(() => {
+    if (!market || !user) {
+      return
+    }
+
+    const closeDelay = getMarketCloseDelayMs(market)
+    if (closeDelay === null) {
+      return
+    }
+
+    // When the market closes, active BID orders get refunded.
+    // refreshUser() handles this server-side in auth/me.
+    const timeoutId = window.setTimeout(() => {
+      void refreshUser()
+      void fetchMarket()
+    }, closeDelay + 200)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [fetchMarket, market, refreshUser, user])
 
   useEffect(() => {
     window.scrollTo(0, 0)

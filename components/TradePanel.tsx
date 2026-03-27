@@ -165,16 +165,12 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
       return
     }
 
-    const syncAfterAutoRelease = () => {
+    const timeoutId = window.setTimeout(() => {
+      // refreshUser() now processes all stale orders (GTD + market-expired)
+      // server-side in auth/me, so balance is fresh in the response.
+      void refreshUser()
       onTradeComplete()
-      // Market close processing and order expiry/cancellation are driven by
-      // market endpoints. Refresh balance shortly after to reflect refunds.
-      window.setTimeout(() => {
-        void refreshUser()
-      }, 250)
-    }
-
-    const timeoutId = window.setTimeout(syncAfterAutoRelease, Math.max(0, nextAutoReleaseDelayMs) + 150)
+    }, Math.max(0, nextAutoReleaseDelayMs) + 150)
 
     return () => {
       window.clearTimeout(timeoutId)
