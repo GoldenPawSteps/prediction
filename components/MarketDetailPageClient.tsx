@@ -18,6 +18,7 @@ import { useErrorToast } from '@/lib/useErrorToast'
 import toast from 'react-hot-toast'
 
 const MARKET_FETCH_TIMEOUT_MS = 12000
+const MARKET_ACTIVE_POLL_MS = 5000
 
 async function readJsonResponse<T>(response: Response): Promise<T> {
   const contentType = response.headers.get('content-type') || ''
@@ -25,6 +26,28 @@ async function readJsonResponse<T>(response: Response): Promise<T> {
     throw new Error(`Expected JSON response, received: ${contentType || 'unknown content type'}`)
   }
   return response.json() as Promise<T>
+}
+
+function countActiveUserOrders(market: Market): number {
+  const parentOrderCount = (market.userOrders ?? []).filter(
+    (order) => ['OPEN', 'PARTIAL'].includes(order.status) && order.remainingShares > 0
+  ).length
+
+  const outcomeOrderCount = (market.outcomes ?? []).reduce((sum, outcome) => {
+    const activeOrders = (outcome.userOrders ?? []).filter(
+      (order) => ['OPEN', 'PARTIAL'].includes(order.status) && order.remainingShares > 0
+    ).length
+
+    return sum + activeOrders
+  }, 0)
+
+  return parentOrderCount + outcomeOrderCount
+}
+
+function shouldPollMarket(market: Market | null): boolean {
+  if (!market) return false
+
+  return market.status === 'OPEN' || countActiveUserOrders(market) > 0
 }
 
 function formatRelativeTime(date: string | Date, locale: string): string {
@@ -212,6 +235,10 @@ export function MarketDetailPageClient({
   const [expandedOutcomeResolution, setExpandedOutcomeResolution] = useState<Record<string, boolean>>({})
   const [commentRefreshKey, setCommentRefreshKey] = useState(0)
   const hasLoggedNavMetricRef = useRef(false)
+  const previousStatusRef = useRef<string | null>(initialMarket?.status ?? null)
+  const previousActiveUserOrdersRef = useRef<number | null>(
+    initialMarket ? countActiveUserOrders(initialMarket) : null
+  )
 
   const translateCategory = (category: string) => {
     switch (category) {
@@ -268,8 +295,20 @@ export function MarketDetailPageClient({
       if (res.status === 404) { setIsNotFound(true); return }
       if (res.ok) {
         const data = await readJsonResponse<Market>(res)
+        const activeUserOrders = countActiveUserOrders(data)
+        const marketJustClosed = previousStatusRef.current === 'OPEN' && data.status !== 'OPEN'
+        const userOrdersReleased = previousActiveUserOrdersRef.current !== null
+          && previousActiveUserOrdersRef.current > activeUserOrders
+
+        previousStatusRef.current = data.status
+        previousActiveUserOrdersRef.current = activeUserOrders
+
         setFetchError(null)
         setMarket(data)
+
+        if (user && (marketJustClosed || userOrdersReleased)) {
+          void refreshUser()
+        }
       } else {
         setFetchError('Failed to fetch market')
       }
@@ -283,11 +322,27 @@ export function MarketDetailPageClient({
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, refreshUser, user])
 
   useErrorToast(fetchError, 'Failed to fetch market')
 
   useEffect(() => { fetchMarket() }, [fetchMarket])
+
+  useEffect(() => {
+    if (!shouldPollMarket(market)) {
+      return
+    }
+
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void fetchMarket()
+      }
+    }, MARKET_ACTIVE_POLL_MS)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [fetchMarket, market])
 
   useEffect(() => {
     window.scrollTo(0, 0)
