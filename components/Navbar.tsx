@@ -21,27 +21,20 @@ export function Navbar() {
     }, [])
   const pathname = usePathname()
   const router = useRouter()
-  const { user, logout } = useAuth()
+  const { user } = useAuth()
   const t = useT('nav')
   const [mobileOpen, setMobileOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     if (loggingOut) return
     setLoggingOut(true)
-    try {
-      // Cancel any pending navigation watchdog before logging out.
-      endNavFeedback()
-      const didLogoutViaPost = await logout()
-      if (!didLogoutViaPost) {
-        return
-      }
-      // Hard navigation clears all in-memory state (caches, polling, stale
-      // auth data) and avoids client router transition edge-cases on mobile.
-      window.location.replace('/auth/login')
-    } finally {
-      setLoggingOut(false)
-    }
+    // Cancel any pending navigation watchdog before navigating away.
+    endNavFeedback()
+    // Synchronous hard navigation to the server-side logout endpoint.
+    // The server clears cookies, bumps session version, and 302-redirects
+    // to /auth/login — no async gaps, no fetch races, no watchdog issues.
+    window.location.href = '/api/auth/logout?next=/auth/login'
   }
 
   const navLinks = [
@@ -279,9 +272,8 @@ export function Navbar() {
                   <Button size="sm" className="w-full mb-2">{t('createMarket')}</Button>
                 </Link>
                 <button
-                  onClick={async () => {
-                    await handleLogout()
-                    setMobileOpen(false)
+                  onClick={() => {
+                    handleLogout()
                   }}
                   disabled={loggingOut}
                   className="w-full text-left px-3 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md disabled:opacity-60"
