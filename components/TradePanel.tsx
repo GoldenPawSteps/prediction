@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { useAuth } from '@/context/AuthContext'
@@ -119,11 +119,67 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
   const asks = selectedOutcomeOrders
     .filter((order) => order.side === 'ASK')
     .sort((a, b) => a.price - b.price || new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-  const myOrders = user ? openOrders.filter((order) => order.userId === user.id) : []
+  const myOrders = useMemo(
+    () => (user ? openOrders.filter((order) => order.userId === user.id) : []),
+    [openOrders, user]
+  )
   const myOrderHistory = (market.userOrders ?? []).slice(0, 8)
   const recentFills = (market.orderFills ?? []).filter((fill) => fill.outcome === selectedOutcome)
   const bestBid = bids[0]?.price ?? null
   const bestAsk = asks[0]?.price ?? null
+
+  const nextAutoReleaseDelayMs = useMemo(() => {
+    if (!user) return null
+
+    const now = Date.now()
+    const releaseMoments: number[] = []
+
+    // GTC BID reserves release when market closes at endDate.
+    const hasOpenBid = myOrders.some((order) => order.side === 'BID' && order.remainingShares > 0)
+    if (hasOpenBid && market.status === 'OPEN') {
+      const marketEndMs = new Date(market.endDate).getTime()
+      if (Number.isFinite(marketEndMs) && marketEndMs > now) {
+        releaseMoments.push(marketEndMs)
+      }
+    }
+
+    // GTD BID reserves release when the order reaches expiresAt.
+    for (const order of myOrders) {
+      if (order.side !== 'BID') continue
+      if (order.orderType !== 'GTD') continue
+      if (!order.expiresAt) continue
+      if (order.remainingShares <= 0) continue
+
+      const expiresAtMs = new Date(order.expiresAt).getTime()
+      if (Number.isFinite(expiresAtMs) && expiresAtMs > now) {
+        releaseMoments.push(expiresAtMs)
+      }
+    }
+
+    if (releaseMoments.length === 0) return null
+    return Math.min(...releaseMoments) - now
+  }, [market.endDate, market.status, myOrders, user])
+
+  useEffect(() => {
+    if (nextAutoReleaseDelayMs === null) {
+      return
+    }
+
+    const syncAfterAutoRelease = () => {
+      onTradeComplete()
+      // Market close processing and order expiry/cancellation are driven by
+      // market endpoints. Refresh balance shortly after to reflect refunds.
+      window.setTimeout(() => {
+        void refreshUser()
+      }, 250)
+    }
+
+    const timeoutId = window.setTimeout(syncAfterAutoRelease, Math.max(0, nextAutoReleaseDelayMs) + 150)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [nextAutoReleaseDelayMs, onTradeComplete, refreshUser])
 
   const handlePreview = async () => {
     const sharesNum = parseFloat(shares)
