@@ -19,6 +19,7 @@ import { useErrorToast } from '@/lib/useErrorToast'
 import toast from 'react-hot-toast'
 
 const MARKET_FETCH_TIMEOUT_MS = 12000
+const MARKET_FETCH_RETRY_DELAYS_MS = [300, 900]
 
 function formatRelativeTime(date: string | Date, locale: string): string {
   const target = new Date(date).getTime()
@@ -244,29 +245,60 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
       setLoading(false)
     }
 
+    let lastError: unknown = null
+
     try {
-      const controller = new AbortController()
-      const timeoutId = window.setTimeout(() => controller.abort(), MARKET_FETCH_TIMEOUT_MS)
-      const res = await fetch(`/api/markets/${id}`, {
-        ...(hasPrefetched ? { cache: 'no-store' as const } : {}),
-        signal: controller.signal,
-      })
-      window.clearTimeout(timeoutId)
-      if (res.status === 404) { setIsNotFound(true); return }
-      if (res.ok) {
-        const data = await res.json()
-        setFetchError(null)
-        setMarket(data)
-      } else {
-        setFetchError('Failed to fetch market')
+      for (let attempt = 0; attempt <= MARKET_FETCH_RETRY_DELAYS_MS.length; attempt += 1) {
+        const controller = new AbortController()
+        const timeoutId = window.setTimeout(() => controller.abort(), MARKET_FETCH_TIMEOUT_MS)
+
+        try {
+          const res = await fetch(`/api/markets/${id}`, {
+            ...(hasPrefetched ? { cache: 'no-store' as const } : {}),
+            signal: controller.signal,
+          })
+
+          if (res.status === 404) {
+            setIsNotFound(true)
+            setFetchError(null)
+            return
+          }
+
+          if (res.ok) {
+            const data = await res.json()
+            setFetchError(null)
+            setMarket(data)
+            return
+          }
+
+          const isRetryableStatus = res.status === 429 || res.status >= 500
+          if (isRetryableStatus && attempt < MARKET_FETCH_RETRY_DELAYS_MS.length) {
+            await new Promise((resolve) => window.setTimeout(resolve, MARKET_FETCH_RETRY_DELAYS_MS[attempt]))
+            continue
+          }
+
+          setFetchError('Failed to fetch market')
+          return
+        } catch (err) {
+          if (err instanceof Error && err.name === 'AbortError') {
+            // Ignore expected aborts (timeout or route change) to avoid noisy UX.
+            return
+          }
+
+          lastError = err
+          if (attempt < MARKET_FETCH_RETRY_DELAYS_MS.length) {
+            await new Promise((resolve) => window.setTimeout(resolve, MARKET_FETCH_RETRY_DELAYS_MS[attempt]))
+            continue
+          }
+        } finally {
+          window.clearTimeout(timeoutId)
+        }
       }
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        setFetchError(new Error('Timed out while fetching market'))
-      } else {
-        setFetchError(err)
+
+      if (lastError) {
+        setFetchError(lastError)
+        console.error('Failed to fetch market:', lastError)
       }
-      console.error('Failed to fetch market:', err)
     } finally {
       setLoading(false)
     }
