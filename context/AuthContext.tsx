@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react'
 import toast from 'react-hot-toast'
+import { endNavFeedback } from '@/lib/client-nav-feedback'
 
 interface User {
   id: string
@@ -183,6 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return false
     }
 
+    endNavFeedback()
     logoutInProgressRef.current = true
     setUser(null)
     try {

@@ -30,15 +30,15 @@ export function Navbar() {
     if (loggingOut) return
     setLoggingOut(true)
     try {
+      // Cancel any pending navigation watchdog before logging out.
+      endNavFeedback()
       const didLogoutViaPost = await logout()
       if (!didLogoutViaPost) {
         return
       }
       // Hard navigation clears all in-memory state (caches, polling, stale
-      // auth data) and avoids a client-side router transition that can stall
-      // on mobile when fired from an async callback outside the user gesture.
-      // Brief delay lets the "Logged out" toast render before the page unloads.
-      setTimeout(() => { window.location.href = '/auth/login' }, 600)
+      // auth data) and avoids client router transition edge-cases on mobile.
+      window.location.replace('/auth/login')
     } finally {
       setLoggingOut(false)
     }
