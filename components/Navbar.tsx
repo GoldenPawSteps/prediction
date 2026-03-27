@@ -31,7 +31,10 @@ export function Navbar() {
     if (loggingOut) return
     setLoggingOut(true)
     try {
-      await logout()
+      const didLogoutViaPost = await logout()
+      if (!didLogoutViaPost) {
+        return
+      }
       // Hard navigation clears all in-memory state (caches, polling, stale
       // auth data) and avoids a client-side router transition that can stall
       // on mobile when fired from an async callback outside the user gesture.

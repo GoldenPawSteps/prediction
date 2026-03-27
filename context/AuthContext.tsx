@@ -19,7 +19,7 @@ interface AuthContextType {
   loading: boolean
   login: (email: string, password: string) => Promise<boolean>
   register: (email: string, username: string, password: string) => Promise<boolean>
-  logout: () => Promise<void>
+  logout: () => Promise<boolean>
   refreshUser: () => Promise<void>
   optimisticUpdateBalance: (amount: number) => () => void
   updateProfile: (fields: { username?: string; bio?: string }) => Promise<boolean>
@@ -178,20 +178,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const logout = async () => {
+  const logout = async (): Promise<boolean> => {
     if (logoutInProgressRef.current) {
-      return
+      return false
     }
 
     logoutInProgressRef.current = true
     setUser(null)
-    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
-    // Keep refresh blocked briefly so cookie invalidation can settle before
-    // background visibility/interval refreshes run.
-    window.setTimeout(() => {
-      logoutInProgressRef.current = false
-    }, 300)
-    toast.success('Logged out')
+    try {
+      const res = await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+        cache: 'no-store',
+        keepalive: true,
+      })
+
+      if (!res.ok) {
+        // Fall back to a hard server-side logout that clears cookies and redirects.
+        window.location.href = '/api/auth/logout?next=/auth/login'
+        return false
+      }
+
+      toast.success('Logged out')
+      return true
+    } catch {
+      // Network/transient fetch failures should still fully log out.
+      window.location.href = '/api/auth/logout?next=/auth/login'
+      return false
+    } finally {
+      // Keep refresh blocked briefly so cookie invalidation can settle before
+      // background visibility/interval refreshes run.
+      window.setTimeout(() => {
+        logoutInProgressRef.current = false
+      }, 300)
+    }
   }
 
   const optimisticUpdateBalance = (amount: number) => {
