@@ -50,41 +50,54 @@ export async function GET(req: NextRequest) {
     if (category) where.category = category
     if (search) where.title = { contains: search, mode: 'insensitive' }
 
-    const [markets, total] = await Promise.all([
-      prisma.market.findMany({
-        where,
-        include: {
-          creator: { select: { username: true, avatar: true } },
-          children: {
-            select: {
-              id: true,
-              title: true,
-              outcomeName: true,
-              status: true,
-              resolution: true,
-              totalVolume: true,
-              yesShares: true,
-              noShares: true,
-              liquidityParam: true,
-              endDate: true,
-              _count: { select: { trades: true, comments: true } },
-            },
-            orderBy: { createdAt: 'asc' },
+    // Fetch all matching markets (no pagination yet for sorting purposes)
+    const allMarkets = await prisma.market.findMany({
+      where,
+      include: {
+        creator: { select: { username: true, avatar: true } },
+        children: {
+          select: {
+            id: true,
+            title: true,
+            outcomeName: true,
+            status: true,
+            resolution: true,
+            totalVolume: true,
+            yesShares: true,
+            noShares: true,
+            liquidityParam: true,
+            endDate: true,
+            _count: { select: { trades: true, comments: true } },
           },
-          _count: { select: { trades: true, comments: true } },
+          orderBy: { createdAt: 'asc' },
         },
-        orderBy: sortBy === 'volume' ? { totalVolume: 'desc' } : { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      prisma.market.count({ where }),
-    ])
+        _count: { select: { trades: true, comments: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    })
 
-    const marketsWithPrices = markets.map((m) => ({
+    // Calculate actual totalVolume for each market (for MULTI, sum children volumes)
+    const marketsWithVolumes = allMarkets.map((m) => ({
       ...m,
-      totalVolume: m.marketType === 'MULTI'
+      actualTotalVolume: m.marketType === 'MULTI'
         ? m.children.reduce((sum, child) => sum + child.totalVolume, 0)
         : m.totalVolume,
+    }))
+
+    // Sort by volume or creation date in memory
+    const sortedMarkets = marketsWithVolumes.sort((a, b) => {
+      if (sortBy === 'volume') {
+        return b.actualTotalVolume - a.actualTotalVolume
+      }
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    })
+
+    // Apply pagination after sorting
+    const paginatedMarkets = sortedMarkets.slice((page - 1) * limit, page * limit)
+
+    const marketsWithPrices = paginatedMarkets.map((m) => ({
+      ...m,
+      totalVolume: m.actualTotalVolume,
       probabilities: m.resolution === 'YES'
         ? { yes: 1, no: 0 }
         : m.resolution === 'NO'
@@ -110,6 +123,8 @@ export async function GET(req: NextRequest) {
           : getMarketProbabilities(child.yesShares, child.noShares, child.liquidityParam),
       })),
     }))
+
+    const total = sortedMarkets.length
 
     return apiSuccess({ markets: marketsWithPrices, total, page, limit })
   } catch (err) {
