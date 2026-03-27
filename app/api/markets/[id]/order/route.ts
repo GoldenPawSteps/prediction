@@ -1,9 +1,11 @@
 import { NextRequest } from 'next/server'
-import type { Prisma, TradeOutcome } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, apiError, apiSuccess } from '@/lib/api-helpers'
 import { activeOrderWhere, expireStaleMarketOrders } from '@/lib/order-expiration'
 import { z } from 'zod'
+
+type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
+type TradeOutcome = 'YES' | 'NO'
 
 const placeOrderSchema = z.object({
 	outcome: z.enum(['YES', 'NO']),
@@ -46,7 +48,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 			return apiError('expiresAt is only supported for GTD orders')
 		}
 
-		const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+		const result = await prisma.$transaction(async (tx: TxClient) => {
 			await expireStaleMarketOrders(tx, marketId)
 
 			const market = await tx.market.findUnique({ where: { id: marketId } })
@@ -104,7 +106,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 					: [{ price: 'desc' }, { createdAt: 'asc' }],
 			})
 
-			const matchableShares = matchingOrders.reduce((total, order) => total + order.remainingShares, 0)
+			const matchableShares = matchingOrders.reduce((total: number, order: { remainingShares: number }) => total + order.remainingShares, 0)
 			if (orderType === 'FOK' && matchableShares + 0.0000001 < shares) {
 				throw new Error('FOK order could not be fully matched immediately')
 			}
@@ -296,7 +298,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 			return apiError(parsed.error.issues[0].message)
 		}
 
-		const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+		const result = await prisma.$transaction(async (tx: TxClient) => {
 			await expireStaleMarketOrders(tx, marketId)
 
 			const order = await tx.marketOrder.findUnique({ where: { id: parsed.data.orderId } })
@@ -338,7 +340,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 }
 
 async function getReservedAskShares(
-	tx: Prisma.TransactionClient,
+	tx: TxClient,
 	userId: string,
 	marketId: string,
 	outcome: TradeOutcome
@@ -359,7 +361,7 @@ async function getReservedAskShares(
 }
 
 async function increasePosition(
-	tx: Prisma.TransactionClient,
+	tx: TxClient,
 	userId: string,
 	marketId: string,
 	outcome: TradeOutcome,
@@ -396,7 +398,7 @@ async function increasePosition(
 }
 
 async function decreasePosition(
-	tx: Prisma.TransactionClient,
+	tx: TxClient,
 	userId: string,
 	marketId: string,
 	outcome: TradeOutcome,

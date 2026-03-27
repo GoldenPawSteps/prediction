@@ -94,19 +94,19 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       resolutionTime: market.resolutionTime?.toISOString() ?? null,
       disputeWindowHours: market.disputeWindowHours,
       endDate: market.endDate.toISOString(),
-      resolutionVotes: resolutionVotes.map(vote => ({
+      resolutionVotes: resolutionVotes.map((vote: { userId: string; outcome: string; createdAt: Date; user: { id: string; username: string; avatar: string | null } }) => ({
         userId: vote.userId,
         outcome: vote.outcome,
         createdAt: vote.createdAt.toISOString(),
         user: vote.user,
       })),
-      voteHistory: voteHistory.map(vote => ({
+      voteHistory: voteHistory.map((vote: { userId: string; outcome: string; createdAt: Date; user: { id: string; username: string; avatar: string | null } }) => ({
         userId: vote.userId,
         outcome: vote.outcome,
         createdAt: vote.createdAt.toISOString(),
         user: vote.user,
       })),
-      disputes: disputes.map(dispute => ({
+      disputes: disputes.map((dispute: { id: string; proposedOutcome: string; status: string; reason: string; createdAt: Date; user: { id: string; username: string; avatar: string | null } }) => ({
         ...dispute,
         createdAt: dispute.createdAt.toISOString(),
       })),

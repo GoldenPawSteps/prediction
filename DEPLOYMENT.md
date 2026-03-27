@@ -103,6 +103,29 @@ npm start
 DATABASE_URL="postgresql://user:pass@ep-xxx.us-east-1.aws.neon.tech/predictify?sslmode=require"
 ```
 
+## 5b. Deploy to Railway
+
+1. Create or reuse a Railway project with:
+   - one application service for this repo
+   - one PostgreSQL service
+2. Set environment variables on the application service:
+   - `DATABASE_URL`
+   - `JWT_SECRET`
+   - `NEXT_PUBLIC_APP_URL`
+   - `NODE_ENV=production`
+3. This repo includes [railway.json](/workspaces/prediction/railway.json), and the production `start` script also runs `npm run db:migrate` before booting Next.js. That keeps Railway deployments safe even if the platform ignores the pre-deploy hook.
+4. Generate the baseline schema on a brand-new database once with:
+
+```bash
+npx prisma migrate deploy
+```
+
+5. If your production database was bootstrapped earlier with `prisma db push`, mark the baseline migration as applied one time:
+
+```bash
+npx prisma migrate resolve --applied 20260327074500_init
+```
+
 ---
 
 ## 6. Deploy with Docker

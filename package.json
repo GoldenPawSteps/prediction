@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev -p 3001",
     "build": "next build",
-    "start": "next start",
+    "postinstall": "prisma generate",
+    "start": "npm run db:migrate && next start",
     "lint": "eslint",
     "test:exchange": "node test-exchange-orders.js",
     "test:exchange:bid-maker": "node test-exchange-orders.js bid-maker",

@@ -36,7 +36,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     })
 
     // Convert Date objects to ISO strings
-    const formattedComments = comments.map(comment => ({
+    const formattedComments = comments.map((comment: { id: string; content: string; createdAt: Date; user: { id: string; username: string; avatar: string | null } }) => ({
       ...comment,
       createdAt: comment.createdAt.toISOString(),
     }))

@@ -5,6 +5,8 @@ import { getQualifiedMajorityThreshold, getResolutionQuorum, isImmediateResoluti
 import { settleMarketResolution } from '@/lib/market-settlement'
 import { z } from 'zod'
 
+type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
+
 const voteSchema = z.object({
   outcome: z.enum(['YES', 'NO', 'INVALID']),
 })
@@ -154,7 +156,7 @@ async function runResolution(
 
   if (!market) return
 
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: TxClient) => {
     await settleMarketResolution(tx, {
       marketId,
       outcome,

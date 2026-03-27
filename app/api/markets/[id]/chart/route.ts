@@ -26,7 +26,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     })
 
     // Convert Date objects to ISO strings
-    const formattedHistory = priceHistory.map(entry => ({
+    const formattedHistory = priceHistory.map((entry: { timestamp: Date; yesPrice: number; noPrice: number }) => ({
       ...entry,
       timestamp: entry.timestamp.toISOString(),
     }))

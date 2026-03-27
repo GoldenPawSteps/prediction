@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth, apiError, apiSuccess } from '@/lib/api-helpers'
 import { settleMarketResolution } from '@/lib/market-settlement'
 
+type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
+
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   // Allow anyone to resolve, no admin check needed (voting drives resolution now)
   const userOrResponse = await requireAuth(req)
@@ -34,7 +36,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const isReResolution = market.status === 'DISPUTED'
 
     // Resolve the market and calculate payouts
-    const settlement = await prisma.$transaction(async (tx) => {
+    const settlement = await prisma.$transaction(async (tx: TxClient) => {
       await tx.market.update({
         where: { id: marketId },
         data: {
