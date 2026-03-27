@@ -83,7 +83,7 @@ export function Navbar() {
   }
 
   const handleNavClick = (href: string) => {
-    beginNavFeedback()
+    beginNavFeedback(href)
     startAdminNavMetric(href, user?.isAdmin)
     handleNavIntentPrefetch(href)
   }

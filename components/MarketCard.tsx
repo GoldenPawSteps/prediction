@@ -108,7 +108,7 @@ export function MarketCard({ market }: MarketCardProps) {
   }
 
   const handleMarketClick = () => {
-    beginNavFeedback()
+    beginNavFeedback(detailHref)
     startAdminNavMetric(detailHref, user?.isAdmin)
     handleIntentPrefetch()
   }

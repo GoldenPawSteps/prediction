@@ -8,6 +8,7 @@ import { useT } from '@/context/I18nContext'
 import { useErrorToast } from '@/lib/useErrorToast'
 import { Badge } from '@/components/ui/Badge'
 import Link from 'next/link'
+import { beginNavFeedback } from '@/lib/client-nav-feedback'
 
 interface Trade {
   id: string
@@ -109,6 +110,7 @@ export function PortfolioTradesSection({ isPrefetched = false }: { isPrefetched?
                   <td className="px-2 sm:px-6 py-2 sm:py-4">
                     <Link
                       href={`/markets/${trade.market.id}`}
+                      onClick={() => beginNavFeedback(`/markets/${trade.market.id}`)}
                       className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline truncate max-w-xs"
                     >
                       {trade.market.title}
