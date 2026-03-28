@@ -34,47 +34,71 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const logoutInProgressRef = useRef(false)
+  const refreshInFlightRef = useRef<Promise<void> | null>(null)
+  const userSnapshotRef = useRef<string | null>(null)
+
+  const commitUser = useCallback((nextUser: User | null) => {
+    const nextSnapshot = nextUser ? JSON.stringify(nextUser) : null
+    if (nextSnapshot === userSnapshotRef.current) {
+      return
+    }
+
+    userSnapshotRef.current = nextSnapshot
+    setUser(nextUser)
+  }, [])
 
   const refreshUser = useCallback(async () => {
     if (logoutInProgressRef.current) {
       return
     }
 
-    try {
-      const res = await fetch('/api/auth/me', { cache: 'no-store' })
-      if (logoutInProgressRef.current) {
-        return
-      }
+    if (refreshInFlightRef.current) {
+      return refreshInFlightRef.current
+    }
 
-      if (res.ok) {
-        const data = await res.json()
+    const run = async () => {
+      try {
+        const res = await fetch('/api/auth/me', { cache: 'no-store' })
         if (logoutInProgressRef.current) {
           return
         }
-        setUser(data)
-        return
-      }
 
-      // Retry once on auth failures to avoid brief session flicker caused by
-      // transient cookie propagation/race conditions.
-      if (res.status === 401 || res.status === 403) {
-        await new Promise((resolve) => window.setTimeout(resolve, 150))
-        const retry = await fetch('/api/auth/me', { cache: 'no-store' })
-        if (retry.ok) {
-          const data = await retry.json()
-          setUser(data)
+        if (res.ok) {
+          const data = await res.json()
+          if (logoutInProgressRef.current) {
+            return
+          }
+          commitUser(data)
           return
         }
 
-        setUser(null)
-        return
-      }
+        // Retry once on auth failures to avoid brief session flicker caused by
+        // transient cookie propagation/race conditions.
+        if (res.status === 401 || res.status === 403) {
+          await new Promise((resolve) => window.setTimeout(resolve, 150))
+          const retry = await fetch('/api/auth/me', { cache: 'no-store' })
+          if (retry.ok) {
+            const data = await retry.json()
+            commitUser(data)
+            return
+          }
 
-      // Keep the current user on non-auth errors (e.g. 5xx/network edge cases).
-    } catch {
-      // Do not clear auth state on transient network failures.
+          commitUser(null)
+          return
+        }
+
+        // Keep the current user on non-auth errors (e.g. 5xx/network edge cases).
+      } catch {
+        // Do not clear auth state on transient network failures.
+      }
     }
-  }, [])
+
+    refreshInFlightRef.current = run().finally(() => {
+      refreshInFlightRef.current = null
+    })
+
+    return refreshInFlightRef.current
+  }, [commitUser])
 
   useEffect(() => {
     let mounted = true
@@ -134,7 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           toast.error('Login failed')
           return false
         }
-        setUser(data.user)
+        commitUser(data.user)
         toast.success('Welcome back!')
         return true
       } else {
@@ -168,7 +192,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           toast.error('Registration failed')
           return false
         }
-        setUser(data.user)
+        commitUser(data.user)
         toast.success('Account created!')
         return true
       } else {
@@ -188,7 +212,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     endNavFeedback()
     logoutInProgressRef.current = true
-    setUser(null)
+    commitUser(null)
     try {
       const res = await fetch('/api/auth/logout', {
         method: 'POST',
@@ -221,15 +245,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const optimisticUpdateBalance = (amount: number) => {
     const previousUser = user
     if (user) {
-      setUser({ ...user, balance: user.balance - amount })
+      commitUser({ ...user, balance: user.balance - amount })
     }
     // Verify in background (don't block)
     refreshUser().catch(() => {
-      if (previousUser) setUser(previousUser)
+      if (previousUser) commitUser(previousUser)
     })
     // Return rollback function
     return () => {
-      if (previousUser) setUser(previousUser)
+      if (previousUser) commitUser(previousUser)
     }
   }
 
@@ -249,7 +273,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         data = {}
       }
       if (res.ok && data.user) {
-        setUser(data.user)
+        commitUser(data.user)
         toast.success('Profile updated!')
         return true
       } else {

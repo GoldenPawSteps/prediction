@@ -20,12 +20,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             __html: `
               (function() {
                 try {
-                  var theme = localStorage.getItem('theme');
-                  if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                    document.documentElement.classList.add('dark');
-                  } else {
-                    document.documentElement.classList.remove('dark');
-                  }
+                  var storedMode = localStorage.getItem('predictify-theme');
+                  var mode = storedMode === 'light' || storedMode === 'dark' || storedMode === 'auto'
+                    ? storedMode
+                    : 'auto';
+                  var resolvedTheme = mode === 'auto'
+                    ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+                    : mode;
+
+                  document.documentElement.classList.toggle('dark', resolvedTheme === 'dark');
+                  document.documentElement.style.colorScheme = resolvedTheme;
                 } catch (e) {}
               })();
             `,

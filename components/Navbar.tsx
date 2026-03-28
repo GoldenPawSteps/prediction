@@ -22,6 +22,8 @@ export function Navbar() {
   const pathname = usePathname()
   const router = useRouter()
   const { user } = useAuth()
+  const isAuthenticated = Boolean(user)
+  const isAdmin = Boolean(user?.isAdmin)
   const t = useT('nav')
   const [mobileOpen, setMobileOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
@@ -105,7 +107,7 @@ export function Navbar() {
         url: '/api/leaderboard?sortBy=profit',
       })
 
-      if (user) {
+      if (isAuthenticated) {
         router.prefetch('/portfolio')
         router.prefetch('/markets/create')
         void prefetchJson('portfolio:me', '/api/portfolio', { credentials: 'include' })
@@ -129,7 +131,7 @@ export function Navbar() {
         router.prefetch('/auth/register')
       }
 
-      if (user?.isAdmin) {
+      if (isAdmin) {
         router.prefetch('/admin')
       }
     }
@@ -148,7 +150,7 @@ export function Navbar() {
 
     const timeout = globalThis.setTimeout(idlePrefetch, 500)
     return () => globalThis.clearTimeout(timeout)
-  }, [router, user])
+  }, [isAdmin, isAuthenticated, router])
 
   return (
     <nav className="sticky top-0 z-40 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-b border-gray-200 dark:border-gray-800">

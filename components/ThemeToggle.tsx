@@ -12,7 +12,7 @@ const MODES: { value: ThemeMode; icon: string; label: string }[] = [
   { value: 'dark', icon: '🌙', label: 'Dark' },
 ]
 
-function getInitialMode(): ThemeMode {
+function getStoredMode(): ThemeMode {
   if (typeof window === 'undefined') return 'auto'
   const saved = localStorage.getItem(THEME_STORAGE_KEY)
   if (saved === 'light' || saved === 'dark' || saved === 'auto') return saved
@@ -33,15 +33,34 @@ function applyTheme(mode: ThemeMode) {
 }
 
 export function ThemeToggle({ className = '' }: { className?: string }) {
-  // Deterministic initial render on server+client; read persisted mode after mount.
   const [mode, setMode] = useState<ThemeMode>('auto')
 
   useEffect(() => {
-    // Defer hydration-time state sync to avoid set-state-in-effect lint violations.
-    const timer = window.setTimeout(() => {
-      setMode(getInitialMode())
-    }, 0)
-    return () => window.clearTimeout(timer)
+    const syncTheme = () => {
+      const nextMode = getStoredMode()
+      setMode((currentMode) => (currentMode === nextMode ? currentMode : nextMode))
+      applyTheme(nextMode)
+    }
+
+    syncTheme()
+
+    const handlePageShow = () => {
+      syncTheme()
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        syncTheme()
+      }
+    }
+
+    window.addEventListener('pageshow', handlePageShow)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      window.removeEventListener('pageshow', handlePageShow)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [])
 
   useEffect(() => {
@@ -59,6 +78,7 @@ export function ThemeToggle({ className = '' }: { className?: string }) {
     const next = MODES[(idx + 1) % MODES.length].value
     setMode(next)
     localStorage.setItem(THEME_STORAGE_KEY, next)
+    applyTheme(next)
   }
 
   const current = MODES.find((m) => m.value === mode)!

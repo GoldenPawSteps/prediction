@@ -63,6 +63,11 @@ export function startSectionRevalidation(
     revalidation.timeoutId = (typeof globalThis !== 'undefined'
       ? globalThis.setTimeout
       : setTimeout)(async () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        scheduleNext()
+        return
+      }
+
       try {
         await fetchFn()
         revalidation.failureCount = 0
