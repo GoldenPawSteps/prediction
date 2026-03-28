@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/Button'
@@ -19,6 +19,8 @@ const CATEGORY_KEYS = {
   Finance: 'finance',
   Other: 'other',
 } as const
+
+const CREATE_MARKET_ERROR_TOAST_ID = 'create-market-error'
 
 // Convert local date to datetime-local format string
 function getLocalDateTimeString(date: Date): string {
@@ -54,6 +56,29 @@ export default function CreateMarketPage() {
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const formRef = useRef<HTMLFormElement>(null)
+  const errorToastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const clearErrorToastTimeout = () => {
+    if (!errorToastTimeoutRef.current) return
+    clearTimeout(errorToastTimeoutRef.current)
+    errorToastTimeoutRef.current = null
+  }
+
+  const showCreateErrorToast = (message: string) => {
+    clearErrorToastTimeout()
+
+    toast.error(message, {
+      id: CREATE_MARKET_ERROR_TOAST_ID,
+      duration: Infinity,
+    })
+
+    errorToastTimeoutRef.current = setTimeout(() => {
+      toast.dismiss(CREATE_MARKET_ERROR_TOAST_ID)
+      errorToastTimeoutRef.current = null
+    }, 4000)
+  }
+
+  useEffect(() => () => clearErrorToastTimeout(), [])
 
   const revealFirstInvalidField = (errs: Record<string, string>) => {
     const keys = Object.keys(errs)
@@ -176,6 +201,8 @@ export default function CreateMarketPage() {
       })
       const data = await res.json()
       if (res.ok) {
+        clearErrorToastTimeout()
+        toast.dismiss(CREATE_MARKET_ERROR_TOAST_ID)
         optimisticUpdateBalance(totalLocked)
         toast.success(t('toastCreated'))
         // After market creation the logical "back" is always the markets list.
@@ -195,10 +222,10 @@ export default function CreateMarketPage() {
         setTimeout(() => { window.location.replace(dest) }, 600)
         return
       } else {
-        toast.error(data.error || t('toastCreateFailed'))
+        showCreateErrorToast(data.error || t('toastCreateFailed'))
       }
     } catch {
-      toast.error(t('toastNetworkError'))
+      showCreateErrorToast(t('toastNetworkError'))
     } finally {
       setLoading(false)
     }
