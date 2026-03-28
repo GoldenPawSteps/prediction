@@ -33,7 +33,7 @@ function applyTheme(mode: ThemeMode) {
 }
 
 export function ThemeToggle({ className = '' }: { className?: string }) {
-  const [mode, setMode] = useState<ThemeMode>('auto')
+  const [mode, setMode] = useState<ThemeMode>(() => getStoredMode())
 
   useEffect(() => {
     const syncTheme = () => {
