@@ -70,6 +70,7 @@ export function usePageSection<T>({
 
   const isMountedRef = useRef(true)
   const revalidateCleanupRef = useRef<(() => void) | null>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
   // Tracks serialized last-known data to skip re-renders when response is unchanged
   const dataJsonRef = useRef<string | null>(null)
   const hasLoadedDataRef = useRef(false)
@@ -93,10 +94,16 @@ export function usePageSection<T>({
         }
       }
 
+      // Abort any previous in-flight request to prevent races
+      abortControllerRef.current?.abort()
+      const controller = new AbortController()
+      abortControllerRef.current = controller
+
       // Second: fetch fresh data from network (no visual stale indicator —
       // background revalidations are silent to avoid flickering)
       const res = await fetch(url, {
         ...fetchInit,
+        signal: controller.signal,
         cache: hasLoadedDataRef.current ? 'no-store' : undefined, // Bypass cache after first load
       })
 
@@ -125,6 +132,11 @@ export function usePageSection<T>({
 
       return newData
     } catch (err) {
+      // Silently ignore aborted requests — they are intentional cancellations
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        return undefined as unknown as T
+      }
+
       const error = err instanceof Error ? err : new Error(String(err))
 
       if (isMountedRef.current) {
@@ -145,10 +157,14 @@ export function usePageSection<T>({
     isMountedRef.current = true
 
     // Fetch from cache or network.
-    void fetchData()
+    fetchData().catch(() => {
+      // Error already handled in fetchData via setError
+    })
 
     return () => {
       isMountedRef.current = false
+      // Cancel any in-flight request on unmount / dependency change
+      abortControllerRef.current?.abort()
     }
   }, [fetchData])
 
@@ -163,8 +179,8 @@ export function usePageSection<T>({
       {
         interval: revalidateInterval,
         immediate: false, // Don't fetch immediately, let initial load handle it
-        maxRetries: 2,
-        retryDelay: 1000,
+        maxRetries: 5,
+        retryDelay: 2000,
         debug,
       }
     )

@@ -30,11 +30,9 @@ interface Comment {
 export function MarketCommentsSection({
   marketId,
   isPrefetched,
-  onCommentPosted,
 }: {
   marketId: string
   isPrefetched?: boolean
-  onCommentPosted?: () => void
 }) {
   const { user } = useAuth()
   const { locale } = useI18n()
@@ -44,7 +42,7 @@ export function MarketCommentsSection({
   const [submittingComment, setSubmittingComment] = useState(false)
 
   // Load comments with background refresh every 8 seconds
-  const { data: comments, isLoading, refetch } = usePageSection<Comment[]>({
+  const { data: comments, isLoading, error, refetch } = usePageSection<Comment[]>({
     key: `market-comments:${marketId}`,
     url: `/api/markets/${marketId}/comments`,
     revalidateInterval: 8000, // Refresh comments every 8 seconds
@@ -65,8 +63,7 @@ export function MarketCommentsSection({
 
       if (res.ok) {
         setComment('')
-        await refetch() // Manually refetch to show new comment immediately
-        onCommentPosted?.()
+        await refetch().catch(() => {}) // Manually refetch to show new comment immediately
         toast.success(t('commentPosted'))
       } else {
         const data = await res.json()
@@ -80,6 +77,23 @@ export function MarketCommentsSection({
   }
 
   if (isLoading) return <CommentsSectionSkeleton />
+
+  if (error && !comments) {
+    return (
+      <SectionErrorBoundary sectionName="market-comments">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 text-center">
+          <p className="text-sm text-red-600 dark:text-red-400 mb-2">{t('failedToLoadComments') ?? 'Failed to load comments'}</p>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => refetch().catch(() => {})}
+          >
+            {t('retry') ?? 'Retry'}
+          </Button>
+        </div>
+      </SectionErrorBoundary>
+    )
+  }
 
   const commentList = comments || []
 

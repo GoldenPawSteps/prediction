@@ -197,7 +197,6 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
   const [outcomeDisputeReason, setOutcomeDisputeReason] = useState<Record<string, string>>({})
   const [outcomeDisputeOutcome, setOutcomeDisputeOutcome] = useState<Record<string, 'YES' | 'NO' | 'INVALID'>>({})
   const [expandedOutcomeResolution, setExpandedOutcomeResolution] = useState<Record<string, boolean>>({})
-  const [commentRefreshKey, setCommentRefreshKey] = useState(0)
   const hasLoggedNavMetricRef = useRef(false)
 
   const translateCategory = (category: string) => {
@@ -287,10 +286,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
     hasLoggedNavMetricRef.current = true
   }, [id, loading, market, user?.isAdmin])
 
-  const handleCommentPosted = () => {
-    // Trigger comment section refresh when new comment is posted
-    setCommentRefreshKey(prev => prev + 1)
-  }
+
 
   const handleVote = async (outcome: 'YES' | 'NO' | 'INVALID') => {
     if (!user) {
@@ -1259,10 +1255,8 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
 
           {/* Comments Section - Progressive Loading */}
           <MarketCommentsSection
-            key={`comments-${id}-${commentRefreshKey}`}
             marketId={id}
             isPrefetched={Boolean(market)}
-            onCommentPosted={handleCommentPosted}
           />
         </div>
 

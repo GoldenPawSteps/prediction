@@ -74,6 +74,7 @@ export function PriceChart({ data }: PriceChartProps) {
   })
 
   return (
+    <div className="[&_svg]:outline-none [&_svg]:[-webkit-tap-highlight-color:transparent] [&_.recharts-wrapper]:!outline-none">
     <ResponsiveContainer width="100%" height={200}>
       <LineChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
@@ -111,5 +112,6 @@ export function PriceChart({ data }: PriceChartProps) {
         />
       </LineChart>
     </ResponsiveContainer>
+    </div>
   )
 }

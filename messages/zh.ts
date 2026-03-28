@@ -239,6 +239,8 @@ export const zh: Messages = {
     shareThoughts: '分享你的想法...',
     post: '发布',
     noCommentsYet: '暂无评论。成为第一个！',
+    failedToLoadComments: '加载评论失败',
+    retry: '重试',
     createdBy: '创建者',
     currentProbability: '当前概率',
     priceHistoryTitle: '价格历史',

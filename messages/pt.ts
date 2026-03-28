@@ -239,6 +239,8 @@ export const pt: Messages = {
     shareThoughts: 'Compartilhe seus pensamentos...',
     post: 'Postar',
     noCommentsYet: 'Nenhum comentário ainda. Seja o primeiro!',
+    failedToLoadComments: 'Falha ao carregar comentários',
+    retry: 'Tentar novamente',
     createdBy: 'Por',
     currentProbability: 'Probabilidade Atual',
     priceHistoryTitle: 'Histórico de Preço',

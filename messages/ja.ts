@@ -239,6 +239,8 @@ export const ja: Messages = {
     shareThoughts: 'あなたの考えを共有してください...',
     post: '投稿',
     noCommentsYet: 'まだコメントはありません。最初になってください！',
+    failedToLoadComments: 'コメントの読み込みに失敗しました',
+    retry: '再試行',
     createdBy: '作成者',
     currentProbability: '現在の確率',
     priceHistoryTitle: '価格履歴',

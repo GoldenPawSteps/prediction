@@ -239,6 +239,8 @@ export const en: Messages = {
     shareThoughts: 'Share your thoughts...',
     post: 'Post',
     noCommentsYet: 'No comments yet. Be the first!',
+    failedToLoadComments: 'Failed to load comments',
+    retry: 'Retry',
     createdBy: 'By',
     currentProbability: 'Current Probability',
     priceHistoryTitle: 'Price History',

@@ -239,6 +239,8 @@ export const de: Messages = {
     shareThoughts: 'Teilen Sie Ihre Gedanken mit...',
     post: 'Veröffentlichen',
     noCommentsYet: 'Noch keine Kommentare. Seien Sie der Erste!',
+    failedToLoadComments: 'Kommentare konnten nicht geladen werden',
+    retry: 'Erneut versuchen',
     createdBy: 'Von',
     currentProbability: 'Aktuelle Wahrscheinlichkeit',
     priceHistoryTitle: 'Preisentwicklung',

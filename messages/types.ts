@@ -237,6 +237,8 @@ export interface Messages {
     shareThoughts: string
     post: string
     noCommentsYet: string
+    failedToLoadComments: string
+    retry: string
     createdBy: string
     currentProbability: string
     priceHistoryTitle: string
