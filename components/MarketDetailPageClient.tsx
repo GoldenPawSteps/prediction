@@ -269,6 +269,14 @@ export function MarketDetailPageClient({
   const previousActiveUserOrdersRef = useRef<number | null>(
     initialMarket ? countActiveUserOrders(initialMarket) : null
   )
+  const userRef = useRef(user)
+  const marketJsonRef = useRef<string | null>(initialMarket ? JSON.stringify(initialMarket) : null)
+  const fetchInFlightRef = useRef<Promise<void> | null>(null)
+  const queuedFetchRef = useRef(false)
+
+  useEffect(() => {
+    userRef.current = user
+  }, [user])
 
   const translateCategory = (category: string) => {
     switch (category) {
@@ -305,54 +313,90 @@ export function MarketDetailPageClient({
   }
 
   const fetchMarket = useCallback(async () => {
-    const prefetchKey = `market:${id}`
-    const prefetched = consumePrefetchedJson<Market>(prefetchKey)
-    const hasPrefetched = Boolean(prefetched)
-
-    if (prefetched) {
-      setMarket(prefetched)
-      setLoading(false)
+    if (fetchInFlightRef.current) {
+      queuedFetchRef.current = true
+      return fetchInFlightRef.current
     }
 
-    try {
-      const controller = new AbortController()
-      const timeoutId = window.setTimeout(() => controller.abort(), MARKET_FETCH_TIMEOUT_MS)
-      const res = await fetch(`/api/markets/${id}`, {
-        ...(hasPrefetched ? { cache: 'no-store' as const } : {}),
-        signal: controller.signal,
-      })
-      window.clearTimeout(timeoutId)
-      if (res.status === 404) { setIsNotFound(true); return }
-      if (res.ok) {
-        const data = await readJsonResponse<Market>(res)
-        const activeUserOrders = countActiveUserOrders(data)
-        const marketJustClosed = previousStatusRef.current === 'OPEN' && data.status !== 'OPEN'
-        const userOrdersReleased = previousActiveUserOrdersRef.current !== null
-          && previousActiveUserOrdersRef.current > activeUserOrders
+    const run = async () => {
+      const prefetchKey = `market:${id}`
+      const prefetched = consumePrefetchedJson<Market>(prefetchKey)
+      const hasPrefetched = Boolean(prefetched)
 
-        previousStatusRef.current = data.status
-        previousActiveUserOrdersRef.current = activeUserOrders
-
-        setFetchError(null)
-        setMarket(data)
-
-        if (user && (marketJustClosed || userOrdersReleased)) {
-          void refreshUser()
+      if (prefetched) {
+        const prefetchedJson = JSON.stringify(prefetched)
+        if (prefetchedJson !== marketJsonRef.current) {
+          marketJsonRef.current = prefetchedJson
+          setMarket(prefetched)
         }
-      } else {
-        setFetchError('Failed to fetch market')
+        setLoading(false)
       }
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        setFetchError(new Error('Timed out while fetching market'))
-      } else {
-        setFetchError(err)
+
+      try {
+        const controller = new AbortController()
+        const timeoutId = window.setTimeout(() => controller.abort(), MARKET_FETCH_TIMEOUT_MS)
+
+        try {
+          const res = await fetch(`/api/markets/${id}`, {
+            ...(hasPrefetched ? { cache: 'no-store' as const } : {}),
+            signal: controller.signal,
+          })
+
+          if (res.status === 404) {
+            setIsNotFound(true)
+            return
+          }
+
+          if (res.ok) {
+            const data = await readJsonResponse<Market>(res)
+            const activeUserOrders = countActiveUserOrders(data)
+            const marketJustClosed = previousStatusRef.current === 'OPEN' && data.status !== 'OPEN'
+            const userOrdersReleased = previousActiveUserOrdersRef.current !== null
+              && previousActiveUserOrdersRef.current > activeUserOrders
+
+            previousStatusRef.current = data.status
+            previousActiveUserOrdersRef.current = activeUserOrders
+
+            setFetchError(null)
+
+            const nextMarketJson = JSON.stringify(data)
+            if (nextMarketJson !== marketJsonRef.current) {
+              marketJsonRef.current = nextMarketJson
+              setMarket(data)
+            }
+
+            if (userRef.current && (marketJustClosed || userOrdersReleased)) {
+              void refreshUser()
+            }
+          } else {
+            setFetchError('Failed to fetch market')
+          }
+        } finally {
+          window.clearTimeout(timeoutId)
+        }
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') {
+          setFetchError(new Error('Timed out while fetching market'))
+        } else {
+          setFetchError(err)
+        }
+        console.error('Failed to fetch market:', err)
+      } finally {
+        setLoading(false)
       }
-      console.error('Failed to fetch market:', err)
-    } finally {
-      setLoading(false)
     }
-  }, [id, refreshUser, user])
+
+    fetchInFlightRef.current = run().finally(() => {
+      fetchInFlightRef.current = null
+
+      if (queuedFetchRef.current) {
+        queuedFetchRef.current = false
+        void fetchMarket()
+      }
+    })
+
+    return fetchInFlightRef.current
+  }, [id, refreshUser])
 
   useErrorToast(fetchError, 'Failed to fetch market')
 
