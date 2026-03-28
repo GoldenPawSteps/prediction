@@ -207,6 +207,7 @@ function HomePageContent() {
             value={status}
             onChange={(e) => updateQuery({ status: e.target.value, page: 1 })}
             className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 min-w-28 sm:min-w-36"
+            suppressHydrationWarning
           >
             {statuses.map((s) => (
               <option key={s.value} value={s.value}>{s.label}</option>
@@ -216,6 +217,7 @@ function HomePageContent() {
             value={sortBy}
             onChange={(e) => updateQuery({ sortBy: e.target.value, page: 1 })}
             className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 min-w-28 sm:min-w-36"
+            suppressHydrationWarning
           >
             {sortOptions.map((s) => (
               <option key={s.value} value={s.value}>{s.label}</option>
