@@ -33,6 +33,9 @@ export function Navbar() {
     setLoggingOut(true)
     // Cancel any pending navigation watchdog before navigating away.
     endNavFeedback()
+    // Clear stale post-create back target so the next user doesn't land on
+    // the previous user's market detail page.
+    try { window.sessionStorage.removeItem('predictify:post-create-back-target') } catch {}
     // Fire-and-forget: POST invalidates session + clears cookies server-side.
     // keepalive ensures the request completes even as the page unloads.
     try {

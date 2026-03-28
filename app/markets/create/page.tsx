@@ -178,20 +178,14 @@ export default function CreateMarketPage() {
       if (res.ok) {
         optimisticUpdateBalance(totalLocked)
         toast.success(t('toastCreated'))
-        // Preserve a deterministic back target for the market detail mobile back button.
-        // This avoids relying on browser history in post-create flows that can stall.
+        // After market creation the logical "back" is always the markets list.
+        // Do NOT use document.referrer — it reflects the last *hard* navigation and
+        // is stale after client-side route changes, which can point to another
+        // user's market detail page across login/logout cycles.
         try {
-          if (typeof window !== 'undefined' && document.referrer) {
-            const referrerUrl = new URL(document.referrer)
-            if (referrerUrl.origin === window.location.origin) {
-              const refPath = `${referrerUrl.pathname}${referrerUrl.search}${referrerUrl.hash}`
-              if (refPath !== '/markets/create') {
-                window.sessionStorage.setItem('predictify:post-create-back-target', refPath)
-              }
-            }
-          }
+          window.sessionStorage.setItem('predictify:post-create-back-target', '/')
         } catch {
-          // Ignore referrer parsing/storage failures.
+          // Ignore storage failures.
         }
         // Hard navigation avoids stalled client-side transitions on mobile
         // when router.push fires from a deep async callback.
