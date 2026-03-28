@@ -54,6 +54,7 @@ export function ThemeToggle({ className = '' }: { className?: string }) {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
           syncTheme()
+          
         }
     }
 
