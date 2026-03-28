@@ -53,7 +53,12 @@ export function ThemeToggle({ className = '' }: { className?: string }) {
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        syncTheme()
+        // Skip sync for 'auto' mode on mobile to avoid media query flakiness
+        // when alternating apps. The media query listener handles auto theme.
+        const currentMode = getStoredMode()
+        if (currentMode !== 'auto') {
+          syncTheme()
+        }
       }
     }
 
