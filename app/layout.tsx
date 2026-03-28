@@ -1,5 +1,4 @@
 import type { Metadata } from 'next'
-import Script from 'next/script'
 import './globals.css'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from '@/context/AuthContext'
@@ -14,31 +13,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <Script
-          id="theme-init"
-          strategy="beforeInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  var storedMode = localStorage.getItem('predictify-theme');
-                  var mode = storedMode === 'light' || storedMode === 'dark' || storedMode === 'auto'
-                    ? storedMode
-                    : 'auto';
-                  var resolvedTheme = mode === 'auto'
-                    ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-                    : mode;
-
-                  document.documentElement.classList.toggle('dark', resolvedTheme === 'dark');
-                  document.documentElement.style.colorScheme = resolvedTheme;
-                } catch (e) {}
-              })();
-            `,
-          }}
-        />
-      </head>
+    <html lang="en">
+      <head />
       <body className="font-sans bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100 min-h-screen transition-colors">
         <NavProgressCleanup />
         <I18nProvider>

@@ -6,7 +6,6 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useT } from '@/context/I18nContext'
 import { Button } from '@/components/ui/Button'
-import { ThemeToggle } from '@/components/ThemeToggle'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { formatCurrency } from '@/lib/utils'
 import { prefetchJson } from '@/lib/client-prefetch'
@@ -190,7 +189,6 @@ export function Navbar() {
           {/* User Actions */}
           <div className="hidden md:flex items-center gap-3">
             <LanguageSwitcher />
-            <ThemeToggle />
             {user ? (
               <>
                 <div className="text-sm text-gray-600 dark:text-gray-400">
@@ -269,7 +267,6 @@ export function Navbar() {
           <div className="md:hidden pb-4 space-y-1">
             <div className="px-3 py-2 flex gap-2">
               <LanguageSwitcher className="flex-1 justify-center" />
-              <ThemeToggle className="flex-1 justify-center" />
             </div>
             {navLinks.map((link) => (
               <Link

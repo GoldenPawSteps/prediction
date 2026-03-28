@@ -1,15 +1,11 @@
 @import "tailwindcss";
 
-/* Enable class-based dark mode for Tailwind v4 */
-@custom-variant dark (&:where(.dark, .dark *));
-
 @theme {
   --color-gray-950: #030712;
 }
 
 @layer base {
   :root {
-    color-scheme: light;
     --app-bg: #f8fafc;
     --app-text: #0f172a;
     --scroll-thumb: #94a3b8;
@@ -18,14 +14,15 @@
     --toast-border: #e2e8f0;
   }
 
-  .dark {
-    color-scheme: dark;
-    --app-bg: var(--color-gray-950);
-    --app-text: rgb(243 244 246);
-    --scroll-thumb: #374151;
-    --toast-bg: #1f2937;
-    --toast-fg: #f9fafb;
-    --toast-border: #374151;
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --app-bg: var(--color-gray-950);
+      --app-text: rgb(243 244 246);
+      --scroll-thumb: #374151;
+      --toast-bg: #1f2937;
+      --toast-fg: #f9fafb;
+      --toast-border: #374151;
+    }
   }
 
   body {
@@ -38,10 +35,12 @@
     background-attachment: fixed;
   }
 
-  .dark body {
-    background-image:
-      radial-gradient(900px 450px at 0% 0%, rgb(34 211 238 / 0.09), transparent 55%),
-      radial-gradient(700px 380px at 100% 0%, rgb(99 102 241 / 0.12), transparent 60%);
+  @media (prefers-color-scheme: dark) {
+    body {
+      background-image:
+        radial-gradient(900px 450px at 0% 0%, rgb(34 211 238 / 0.09), transparent 55%),
+        radial-gradient(700px 380px at 100% 0%, rgb(99 102 241 / 0.12), transparent 60%);
+    }
   }
 
   * {
@@ -107,85 +106,87 @@ html[data-nav-pending='true'] body::before {
 }
 
 @layer utilities {
-  :root:not(.dark) .bg-gray-900 {
-    background-color: rgb(255 255 255);
-  }
+  @media (prefers-color-scheme: light) {
+    .bg-gray-900 {
+      background-color: rgb(255 255 255);
+    }
 
-  :root:not(.dark) .bg-gray-900\/95 {
-    background-color: rgb(255 255 255 / 0.95);
-  }
+    .bg-gray-900\/95 {
+      background-color: rgb(255 255 255 / 0.95);
+    }
 
-  :root:not(.dark) .bg-gray-900\/60 {
-    background-color: rgb(248 250 252 / 0.95);
-  }
+    .bg-gray-900\/60 {
+      background-color: rgb(248 250 252 / 0.95);
+    }
 
-  :root:not(.dark) .bg-gray-800 {
-    background-color: rgb(241 245 249);
-  }
+    .bg-gray-800 {
+      background-color: rgb(241 245 249);
+    }
 
-  :root:not(.dark) .bg-gray-800\/70,
-  :root:not(.dark) .bg-gray-800\/50 {
-    background-color: rgb(241 245 249 / 0.8);
-  }
+    .bg-gray-800\/70,
+    .bg-gray-800\/50 {
+      background-color: rgb(241 245 249 / 0.8);
+    }
 
-  :root:not(.dark) .bg-gray-700,
-  :root:not(.dark) .bg-gray-700\/50,
-  :root:not(.dark) .bg-gray-700\/40 {
-    background-color: rgb(226 232 240);
-  }
+    .bg-gray-700,
+    .bg-gray-700\/50,
+    .bg-gray-700\/40 {
+      background-color: rgb(226 232 240);
+    }
 
-  :root:not(.dark) .text-white {
-    color: rgb(15 23 42);
-  }
+    .text-white {
+      color: rgb(15 23 42);
+    }
 
-  :root:not(.dark) .bg-indigo-600.text-white,
-  :root:not(.dark) .bg-indigo-500.text-white,
-  :root:not(.dark) .bg-green-600.text-white,
-  :root:not(.dark) .bg-red-600.text-white,
-  :root:not(.dark) .bg-red-500.text-white,
-  :root:not(.dark) .bg-indigo-600 .text-white,
-  :root:not(.dark) .bg-indigo-500 .text-white,
-  :root:not(.dark) .bg-green-600 .text-white,
-  :root:not(.dark) .bg-red-600 .text-white,
-  :root:not(.dark) .bg-red-500 .text-white {
-    color: rgb(255 255 255);
-  }
+    .bg-indigo-600.text-white,
+    .bg-indigo-500.text-white,
+    .bg-green-600.text-white,
+    .bg-red-600.text-white,
+    .bg-red-500.text-white,
+    .bg-indigo-600 .text-white,
+    .bg-indigo-500 .text-white,
+    .bg-green-600 .text-white,
+    .bg-red-600 .text-white,
+    .bg-red-500 .text-white {
+      color: rgb(255 255 255);
+    }
 
-  :root:not(.dark) .text-gray-400 {
-    color: rgb(71 85 105);
-  }
+    .text-gray-400 {
+      color: rgb(71 85 105);
+    }
 
-  :root:not(.dark) .text-gray-300 {
-    color: rgb(51 65 85);
-  }
+    .text-gray-300 {
+      color: rgb(51 65 85);
+    }
 
-  :root:not(.dark) .text-gray-500 {
-    color: rgb(100 116 139);
-  }
+    .text-gray-500 {
+      color: rgb(100 116 139);
+    }
 
-  :root:not(.dark) .border-gray-800 {
-    border-color: rgb(226 232 240);
-  }
+    .border-gray-800 {
+      border-color: rgb(226 232 240);
+    }
 
-  :root:not(.dark) .border-gray-700,
-  :root:not(.dark) .border-gray-700\/60,
-  :root:not(.dark) .border-gray-700\/50,
-  :root:not(.dark) .border-gray-600,
-  :root:not(.dark) .border-gray-600\/40 {
-    border-color: rgb(203 213 225);
-  }
+    .border-gray-700,
+    .border-gray-700\/60,
+    .border-gray-700\/50,
+    .border-gray-600,
+    .border-gray-600\/40 {
+      border-color: rgb(203 213 225);
+    }
 
-  :root:not(.dark) .hover\:bg-gray-800:hover {
-    background-color: rgb(226 232 240);
-  }
+    .hover\:bg-gray-800:hover {
+      background-color: rgb(226 232 240);
+    }
 
-  :root:not(.dark) .hover\:bg-gray-700:hover,
-  :root:not(.dark) .hover\:bg-gray-600:hover {
-    background-color: rgb(203 213 225);
-  }
+    .hover\:bg-gray-700:hover,
+    .hover\:bg-gray-600:hover {
+      background-color: rgb(203 213 225);
+    }
 
-  :root:not(.dark) .hover\:text-white:hover {
-    color: rgb(15 23 42);
+    .hover\:text-white:hover {
+      color: rgb(15 23 42);
+    }
   }
 
   .reveal-up {
