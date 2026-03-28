@@ -128,54 +128,67 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
   const bestBid = bids[0]?.price ?? null
   const bestAsk = asks[0]?.price ?? null
 
-  const nextAutoReleaseDelayMs = useMemo(() => {
+  const nextOrderBookRefresh = useMemo(() => {
     if (!user) return null
 
     const now = Date.now()
-    const releaseMoments: number[] = []
+    const refreshMoments: Array<{ atMs: number; needsBalanceRefresh: boolean }> = []
 
     // GTC BID reserves release when market closes at endDate.
     const hasOpenBid = myOrders.some((order) => order.side === 'BID' && order.remainingShares > 0)
     if (hasOpenBid && market.status === 'OPEN') {
       const marketEndMs = new Date(market.endDate).getTime()
       if (Number.isFinite(marketEndMs) && marketEndMs > now) {
-        releaseMoments.push(marketEndMs)
+        refreshMoments.push({ atMs: marketEndMs, needsBalanceRefresh: true })
       }
     }
 
-    // GTD BID reserves release when the order reaches expiresAt.
+    // GTD orders should disappear from the book immediately at expiresAt.
+    // BID expirations also release reserved balance.
     for (const order of myOrders) {
-      if (order.side !== 'BID') continue
       if (order.orderType !== 'GTD') continue
       if (!order.expiresAt) continue
       if (order.remainingShares <= 0) continue
 
       const expiresAtMs = new Date(order.expiresAt).getTime()
       if (Number.isFinite(expiresAtMs) && expiresAtMs > now) {
-        releaseMoments.push(expiresAtMs)
+        refreshMoments.push({
+          atMs: expiresAtMs,
+          needsBalanceRefresh: order.side === 'BID',
+        })
       }
     }
 
-    if (releaseMoments.length === 0) return null
-    return Math.min(...releaseMoments) - now
+    if (refreshMoments.length === 0) return null
+
+    const earliestAtMs = Math.min(...refreshMoments.map((moment) => moment.atMs))
+    const needsBalanceRefresh = refreshMoments.some(
+      (moment) => moment.atMs === earliestAtMs && moment.needsBalanceRefresh
+    )
+
+    return {
+      delayMs: earliestAtMs - now,
+      needsBalanceRefresh,
+    }
   }, [market.endDate, market.status, myOrders, user])
 
   useEffect(() => {
-    if (nextAutoReleaseDelayMs === null) {
+    if (nextOrderBookRefresh === null) {
       return
     }
 
     const timeoutId = window.setTimeout(() => {
-      // refreshUser() now processes all stale orders (GTD + market-expired)
-      // server-side in auth/me, so balance is fresh in the response.
-      void refreshUser()
+      if (nextOrderBookRefresh.needsBalanceRefresh) {
+        // refreshUser() processes stale order releases server-side in auth/me.
+        void refreshUser()
+      }
       onTradeComplete()
-    }, Math.max(0, nextAutoReleaseDelayMs) + 150)
+    }, Math.max(0, nextOrderBookRefresh.delayMs) + 150)
 
     return () => {
       window.clearTimeout(timeoutId)
     }
-  }, [nextAutoReleaseDelayMs, onTradeComplete, refreshUser])
+  }, [nextOrderBookRefresh, onTradeComplete, refreshUser])
 
   const handlePreview = async () => {
     const sharesNum = parseFloat(shares)
