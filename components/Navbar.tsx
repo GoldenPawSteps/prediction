@@ -55,7 +55,7 @@ export function Navbar() {
     ...(user?.isAdmin ? [{ href: '/admin', label: t('admin') }] : []),
   ]
 
-  const isMarketDetail = /^\/markets\/[^/]+$/.test(pathname)
+  const isMarketDetail = /^\/markets\/(?!create$)[^/]+$/.test(pathname)
 
   const handleNavIntentPrefetch = (href: string) => {
     router.prefetch(href)
@@ -229,6 +229,13 @@ export function Navbar() {
               <button
                 className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white p-1.5 -ml-1.5"
                 onClick={() => {
+                  const postCreateBackTarget = window.sessionStorage.getItem('predictify:post-create-back-target')
+                  if (postCreateBackTarget) {
+                    window.sessionStorage.removeItem('predictify:post-create-back-target')
+                    window.location.assign(postCreateBackTarget)
+                    return
+                  }
+
                   if (window.history.length > 1) router.back()
                   else router.push('/')
                 }}

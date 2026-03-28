@@ -34,7 +34,7 @@ export default function CreateMarketPage() {
   const t = useT('createMarket')
   const tCategories = useT('categories')
   const router = useRouter()
-  const { user, optimisticUpdateBalance } = useAuth()
+  const { user, loading: authLoading, optimisticUpdateBalance } = useAuth()
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({
     marketType: 'BINARY' as 'BINARY' | 'MULTI',
@@ -178,11 +178,27 @@ export default function CreateMarketPage() {
       if (res.ok) {
         optimisticUpdateBalance(totalLocked)
         toast.success(t('toastCreated'))
+        // Preserve a deterministic back target for the market detail mobile back button.
+        // This avoids relying on browser history in post-create flows that can stall.
+        try {
+          if (typeof window !== 'undefined' && document.referrer) {
+            const referrerUrl = new URL(document.referrer)
+            if (referrerUrl.origin === window.location.origin) {
+              const refPath = `${referrerUrl.pathname}${referrerUrl.search}${referrerUrl.hash}`
+              if (refPath !== '/markets/create') {
+                window.sessionStorage.setItem('predictify:post-create-back-target', refPath)
+              }
+            }
+          }
+        } catch {
+          // Ignore referrer parsing/storage failures.
+        }
         // Hard navigation avoids stalled client-side transitions on mobile
         // when router.push fires from a deep async callback.
         // Brief delay lets the success toast render before the page unloads.
+        // Use replace so browser back does not return to the create form.
         const dest = `/markets/${data.market.id}`
-        setTimeout(() => { window.location.href = dest }, 600)
+        setTimeout(() => { window.location.replace(dest) }, 600)
         return
       } else {
         toast.error(data.error || t('toastCreateFailed'))
@@ -192,6 +208,16 @@ export default function CreateMarketPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (authLoading) {
+    return (
+      <div className="max-w-2xl mx-auto animate-pulse space-y-4">
+        <div className="h-8 bg-gray-200 dark:bg-gray-800 rounded w-2/3" />
+        <div className="h-5 bg-gray-200 dark:bg-gray-800 rounded w-1/2" />
+        <div className="h-96 bg-gray-200 dark:bg-gray-800 rounded-xl" />
+      </div>
+    )
   }
 
   if (!user) {
