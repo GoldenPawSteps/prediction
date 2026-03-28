@@ -18,6 +18,8 @@ interface Trade {
   price: number
   totalCost: number
   createdAt: string
+  executionVenue?: 'AMM' | 'EXCHANGE'
+  exchangeRole?: 'MAKER' | 'TAKER' | null
   market: { id: string; title: string; category: string }
 }
 
@@ -28,6 +30,7 @@ interface PortfolioTradesData {
 export function PortfolioTradesSection({ isPrefetched = false }: { isPrefetched?: boolean }) {
   const t = useT('portfolio')
   const tCategories = useT('categories')
+  const tMarketDetail = useT('marketDetail')
   const tAdmin = useT('admin')
   const tTradePanel = useT('tradePanel')
 
@@ -60,6 +63,12 @@ export function PortfolioTradesSection({ isPrefetched = false }: { isPrefetched?
       case 'SELL': return tTradePanel('sell')
       default: return type
     }
+  }
+
+  const translateExchangeRole = (role?: 'MAKER' | 'TAKER' | null) => {
+    if (role === 'MAKER') return tMarketDetail('makerLabel')
+    if (role === 'TAKER') return tMarketDetail('takerLabel')
+    return ''
   }
 
   // Load trades with lower refresh rate (historical data)
@@ -129,6 +138,16 @@ export function PortfolioTradesSection({ isPrefetched = false }: { isPrefetched?
                         {translateOutcome(trade.outcome)}
                       </Badge>
                       <Badge variant={trade.type === 'BUY' ? 'success' : 'danger'}>
+                      {trade.executionVenue === 'EXCHANGE' ? (
+                        <>
+                          <Badge variant="info">{tTradePanel('exchange')}</Badge>
+                          {trade.exchangeRole && (
+                            <Badge variant="warning">{translateExchangeRole(trade.exchangeRole)}</Badge>
+                          )}
+                        </>
+                      ) : (
+                        <Badge variant="default">{tTradePanel('amm')}</Badge>
+                      )}
                         {translateTradeType(trade.type)}
                       </Badge>
                     </div>
