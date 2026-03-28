@@ -58,6 +58,7 @@ export function ThemeToggle({ className = '' }: { className?: string }) {
         const currentMode = getStoredMode()
         if (currentMode !== 'auto') {
           syncTheme()
+          
         }
       }
     }
