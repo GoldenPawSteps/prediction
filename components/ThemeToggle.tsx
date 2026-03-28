@@ -33,10 +33,10 @@ function applyTheme(mode: ThemeMode) {
 }
 
 export function ThemeToggle({ className = '' }: { className?: string }) {
-  // Always initialise with 'auto' so the server and client first-render match.
-  // The mount effect below immediately syncs to the real stored preference.
-  const [mode, setMode] = useState<ThemeMode>('auto')
-  const [mounted, setMounted] = useState(false)
+  // Read stored preference immediately so re-mounts (e.g. hamburger menu open)
+  // never flash "Auto". On the server `getStoredMode()` returns 'auto';
+  // `suppressHydrationWarning` on the rendered elements covers the mismatch.
+  const [mode, setMode] = useState<ThemeMode>(() => getStoredMode())
 
   useEffect(() => {
     const syncTheme = () => {
@@ -46,7 +46,6 @@ export function ThemeToggle({ className = '' }: { className?: string }) {
     }
 
     syncTheme()
-    setMounted(true)
 
     const handlePageShow = () => {
       syncTheme()
@@ -85,22 +84,19 @@ export function ThemeToggle({ className = '' }: { className?: string }) {
     applyTheme(next)
   }
 
-  // Before mount, render a placeholder that matches the server HTML (mode='auto')
-  // so there is no hydration diff. The boot <script> already applied the correct
-  // theme class to <html>, so the page looks correct despite the label saying "Auto".
-  const display = mounted ? MODES.find((m) => m.value === mode)! : MODES.find((m) => m.value === 'auto')!
+  const current = MODES.find((m) => m.value === mode)!
 
   return (
     <button
       type="button"
       onClick={cycleMode}
       className={`inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 ${className}`}
-      aria-label={`Theme: ${display.label}`}
-      title={`Theme: ${display.label} — click to cycle`}
+      aria-label={`Theme: ${current.label}`}
+      title={`Theme: ${current.label} — click to cycle`}
       suppressHydrationWarning
     >
-      <span suppressHydrationWarning>{display.icon}</span>
-      <span suppressHydrationWarning>{display.label}</span>
+      <span suppressHydrationWarning>{current.icon}</span>
+      <span suppressHydrationWarning>{current.label}</span>
     </button>
   )
 }
