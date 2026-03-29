@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, apiError, apiSuccess } from '@/lib/api-helpers'
 import { lmsrTradeCost, getMarketProbabilities } from '@/lib/lmsr'
+import { roundMoney, roundPrice } from '@/lib/money'
 import { activeOrderWhere, expireStaleMarketOrders } from '@/lib/order-expiration'
 import { z } from 'zod'
 
@@ -58,8 +59,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
       if (newYesShares < 0 || newNoShares < 0) throw new Error('Invalid trade: negative shares')
 
-      const tradeCost = lmsrTradeCost(market.yesShares, market.noShares, newYesShares, newNoShares, b)
-      const actualPrice = Math.abs(tradeCost) / shares
+      const tradeCost = roundMoney(
+        lmsrTradeCost(market.yesShares, market.noShares, newYesShares, newNoShares, b)
+      )
+      const actualPrice = roundPrice(Math.abs(tradeCost) / shares)
 
       if (type === 'BUY' && user.balance < tradeCost) {
         throw new Error('Insufficient balance')
@@ -92,7 +95,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       // Update user balance (-tradeCost: positive for BUY, negative for SELL since LMSR cost is negative when selling)
       await tx.user.update({
         where: { id: authUser.userId },
-        data: { balance: { increment: -tradeCost } },
+        data: { balance: { increment: roundMoney(-tradeCost) } },
       })
 
       // Update market shares
@@ -101,8 +104,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         data: {
           yesShares: newYesShares,
           noShares: newNoShares,
-          totalVolume: { increment: Math.abs(tradeCost) },
-          ammVolume: { increment: Math.abs(tradeCost) },
+          totalVolume: { increment: roundMoney(Math.abs(tradeCost)) },
+          ammVolume: { increment: roundMoney(Math.abs(tradeCost)) },
         },
       })
 
@@ -127,7 +130,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       if (type === 'BUY') {
         if (existingPosition) {
           const totalShares = existingPosition.shares + shares
-          const avgEntry = (existingPosition.avgEntryPrice * existingPosition.shares + tradeCost) / totalShares
+          const avgEntry = roundPrice(
+            (existingPosition.avgEntryPrice * existingPosition.shares + tradeCost) / totalShares
+          )
           await tx.position.update({
             where: { id: existingPosition.id },
             data: { shares: totalShares, avgEntryPrice: avgEntry },
@@ -139,14 +144,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
               marketId,
               outcome,
               shares,
-              avgEntryPrice: tradeCost / shares,
+              avgEntryPrice: roundPrice(tradeCost / shares),
             },
           })
         }
       } else {
         if (existingPosition) {
           const newShares = existingPosition.shares - shares
-          const realizedPnl = -tradeCost - (existingPosition.avgEntryPrice * shares)
+          const realizedPnl = roundMoney(-tradeCost - (existingPosition.avgEntryPrice * shares))
           if (newShares <= 0) {
             await tx.position.delete({ where: { id: existingPosition.id } })
           } else {

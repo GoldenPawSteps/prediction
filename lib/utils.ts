@@ -7,22 +7,32 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatCurrency(amount: number): string {
+  const safeAmount = Number.isFinite(Number(amount)) ? Number(amount) : 0
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(amount)
+  }).format(safeAmount)
 }
 
 export function formatPercent(value: number): string {
-  return `${(value * 100).toFixed(1)}%`
+  const safeValue = Number.isFinite(Number(value)) ? Number(value) : 0
+  return `${(safeValue * 100).toFixed(1)}%`
 }
 
 export function formatNumber(value: number): string {
   if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`
   if (value >= 1000) return `${(value / 1000).toFixed(1)}K`
   return value.toFixed(2)
+}
+
+export function formatFixed(value: unknown, digits: number = 2): string {
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue)) {
+    return Number(0).toFixed(digits)
+  }
+  return numericValue.toFixed(digits)
 }
 
 export function timeUntil(date: string | Date): string {

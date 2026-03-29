@@ -36,6 +36,7 @@
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
+    "decimal.js": "^10.6.0",
     "jsonwebtoken": "^9.0.3",
     "next": "16.2.1",
     "next-auth": "^4.24.13",

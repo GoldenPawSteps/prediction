@@ -3,7 +3,7 @@
 import { usePageSection } from '@/lib/client-page-section'
 import { TableSkeleton } from '@/components/SectionSkeletons'
 import { SectionErrorBoundary } from '@/components/SectionErrorBoundary'
-import { formatCurrency, formatRelativeTime, getCategoryColor } from '@/lib/utils'
+import { formatCurrency, formatFixed, formatRelativeTime, getCategoryColor } from '@/lib/utils'
 import { useT } from '@/context/I18nContext'
 import { useErrorToast } from '@/lib/useErrorToast'
 import { Badge } from '@/components/ui/Badge'
@@ -153,7 +153,7 @@ export function PortfolioTradesSection({ isPrefetched = false }: { isPrefetched?
                     </div>
                   </td>
                   <td className="px-2 sm:px-6 py-2 sm:py-4 text-right text-gray-900 dark:text-white font-medium">
-                    {trade.shares.toFixed(2)}
+                    {formatFixed(trade.shares)}
                   </td>
                   <td className="px-2 sm:px-6 py-2 sm:py-4 text-right text-gray-600 dark:text-gray-400">
                     {formatCurrency(trade.price)}

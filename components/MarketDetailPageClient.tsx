@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/Button'
 import { useAuth } from '@/context/AuthContext'
 import { useI18n, useT } from '@/context/I18nContext'
 import { formatQualifiedMajorityLabel, getQualifiedMajorityThreshold, getResolutionQuorum, isImmediateResolutionRound } from '@/lib/resolution'
-import { formatCurrency, formatPercent, formatDateTime, getCategoryColor } from '@/lib/utils'
+import { formatCurrency, formatFixed, formatPercent, formatDateTime, getCategoryColor } from '@/lib/utils'
 import { consumePrefetchedJson } from '@/lib/client-prefetch'
 import { finishAdminNavMetric } from '@/lib/client-nav-metrics'
 import { MarketCommentsSection } from '@/components/sections/MarketCommentsSection'
@@ -1586,8 +1586,8 @@ function ExchangeHistoryPanel({ orderFills, userOrders }: { orderFills: Fill[]; 
                       </span>
                     </td>
                     <td className="py-1.5 text-right font-mono">{formatPercent(fill.price)}</td>
-                    <td className="py-1.5 text-right font-mono">{fill.shares.toFixed(2)}</td>
-                    <td className="py-1.5 text-right font-mono text-gray-600 dark:text-gray-400">{formatCurrency(fill.price * fill.shares)}</td>
+                    <td className="py-1.5 text-right font-mono">{formatFixed(fill.shares)}</td>
+                    <td className="py-1.5 text-right font-mono text-gray-600 dark:text-gray-400">{formatCurrency(Number(fill.price) * Number(fill.shares))}</td>
                     <td className="py-1.5 pl-4 text-gray-600 dark:text-gray-400">@{fill.makerUser.username}</td>
                     <td className="py-1.5 text-gray-600 dark:text-gray-400">@{fill.takerUser.username}</td>
                   </tr>
@@ -1617,9 +1617,9 @@ function ExchangeHistoryPanel({ orderFills, userOrders }: { orderFills: Fill[]; 
                       <span className="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-1 rounded text-[10px]">{order.orderType}</span>
                     )}
                     <span className="text-gray-900 dark:text-white font-mono">
-                      {formatPercent(order.price)}
+                      {formatPercent(Number(order.price))}
                     </span>
-                    <span className="text-gray-600 dark:text-gray-400">{order.initialShares.toFixed(2)} {tPortfolio('shares').toLowerCase()}</span>
+                    <span className="text-gray-600 dark:text-gray-400">{formatFixed(order.initialShares)} {tPortfolio('shares').toLowerCase()}</span>
                   </div>
                   <span className={`font-medium ${ORDER_STATUS_COLORS[order.status]}`}>{translateOrderStatus(order.status)}</span>
                 </div>
@@ -1627,7 +1627,7 @@ function ExchangeHistoryPanel({ orderFills, userOrders }: { orderFills: Fill[]; 
                 {/* Fill progress bar */}
                 <div className="space-y-1">
                   <div className="flex justify-between text-gray-500 dark:text-gray-500">
-                    <span>{tTradePanel('filledLabel', { filled: filledShares.toFixed(2), total: order.initialShares.toFixed(2) })}</span>
+                    <span>{tTradePanel('filledLabel', { filled: formatFixed(filledShares), total: formatFixed(order.initialShares) })}</span>
                     <span>{fillPct.toFixed(0)}%</span>
                   </div>
                   <div className="h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full overflow-hidden">

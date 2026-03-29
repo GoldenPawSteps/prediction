@@ -8,7 +8,7 @@
 import { usePageSection } from '@/lib/client-page-section'
 import { TableSkeleton } from '@/components/SectionSkeletons'
 import { SectionErrorBoundary } from '@/components/SectionErrorBoundary'
-import { formatCurrency, formatPercent, formatRelativeTime } from '@/lib/utils'
+import { formatCurrency, formatFixed, formatPercent, formatRelativeTime } from '@/lib/utils'
 import { useT } from '@/context/I18nContext'
 import { useErrorToast } from '@/lib/useErrorToast'
 import { Badge } from '@/components/ui/Badge'
@@ -260,15 +260,15 @@ export function PortfolioSummarySection({ isPrefetched = false }: { isPrefetched
                       )}
                     </div>
                     <p className="mt-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                      {order.remainingShares.toFixed(2)} / {order.initialShares.toFixed(2)} {t('shares').toLowerCase()} @ {formatPercent(order.price)}
+                      {formatFixed(order.remainingShares)} / {formatFixed(order.initialShares)} {t('shares').toLowerCase()} @ {formatPercent(Number(order.price))}
                     </p>
                   </div>
                   <div className="shrink-0 text-right">
                     <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">
-                      {formatCurrency(order.reservedAmount)}
+                      {formatCurrency(Number(order.reservedAmount))}
                     </p>
                     <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                      {tTradePanel('reserveHint', { amount: formatCurrency(order.reservedAmount) })}
+                      {tTradePanel('reserveHint', { amount: formatCurrency(Number(order.reservedAmount)) })}
                     </p>
                   </div>
                 </div>

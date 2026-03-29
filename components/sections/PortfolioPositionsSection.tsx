@@ -8,7 +8,7 @@
 import { usePageSection } from '@/lib/client-page-section'
 import { TableSkeleton } from '@/components/SectionSkeletons'
 import { SectionErrorBoundary } from '@/components/SectionErrorBoundary'
-import { formatCurrency, getCategoryColor } from '@/lib/utils'
+import { formatCurrency, formatFixed, getCategoryColor } from '@/lib/utils'
 import { useT } from '@/context/I18nContext'
 import { useErrorToast } from '@/lib/useErrorToast'
 import { Badge } from '@/components/ui/Badge'
@@ -137,7 +137,7 @@ export function PortfolioPositionsSection({ isPrefetched = false }: { isPrefetch
                     </Badge>
                   </td>
                   <td className="px-2 sm:px-6 py-2 sm:py-4 text-right text-gray-900 dark:text-white font-medium">
-                    {position.shares.toFixed(2)}
+                      {formatFixed(position.shares)}
                   </td>
                   <td className="px-2 sm:px-6 py-2 sm:py-4 text-right text-gray-600 dark:text-gray-400">
                     {formatCurrency(position.avgEntryPrice)}

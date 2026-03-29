@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
 import { useT } from '@/context/I18nContext'
-import { formatCurrency, formatPercent, timeUntil } from '@/lib/utils'
+import { formatCurrency, formatFixed, formatPercent, timeUntil } from '@/lib/utils'
 
 type OrderSide = 'BID' | 'ASK'
 type OrderOutcome = 'YES' | 'NO'
@@ -284,7 +284,7 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
         const filled = Number(data?.filledShares ?? 0)
         toast.success(
           filled > 0
-            ? t('toastOrderPlacedMatched', { filled: filled.toFixed(2) })
+            ? t('toastOrderPlacedMatched', { filled: formatFixed(filled) })
             : t('toastOrderPlaced')
         )
         setOrderShares('')
@@ -574,7 +574,7 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
                 {bids.length === 0 ? <div className="text-gray-500">{t('noBids')}</div> : bids.slice(0, 8).map((order) => (
                   <div key={order.id} className="flex items-start justify-between gap-2 text-gray-700 dark:text-gray-300">
                     <div className="flex flex-col">
-                      <span>{order.remainingShares.toFixed(2)}</span>
+                      <span>{formatFixed(order.remainingShares)}</span>
                       {order.orderType === 'GTD' && order.expiresAt && (
                         <span className="text-[10px] text-indigo-300" title={new Date(order.expiresAt).toLocaleString()}>
                           {t('gtdLabel', { time: timeUntil(order.expiresAt) })}
@@ -590,7 +590,7 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
                 {asks.length === 0 ? <div className="text-gray-500">{t('noAsks')}</div> : asks.slice(0, 8).map((order) => (
                   <div key={order.id} className="flex items-start justify-between gap-2 text-gray-700 dark:text-gray-300">
                     <div className="flex flex-col">
-                      <span>{order.remainingShares.toFixed(2)}</span>
+                      <span>{formatFixed(order.remainingShares)}</span>
                       {order.orderType === 'GTD' && order.expiresAt && (
                         <span className="text-[10px] text-indigo-300" title={new Date(order.expiresAt).toLocaleString()}>
                           {t('gtdLabel', { time: timeUntil(order.expiresAt) })}
@@ -610,7 +610,7 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
                   {myOrders.map((order) => (
                     <div key={order.id} className="flex items-center justify-between gap-2 text-xs">
                       <span className="text-gray-700 dark:text-gray-300">
-                        {order.side} {order.outcome} {order.remainingShares.toFixed(2)}/{order.initialShares.toFixed(2)} @ {formatPercent(order.price)}
+                        {order.side} {order.outcome} {formatFixed(order.remainingShares)}/{formatFixed(order.initialShares)} @ {formatPercent(Number(order.price))}
                         {order.orderType === 'GTD' && order.expiresAt && (
                           <span className="text-indigo-300"> · {t('gtdLabel', { time: timeUntil(order.expiresAt) })}</span>
                         )}
@@ -649,12 +649,12 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
                           {order.orderType && order.orderType !== 'GTC' && (
                             <span className="bg-gray-700 text-gray-300 px-1 rounded text-[10px]">{order.orderType}</span>
                           )}
-                          {' '}{order.initialShares.toFixed(2)} @ {formatPercent(order.price)}
+                          {' '}{formatFixed(order.initialShares)} @ {formatPercent(Number(order.price))}
                         </span>
                         <span className={statusTone}>{order.status}</span>
                       </div>
                       <div className="mt-1 text-gray-500">
-                        {t('filledLabel', { filled: filledShares.toFixed(2), total: order.initialShares.toFixed(2) })}
+                        {t('filledLabel', { filled: formatFixed(filledShares), total: formatFixed(order.initialShares) })}
                       </div>
                       {order.orderType === 'GTD' && order.expiresAt && (
                         <div className="mt-1 text-gray-500">
@@ -675,7 +675,7 @@ export function TradePanel({ market, onTradeComplete }: TradePanelProps) {
                 recentFills.slice(0, 6).map((fill) => (
                   <div key={fill.id} className="flex items-center justify-between gap-2 text-xs text-gray-700 dark:text-gray-300">
                     <span>
-                      {fill.shares.toFixed(2)} @ {formatPercent(fill.price)}
+                      {formatFixed(fill.shares)} @ {formatPercent(Number(fill.price))}
                     </span>
                     <span className="text-gray-500">
                       @{fill.makerUser.username} -&gt; @{fill.takerUser.username}

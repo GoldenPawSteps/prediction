@@ -61,7 +61,7 @@ model User {
   passwordHash       String?
   avatar             String?
   bio                String?
-  balance            Float     @default(1000.0)
+  balance            Decimal   @default(1000.0) @db.Decimal(30, 6)
   isAdmin            Boolean   @default(false)
   sessionVersion     Int       @default(0)
   createdAt          DateTime  @default(now())
@@ -97,13 +97,13 @@ model Market {
   creator          User             @relation(fields: [creatorId], references: [id])
   parent           Market?          @relation("MarketChildren", fields: [parentMarketId], references: [id])
   children         Market[]         @relation("MarketChildren")
-  yesShares        Float            @default(0)
-  noShares         Float            @default(0)
-  liquidityParam   Float            @default(100.0)
-  totalVolume      Float            @default(0)
-  ammVolume        Float            @default(0)
-  exchangeVolume   Float            @default(0)
-  initialLiquidity Float            @default(100.0)
+  yesShares        Decimal          @default(0) @db.Decimal(30, 6)
+  noShares         Decimal          @default(0) @db.Decimal(30, 6)
+  liquidityParam   Decimal          @default(100.0) @db.Decimal(30, 6)
+  totalVolume      Decimal          @default(0) @db.Decimal(30, 6)
+  ammVolume        Decimal          @default(0) @db.Decimal(30, 6)
+  exchangeVolume   Decimal          @default(0) @db.Decimal(30, 6)
+  initialLiquidity Decimal          @default(100.0) @db.Decimal(30, 6)
   disputeWindowHours Int            @default(24)
   tags             String[]         @default([])
   createdAt        DateTime         @default(now())
@@ -128,9 +128,9 @@ model Trade {
   market     Market       @relation(fields: [marketId], references: [id])
   outcome    TradeOutcome
   type       TradeType
-  shares     Float
-  price      Float
-  totalCost  Float
+  shares     Decimal      @db.Decimal(30, 6)
+  price      Decimal      @db.Decimal(30, 6)
+  totalCost  Decimal      @db.Decimal(30, 6)
   createdAt  DateTime     @default(now())
 }
 
@@ -141,9 +141,9 @@ model Position {
   marketId      String
   market        Market       @relation(fields: [marketId], references: [id])
   outcome       TradeOutcome
-  shares        Float        @default(0)
-  avgEntryPrice Float        @default(0)
-  realizedPnl   Float        @default(0)
+  shares        Decimal      @default(0) @db.Decimal(30, 6)
+  avgEntryPrice Decimal      @default(0) @db.Decimal(30, 6)
+  realizedPnl   Decimal      @default(0) @db.Decimal(30, 6)
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
@@ -164,9 +164,9 @@ model PriceHistory {
   id        String   @id @default(cuid())
   marketId  String
   market    Market   @relation(fields: [marketId], references: [id])
-  yesPrice  Float
-  noPrice   Float
-  volume    Float    @default(0)
+  yesPrice  Decimal   @db.Decimal(30, 6)
+  noPrice   Decimal   @db.Decimal(30, 6)
+  volume    Decimal   @default(0) @db.Decimal(30, 6)
   timestamp DateTime @default(now())
 }
 
@@ -220,11 +220,11 @@ model MarketOrder {
   side                  OrderSide
   orderType             OrderType   @default(GTC)
   status                OrderStatus @default(OPEN)
-  price                 Float
-  initialShares         Float
-  remainingShares       Float
-  reservedAmount        Float       @default(0)
-  avgEntryPriceSnapshot Float       @default(0)
+  price                 Decimal     @db.Decimal(30, 6)
+  initialShares         Decimal     @db.Decimal(30, 6)
+  remainingShares       Decimal     @db.Decimal(30, 6)
+  reservedAmount        Decimal     @default(0) @db.Decimal(30, 6)
+  avgEntryPriceSnapshot Decimal     @default(0) @db.Decimal(30, 6)
   expiresAt             DateTime?
   createdAt             DateTime    @default(now())
   updatedAt             DateTime    @updatedAt
@@ -244,8 +244,8 @@ model MarketOrderFill {
   takerOrderId String
   takerOrder   MarketOrder  @relation("MarketOrderFillTakerOrder", fields: [takerOrderId], references: [id])
   outcome     TradeOutcome
-  price       Float
-  shares      Float
+  price       Decimal      @db.Decimal(30, 6)
+  shares      Decimal      @db.Decimal(30, 6)
   makerUserId String
   makerUser   User         @relation("MarketOrderFillMaker", fields: [makerUserId], references: [id])
   takerUserId String

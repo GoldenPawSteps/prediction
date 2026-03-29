@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import Decimal from 'decimal.js'
 import { verifyToken, JWTPayload } from './auth'
 import { prisma } from './prisma'
 
@@ -138,6 +139,47 @@ export function apiError(message: string, status: number = 400) {
   return NextResponse.json({ error: message }, { status })
 }
 
+function isDecimalLike(value: unknown): value is { toString: () => string } {
+  if (Decimal.isDecimal(value)) return true
+
+  // Fallback for serialized decimal-like objects that expose decimal internals.
+  if (
+    value
+    && typeof value === 'object'
+    && 's' in (value as Record<string, unknown>)
+    && 'e' in (value as Record<string, unknown>)
+    && 'd' in (value as Record<string, unknown>)
+  ) {
+    return true
+  }
+
+  return Boolean(
+    value
+    && typeof value === 'object'
+    && typeof (value as { toString?: unknown }).toString === 'function'
+    && (value as { constructor?: { name?: string } }).constructor?.name === 'Decimal'
+  )
+}
+
+function normalizeApiData(value: unknown): unknown {
+  if (value === null || value === undefined) return value
+  if (value instanceof Date) return value
+  if (isDecimalLike(value)) {
+    const numericValue = Number(value.toString())
+    return Number.isFinite(numericValue) ? numericValue : 0
+  }
+  if (Array.isArray(value)) return value.map(normalizeApiData)
+  if (typeof value === 'object') {
+    const input = value as Record<string, unknown>
+    const out: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(input)) {
+      out[k] = normalizeApiData(v)
+    }
+    return out
+  }
+  return value
+}
+
 export function apiSuccess(data: unknown, status: number = 200) {
-  return NextResponse.json(data, { status })
+  return NextResponse.json(normalizeApiData(data), { status })
 }

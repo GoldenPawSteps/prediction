@@ -10,6 +10,11 @@ import { closeExpiredOpenMarkets } from '@/lib/market-status'
 import { finalizeImmutableResolutions } from '@/lib/market-status'
 import { z } from 'zod'
 
+function toFiniteNumber(value: unknown, fallback: number = 0): number {
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) ? numericValue : fallback
+}
+
 function isUnknownDisputeWindowFieldError(err: unknown): boolean {
   return err instanceof Error && err.message.includes('Unknown argument `disputeWindowHours`')
 }
@@ -82,14 +87,14 @@ export async function GET(req: NextRequest) {
     const marketsWithVolumes = allMarkets.map((m) => ({
       ...m,
       actualTotalVolume: m.marketType === 'MULTI'
-        ? m.children.reduce((sum, child) => sum + child.totalVolume, 0)
-        : m.totalVolume,
+        ? m.children.reduce((sum, child) => sum + toFiniteNumber(child.totalVolume), 0)
+        : toFiniteNumber(m.totalVolume),
     }))
 
     // Sort by volume or creation date in memory
     const sortedMarkets = marketsWithVolumes.sort((a, b) => {
       if (sortBy === 'volume') {
-        return b.actualTotalVolume - a.actualTotalVolume
+        return toFiniteNumber(b.actualTotalVolume) - toFiniteNumber(a.actualTotalVolume)
       }
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     })
@@ -104,7 +109,7 @@ export async function GET(req: NextRequest) {
 
       return {
         ...m,
-        totalVolume: m.actualTotalVolume,
+        totalVolume: toFiniteNumber(m.actualTotalVolume),
         _count: {
           ...m._count,
           trades: actualTradeCount,
@@ -122,7 +127,7 @@ export async function GET(req: NextRequest) {
           outcomeName: child.outcomeName,
           status: child.status,
           resolution: child.resolution,
-          totalVolume: child.totalVolume,
+          totalVolume: toFiniteNumber(child.totalVolume),
           endDate: child.endDate,
           _count: child._count,
           probabilities: child.resolution === 'YES'
