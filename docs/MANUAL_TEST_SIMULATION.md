@@ -25,6 +25,20 @@ For a short pre-deploy pass, use `docs/MANUAL_QA_SMOKE_CHECKLIST.md`.
 npm run test:simulation
 ```
 
+## Run all three simulations
+
+Use this when you want a full regression pass across business flow, money conservation, and lifecycle state transitions:
+
+```bash
+npm run test:all-simulations
+```
+
+What this covers:
+
+- `test-simulation.js`: broad product and API behavior
+- `test-money-conservation.js`: balance integrity and payout accounting
+- `test-market-lifecycle.js`: state transitions from OPEN through final settlement
+
 ## Run one section (npm shortcuts)
 
 ```bash
@@ -89,9 +103,147 @@ A complementary simulation focused specifically on **money conservation invarian
 - **Run API-only tests:** `npm run test:conservation:api` (fast, no DB settlement)
 - **Run lifecycle tests:** `npm run test:conservation:lifecycle` (with settlement)
 
+### Business-Flow Tests In Plain English
+
+#### Authentication
+
+This section verifies the full login lifecycle: new accounts can register, sessions are created correctly, users can log in again later, and one user's session never leaks into another user's account state.
+
+#### Markets
+
+This section verifies that markets can be created, listed, filtered, searched, and opened by id. It checks that the most basic discovery flow works from creation all the way to reading details.
+
+#### AMM Trading
+
+This section tests buying and selling through the AMM, confirms that probabilities move after trades, and verifies that invalid or underfunded trades are rejected instead of partially mutating state.
+
+#### Exchange Orders
+
+This section covers order-book behavior: placing BID and ASK orders, matching crossing orders, partial fills, cancellations, and time-based order handling like GTD, FOK, and FAK. It is focused on the exchange path instead of the AMM path.
+
+#### Comments
+
+This section verifies that users can post comments, fetch comments back in the expected order, and that invalid comment payloads are rejected.
+
+#### Market Data
+
+This section checks read-only market data endpoints like probabilities, chart history, and resolution/status views. It makes sure the data needed by the UI stays coherent after trading and resolution activity.
+
+#### Portfolio
+
+This section verifies that positions, trades, and account statistics appear in the authenticated portfolio view and reflect the user's actual market activity.
+
+#### Leaderboard
+
+This section checks that leaderboard endpoints load and support different sort modes such as default ranking, trade activity, and ROI-oriented views.
+
+#### Resolution
+
+This section verifies that markets can be resolved, payouts are applied correctly after settlement, and once resolved, the market can no longer accept additional trading.
+
+#### Dispute
+
+This section exercises the rollback path where a provisional resolution is disputed, the market is re-voted, and a later outcome replaces the earlier one.
+
+#### Edge Cases
+
+This section intentionally sends bad inputs and malformed requests to ensure the APIs fail safely instead of corrupting balances, market state, or session state.
+
+### Money Conservation Tests In Plain English
+
+#### A1 — AMM BUY exactness
+
+The test buys shares through the AMM and checks that the user's balance drops by exactly the same amount the API reports as `totalCost`.
+
+#### A2 — AMM SELL exactness
+
+The test sells shares back to the AMM and checks that the user's balance increases by exactly the sell proceeds.
+
+#### A3 — Round-trip residual
+
+The test buys shares and then immediately sells the same amount, verifying that the net cost is effectively zero aside from tiny allowed rounding noise.
+
+#### A4 — Multi-user sum conservation
+
+The test spreads trades across several users and verifies that the sum of all balance decreases exactly matches the sum of all reported trade costs.
+
+#### A5 — Exchange BID reservation
+
+The test places a BID order and checks that the reserved amount debited from the buyer is exactly `price × shares`.
+
+#### A6 — Exchange cancel refund
+
+The test cancels reserved BID orders and verifies that the exact reserved amount comes back, with no leakage from repeated cancel flows.
+
+#### A7 — Exchange fill zero-sum transfer
+
+The test matches a buyer and seller and verifies that the buyer's payment and seller's proceeds offset exactly, so the fill itself creates no money.
+
+#### B8 — Zero-trade settlement
+
+The test resolves a market with no trades and verifies that the creator gets the full initial liquidity back.
+
+#### B9 — Single-sided market
+
+The test creates a market where only YES is bought, resolves YES, and verifies that the winners are paid correctly while total system money remains conserved.
+
+#### B10 — Creator as active trader
+
+The test puts the creator on both sides of the lifecycle, as market funder and trader, and verifies that payout plus creator refund are still accounted for correctly.
+
+#### B11 — Dispute rollback conservation
+
+The test walks through provisional resolution, dispute, re-vote, and final settlement while checking that the money in the system is conserved at every phase.
+
+#### B12 — Precision drift
+
+The test repeats many tiny buy/sell pairs and verifies that rounding drift stays bounded rather than accumulating into a meaningful balance error.
+
+### Market Lifecycle Simulation
+
+A dedicated simulation focused on **market status transitions and settlement phases** — verifying end-to-end progression through `OPEN`, `CLOSED`, provisional resolution, immutable finalization, INVALID finalization, and dispute-driven re-resolution.
+
+- **Full checklist:** `docs/MARKET_LIFECYCLE_QA_CHECKLIST.md` — manual verification of all lifecycle phases
+- **Smoke checklist:** `docs/MARKET_LIFECYCLE_SMOKE_CHECKLIST.md` — short pre-deploy lifecycle regression pass
+- **Run automated suite:** `npm run test:lifecycle` (19 checks)
+- **Run core lifecycle checks:** `npm run test:lifecycle:core`
+- **Run INVALID-only checks:** `npm run test:lifecycle:invalid`
+- **Run dispute-only checks:** `npm run test:lifecycle:dispute`
+
+### Lifecycle Tests In Plain English
+
+#### L1/L2 — OPEN creation, expiry auto-close, order cancellation, trading lock
+
+This scenario creates a new market and confirms the creator's liquidity is immediately locked. It then verifies the market is visible as `OPEN` in both the list page and the detail page.
+
+Next, a second user places a BID while the market is still open. The test checks that the reserved cash is deducted right away. After the market passes its end time, the script refreshes market detail so the normal auto-close path runs. It then verifies four things: the market becomes `CLOSED`, the open BID is cancelled, the reserved cash is fully refunded, and both AMM trading and exchange orders are rejected on the closed market.
+
+#### L3/L4 — Provisional resolution stays pending, then finalizes exactly once
+
+This scenario creates a market, has a trader buy YES shares, waits for expiry, and then resolves the market to YES. The important point is that this first resolution is only provisional because the dispute window is still open.
+
+The test checks that after provisional resolution, the creator's liquidity is still locked, the trader's position is still open, and no payout has been credited yet. It also confirms that once the market is marked `RESOLVED`, new trades and orders are blocked.
+
+Then the script backdates `resolutionTime` so the dispute window is treated as expired and triggers finalization through the portfolio endpoint. At that point it verifies that liquidity unlocks, positions close, the winning trader finally gets paid, and a second refresh does not produce any duplicate payout or refund.
+
+#### L5 — INVALID lifecycle refunds the trader's cost basis
+
+This scenario creates a market, has one trader buy YES shares, waits for expiry, and then resolves the market to `INVALID`.
+
+Right after that provisional INVALID resolution, the test checks that the market shows INVALID status and neutral `0.5 / 0.5` probabilities, but still has not refunded the trader yet. Then it forces immutable finalization and verifies the expected INVALID behavior: creator liquidity unlocks, the position closes, and the trader gets back the original amount they paid.
+
+#### L6 — Dispute and re-resolution settle only the latest outcome
+
+This is the most complex lifecycle path. One trader buys YES, another buys NO, the market expires, and the first vote provisionally resolves the market to YES. At this point nobody should be paid yet.
+
+Then the NO trader files a dispute, which moves the market into `DISPUTED`. The first re-vote for NO is not enough to resolve because dispute round 1 requires quorum 2. The second NO vote reaches quorum and re-resolves the market to NO.
+
+Finally, the script forces immutable finalization after the dispute window and verifies that the YES and NO positions both close, but only the latest NO outcome is actually settled. In other words, the NO trader gets the payout, the YES trader does not, and the system does not accidentally pay both resolutions.
+
 ### Simulation Smoke Tests
 
 Quick pre-deploy verification without full manual testing:
 
 - **Simulation smoke:** `docs/MANUAL_QA_SMOKE_CHECKLIST.md` — 12-step smoke test for test-simulation.js
 - **Conservation smoke:** `docs/MONEY_CONSERVATION_SMOKE_CHECKLIST.md` — 6-check smoke test for money invariants
+- **Lifecycle smoke:** `docs/MARKET_LIFECYCLE_SMOKE_CHECKLIST.md` — short smoke test for lifecycle transitions

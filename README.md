@@ -188,6 +188,9 @@ Comprehensive simulations:
 
 - `npm run test:simulation` - Full 11-section business-flow simulation (72 tests)
 - `npm run test:simulation:<section>` - Run one section (auth, markets, amm, exchange, comments, data, portfolio, leaderboard, resolution, dispute, edge)
+- `npm run test:all-simulations` - Run the business-flow, conservation, and lifecycle suites in one command
+- `npm run test:lifecycle` - Market lifecycle simulation (19 checks across state transitions)
+- `npm run test:lifecycle:<mode>` - Run one lifecycle slice (`core`, `invalid`, `dispute`)
 - `npm run test:conservation` - Full money conservation suite (41 tests across 12 scenarios)
 - `npm run test:conservation:api` - API-only conservation tests (7 scenarios, fast)
 - `npm run test:conservation:lifecycle` - Full-lifecycle conservation tests (5 scenarios, with DB)
@@ -201,6 +204,8 @@ Additional repository test utilities:
 - `docs/MANUAL_QA_SMOKE_CHECKLIST.md` - 12-step pre-deploy smoke test for test-simulation.js
 - `docs/MONEY_CONSERVATION_QA_CHECKLIST.md` - step-by-step human QA checklist for money invariants
 - `docs/MONEY_CONSERVATION_SMOKE_CHECKLIST.md` - 6-check pre-deploy smoke test for conservation
+- `docs/MARKET_LIFECYCLE_QA_CHECKLIST.md` - step-by-step human QA checklist for lifecycle transitions
+- `docs/MARKET_LIFECYCLE_SMOKE_CHECKLIST.md` - short pre-deploy smoke test for lifecycle transitions
 
 ## Troubleshooting
 
