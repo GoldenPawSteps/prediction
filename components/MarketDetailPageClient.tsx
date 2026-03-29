@@ -1442,6 +1442,7 @@ export function MarketDetailPageClient({
           {/* Comments Section - Progressive Loading */}
           <MarketCommentsSection
             marketId={id}
+            initialComments={market.comments}
             isPrefetched={Boolean(market)}
           />
         </div>

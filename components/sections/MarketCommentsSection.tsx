@@ -6,11 +6,9 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useI18n, useT } from '@/context/I18nContext'
-import { usePageSection } from '@/lib/client-page-section'
-import { CommentsSectionSkeleton } from '@/components/SectionSkeletons'
 import { SectionErrorBoundary } from '@/components/SectionErrorBoundary'
 import { Button } from '@/components/ui/Button'
 import { formatRelativeTime } from '@/lib/utils'
@@ -29,9 +27,11 @@ interface Comment {
 
 export function MarketCommentsSection({
   marketId,
+  initialComments = [],
   isPrefetched,
 }: {
   marketId: string
+  initialComments?: Comment[]
   isPrefetched?: boolean
 }) {
   const { user } = useAuth()
@@ -40,15 +40,13 @@ export function MarketCommentsSection({
 
   const [comment, setComment] = useState('')
   const [submittingComment, setSubmittingComment] = useState(false)
+  const [comments, setComments] = useState<Comment[]>(initialComments)
 
-  // Load comments with background refresh every 8 seconds
-  const { data: comments, isLoading, error, refetch } = usePageSection<Comment[]>({
-    key: `market-comments:${marketId}`,
-    url: `/api/markets/${marketId}/comment`,
-    revalidateInterval: 8000, // Refresh comments every 8 seconds
-    shouldConsume: isPrefetched,
-    debug: false,
-  })
+  useEffect(() => {
+    setComments(initialComments)
+  }, [initialComments])
+
+  void isPrefetched
 
   const handleComment = async () => {
     if (!comment.trim()) return
@@ -62,8 +60,9 @@ export function MarketCommentsSection({
       })
 
       if (res.ok) {
+        const createdComment = await res.json() as Comment
         setComment('')
-        await refetch().catch(() => {}) // Manually refetch to show new comment immediately
+        setComments((prev) => [createdComment, ...prev])
         toast.success(t('commentPosted'))
       } else {
         const data = await res.json()
@@ -76,33 +75,12 @@ export function MarketCommentsSection({
     }
   }
 
-  if (isLoading) return <CommentsSectionSkeleton />
-
-  if (error && !comments) {
-    return (
-      <SectionErrorBoundary sectionName="market-comments">
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 text-center">
-          <p className="text-sm text-red-600 dark:text-red-400 mb-2">{t('failedToLoadComments') ?? 'Failed to load comments'}</p>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => refetch().catch(() => {})}
-          >
-            {t('retry') ?? 'Retry'}
-          </Button>
-        </div>
-      </SectionErrorBoundary>
-    )
-  }
-
-  const commentList = comments || []
-
   return (
     <SectionErrorBoundary sectionName="market-comments">
       <div className="bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 rounded-xl p-4">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-            {t('discussion')} ({commentList.length})
+            {t('discussion')} ({comments.length})
           </h2>
         </div>
 
@@ -123,11 +101,11 @@ export function MarketCommentsSection({
           </div>
         )}
 
-        {commentList.length === 0 ? (
+        {comments.length === 0 ? (
           <p className="text-gray-500 dark:text-gray-500 text-sm text-center py-4">{t('noCommentsYet')}</p>
         ) : (
           <div className="space-y-3">
-            {commentList.map((c) => (
+            {comments.map((c) => (
               <div key={c.id} className="flex gap-3">
                 <div className="w-7 h-7 bg-indigo-600 rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
                   {c.user.username[0].toUpperCase()}

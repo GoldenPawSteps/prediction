@@ -68,7 +68,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       include: { user: { select: { id: true, username: true, avatar: true } } },
     })
 
-    return apiSuccess(comment, 201)
+    return apiSuccess({
+      ...comment,
+      createdAt: comment.createdAt.toISOString(),
+    }, 201)
   } catch (err) {
     console.error('Comment error:', err)
     return apiError('Internal server error', 500)

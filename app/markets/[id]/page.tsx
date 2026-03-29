@@ -198,6 +198,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
   const [outcomeDisputeOutcome, setOutcomeDisputeOutcome] = useState<Record<string, 'YES' | 'NO' | 'INVALID'>>({})
   const [expandedOutcomeResolution, setExpandedOutcomeResolution] = useState<Record<string, boolean>>({})
   const hasLoggedNavMetricRef = useRef(false)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   const translateCategory = (category: string) => {
     switch (category) {
@@ -244,13 +245,16 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
     }
 
     try {
-      const controller = new AbortController()
-      const timeoutId = window.setTimeout(() => controller.abort(), MARKET_FETCH_TIMEOUT_MS)
+      // Create new abort controller for this fetch
+      abortControllerRef.current = new AbortController()
+      const timeoutId = window.setTimeout(() => abortControllerRef.current?.abort(), MARKET_FETCH_TIMEOUT_MS)
+      
       const res = await fetch(`/api/markets/${id}`, {
         ...(hasPrefetched ? { cache: 'no-store' as const } : {}),
-        signal: controller.signal,
+        signal: abortControllerRef.current.signal,
       })
       window.clearTimeout(timeoutId)
+      
       if (res.status === 404) { setIsNotFound(true); return }
       if (res.ok) {
         const data = await res.json()
@@ -261,7 +265,8 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
       }
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
-        setFetchError(new Error('Timed out while fetching market'))
+        // Silently ignore abort errors (from cleanup or timeout)
+        return
       } else {
         setFetchError(err)
       }
@@ -273,7 +278,12 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
 
   useErrorToast(fetchError, 'Failed to fetch market')
 
-  useEffect(() => { fetchMarket() }, [fetchMarket])
+  useEffect(() => {
+    fetchMarket()
+    return () => {
+      abortControllerRef.current?.abort()
+    }
+  }, [fetchMarket])
 
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -480,7 +490,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
     }
   }
 
-  if (loading) {
+  if (loading || !market) {
     return (
       <div className="animate-pulse space-y-4">
         <div className="h-8 bg-gray-200 dark:bg-gray-800 rounded w-3/4" />
@@ -493,7 +503,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
     )
   }
 
-  if (isNotFound || !market) return notFound()
+  if (isNotFound) return notFound()
 
   const isMultiMarket = market.marketType === 'MULTI'
   const outcomeMarkets = market.outcomes ?? []
@@ -1256,6 +1266,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
           {/* Comments Section - Progressive Loading */}
           <MarketCommentsSection
             marketId={id}
+            initialComments={market.comments}
             isPrefetched={Boolean(market)}
           />
         </div>

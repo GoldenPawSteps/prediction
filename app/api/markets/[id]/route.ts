@@ -14,7 +14,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     const { id } = await params
     const viewer = await getUserFromRequest(_req)
     await closeMarketIfExpired(id)
-    await finalizeImmutableResolutionIfReady(id)
+    // Skip finalization here to avoid blocking market detail page loads
+    // Finalization runs opportunistically on portfolio/me endpoints instead
     await prisma.$transaction(async (tx: TxClient) => {
       await expireStaleMarketOrders(tx, id)
     })

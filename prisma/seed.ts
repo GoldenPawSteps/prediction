@@ -22,6 +22,10 @@ type SeedMarket = {
   resolutionSource: string
   initialLiquidity: number
   priorProbability: number
+  status?: 'OPEN' | 'CLOSED' | 'RESOLVED' | 'INVALID' | 'DISPUTED'
+  resolution?: 'YES' | 'NO' | 'INVALID'
+  resolutionHoursAgo?: number
+  disputeWindowHours?: number
   tags: string[]
 }
 
@@ -33,6 +37,12 @@ type SeedExchangeOrder = {
   shares: number
   orderType?: 'GTC' | 'GTD'
   expiresAtDaysFromNow?: number
+}
+
+type SeedComment = {
+  marketTitle: string
+  userEmail: string
+  content: string
 }
 
 const SAMPLE_MARKETS: SeedMarket[] = [
@@ -102,6 +112,49 @@ const SAMPLE_MARKETS: SeedMarket[] = [
     priorProbability: 0.47,
     tags: ['senate', 'midterms', 'politics', '2026'],
   },
+  {
+    title: 'Will the SEC approve a spot Solana ETF by June 30, 2026?',
+    description:
+      'Resolves YES if the U.S. Securities and Exchange Commission approves any spot Solana ETF for U.S. listing by June 30, 2026. Resolves NO if no such approval is granted by the deadline.',
+    category: 'Crypto',
+    endDate: new Date('2026-02-15T23:59:59Z'),
+    resolutionSource: 'https://www.sec.gov/',
+    initialLiquidity: 320,
+    priorProbability: 0.41,
+    status: 'RESOLVED',
+    resolution: 'NO',
+    resolutionHoursAgo: 3,
+    disputeWindowHours: 48,
+    tags: ['solana', 'etf', 'sec', 'resolution-demo'],
+  },
+  {
+    title: 'Will NASA launch Artemis III before April 2026?',
+    description:
+      'Resolves YES if NASA launches Artemis III before April 1, 2026 UTC. Resolves NO otherwise. This demo market is intentionally left in DISPUTED state to showcase re-voting and dispute workflows.',
+    category: 'Science',
+    endDate: new Date('2026-03-01T23:59:59Z'),
+    resolutionSource: 'https://www.nasa.gov/artemis/',
+    initialLiquidity: 280,
+    priorProbability: 0.29,
+    status: 'DISPUTED',
+    resolution: 'YES',
+    resolutionHoursAgo: 4,
+    disputeWindowHours: 72,
+    tags: ['nasa', 'artemis', 'dispute-demo'],
+  },
+  {
+    title: 'Did global EV sales exceed 20 million units in 2025?',
+    description:
+      'Resolves YES if credible industry reports confirm more than 20 million battery-electric and plug-in hybrid vehicles were sold globally during calendar year 2025. This market is seeded as CLOSED to showcase post-expiry pre-resolution voting states.',
+    category: 'Finance',
+    endDate: new Date('2026-01-10T23:59:59Z'),
+    resolutionSource: 'https://www.iea.org/reports/global-ev-outlook-2026',
+    initialLiquidity: 260,
+    priorProbability: 0.58,
+    status: 'CLOSED',
+    disputeWindowHours: 24,
+    tags: ['ev', 'macro', 'closed-demo'],
+  },
 ]
 
 const SAMPLE_EXCHANGE_ORDERS: SeedExchangeOrder[] = [
@@ -134,6 +187,24 @@ const SAMPLE_EXCHANGE_ORDERS: SeedExchangeOrder[] = [
     outcome: 'YES',
     price: 0.27,
     shares: 12,
+  },
+]
+
+const SAMPLE_COMMENTS: SeedComment[] = [
+  {
+    marketTitle: 'Will Bitcoin (BTC) exceed $150,000 by December 31, 2026?',
+    userEmail: 'demo@predictify.com',
+    content: 'Momentum has been strong this quarter, but macro policy still looks like the key risk for a sustained breakout.',
+  },
+  {
+    marketTitle: 'Will Bitcoin (BTC) exceed $150,000 by December 31, 2026?',
+    userEmail: 'admin@predictify.com',
+    content: 'Reminder: resolution requires any intraday touch >= 150,000 USD on a listed major exchange before the deadline.',
+  },
+  {
+    marketTitle: 'Will NASA launch Artemis III before April 2026?',
+    userEmail: 'demo@predictify.com',
+    content: 'Program timeline uncertainty is why I challenged the provisional outcome and opened a dispute.',
   },
 ]
 
@@ -182,6 +253,11 @@ async function ensureSampleMarket(adminId: string, marketData: SeedMarket) {
 
   const liquidityParam = lmsrLiquidityParamForMaxLoss(marketData.initialLiquidity, marketData.priorProbability)
   const { yesShares, noShares } = lmsrInitialSharesForPrior(marketData.priorProbability, liquidityParam)
+  const status = marketData.status ?? 'OPEN'
+  const disputeWindowHours = marketData.disputeWindowHours ?? 24
+  const resolutionTime = marketData.resolutionHoursAgo != null
+    ? new Date(Date.now() - marketData.resolutionHoursAgo * 60 * 60 * 1000)
+    : null
 
   if (!existing) {
     const market = await prisma.market.create({
@@ -195,6 +271,11 @@ async function ensureSampleMarket(adminId: string, marketData: SeedMarket) {
         liquidityParam,
         yesShares,
         noShares,
+        status,
+        resolution: marketData.resolution ?? null,
+        resolutionTime,
+        disputeWindowHours,
+        settledAt: null,
         creatorId: adminId,
         tags: marketData.tags,
       },
@@ -238,6 +319,11 @@ async function ensureSampleMarket(adminId: string, marketData: SeedMarket) {
         liquidityParam,
         yesShares,
         noShares,
+        status,
+        resolution: marketData.resolution ?? null,
+        resolutionTime,
+        disputeWindowHours,
+        settledAt: null,
         creatorId: adminId,
         tags: marketData.tags,
       },
@@ -350,6 +436,146 @@ async function ensureSampleExchangeOrder(
   )
 }
 
+async function ensureSampleComment(
+  usersByEmail: Map<string, { id: string }>,
+  marketsByTitle: Map<string, { id: string; endDate: Date }>,
+  commentData: SeedComment,
+) {
+  const user = usersByEmail.get(commentData.userEmail)
+  const market = marketsByTitle.get(commentData.marketTitle)
+
+  if (!user || !market) {
+    throw new Error(`Missing seed dependency for comment on market: ${commentData.marketTitle}`)
+  }
+
+  const existing = await prisma.comment.findFirst({
+    where: {
+      userId: user.id,
+      marketId: market.id,
+      content: commentData.content,
+    },
+    select: { id: true },
+  })
+
+  if (existing) return
+
+  await prisma.comment.create({
+    data: {
+      userId: user.id,
+      marketId: market.id,
+      content: commentData.content,
+    },
+  })
+}
+
+async function ensureResolutionActivity(
+  usersByEmail: Map<string, { id: string }>,
+  marketsByTitle: Map<string, { id: string; endDate: Date }>,
+) {
+  const admin = usersByEmail.get('admin@predictify.com')
+  const demo = usersByEmail.get('demo@predictify.com')
+  const disputed = marketsByTitle.get('Will NASA launch Artemis III before April 2026?')
+  const resolved = marketsByTitle.get('Will the SEC approve a spot Solana ETF by June 30, 2026?')
+
+  if (!admin || !demo || !disputed || !resolved) {
+    throw new Error('Missing seed dependencies for resolution activity')
+  }
+
+  // Current vote state for each market.
+  await prisma.marketResolutionVote.upsert({
+    where: { userId_marketId: { userId: admin.id, marketId: disputed.id } },
+    update: { outcome: 'NO' },
+    create: { userId: admin.id, marketId: disputed.id, outcome: 'NO' },
+  })
+
+  await prisma.marketResolutionVote.upsert({
+    where: { userId_marketId: { userId: demo.id, marketId: disputed.id } },
+    update: { outcome: 'YES' },
+    create: { userId: demo.id, marketId: disputed.id, outcome: 'YES' },
+  })
+
+  await prisma.marketResolutionVote.upsert({
+    where: { userId_marketId: { userId: admin.id, marketId: resolved.id } },
+    update: { outcome: 'NO' },
+    create: { userId: admin.id, marketId: resolved.id, outcome: 'NO' },
+  })
+
+  await prisma.marketResolutionVote.upsert({
+    where: { userId_marketId: { userId: demo.id, marketId: resolved.id } },
+    update: { outcome: 'NO' },
+    create: { userId: demo.id, marketId: resolved.id, outcome: 'NO' },
+  })
+
+  const disputedHistoryCount = await prisma.marketVoteHistory.count({ where: { marketId: disputed.id } })
+  if (disputedHistoryCount === 0) {
+    const now = Date.now()
+    await prisma.marketVoteHistory.createMany({
+      data: [
+        {
+          userId: demo.id,
+          marketId: disputed.id,
+          outcome: 'INVALID',
+          createdAt: new Date(now - 2 * 60 * 60 * 1000),
+        },
+        {
+          userId: demo.id,
+          marketId: disputed.id,
+          outcome: 'YES',
+          createdAt: new Date(now - 90 * 60 * 1000),
+        },
+        {
+          userId: admin.id,
+          marketId: disputed.id,
+          outcome: 'NO',
+          createdAt: new Date(now - 75 * 60 * 1000),
+        },
+      ],
+    })
+  }
+
+  const resolvedHistoryCount = await prisma.marketVoteHistory.count({ where: { marketId: resolved.id } })
+  if (resolvedHistoryCount === 0) {
+    const now = Date.now()
+    await prisma.marketVoteHistory.createMany({
+      data: [
+        {
+          userId: admin.id,
+          marketId: resolved.id,
+          outcome: 'NO',
+          createdAt: new Date(now - 4 * 60 * 60 * 1000),
+        },
+        {
+          userId: demo.id,
+          marketId: resolved.id,
+          outcome: 'NO',
+          createdAt: new Date(now - 3 * 60 * 60 * 1000),
+        },
+      ],
+    })
+  }
+
+  const existingDispute = await prisma.marketDispute.findFirst({
+    where: {
+      marketId: disputed.id,
+      userId: demo.id,
+      reason: 'Launch schedule evidence suggests the provisional YES resolution should be reopened for community voting.',
+    },
+    select: { id: true },
+  })
+
+  if (!existingDispute) {
+    await prisma.marketDispute.create({
+      data: {
+        marketId: disputed.id,
+        userId: demo.id,
+        proposedOutcome: 'NO',
+        reason: 'Launch schedule evidence suggests the provisional YES resolution should be reopened for community voting.',
+        status: 'OPEN',
+      },
+    })
+  }
+}
+
 async function main() {
   console.log('🌱 Seeding database...')
 
@@ -409,6 +635,12 @@ async function main() {
   for (const orderData of SAMPLE_EXCHANGE_ORDERS) {
     await ensureSampleExchangeOrder(usersByEmail, marketsByTitle, orderData)
   }
+
+  for (const commentData of SAMPLE_COMMENTS) {
+    await ensureSampleComment(usersByEmail, marketsByTitle, commentData)
+  }
+
+  await ensureResolutionActivity(usersByEmail, marketsByTitle)
 
   console.log('\n✨ Seed complete!')
   console.log('\nDemo credentials:')
