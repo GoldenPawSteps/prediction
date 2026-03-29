@@ -5,6 +5,10 @@ The repository includes a comprehensive API and business-flow simulation in `tes
 If you want a human-executed version of the same flow, use `docs/MANUAL_QA_CHECKLIST.md`.
 For a short pre-deploy pass, use `docs/MANUAL_QA_SMOKE_CHECKLIST.md`.
 
+The repository also includes a dedicated market-creation simulation in `test-market-creation.js`.
+For manual creation-only verification, use `docs/MARKET_CREATION_QA_CHECKLIST.md`.
+For a short creation pre-deploy pass, use `docs/MARKET_CREATION_SMOKE_CHECKLIST.md`.
+
 ## What it covers
 
 - Authentication lifecycle: register, login, session isolation, logout
@@ -25,9 +29,9 @@ For a short pre-deploy pass, use `docs/MANUAL_QA_SMOKE_CHECKLIST.md`.
 npm run test:simulation
 ```
 
-## Run all three simulations
+## Run all simulations
 
-Use this when you want a full regression pass across business flow, money conservation, and lifecycle state transitions:
+Use this when you want a full regression pass across business flow, market creation, money conservation, and lifecycle state transitions:
 
 ```bash
 npm run test:all-simulations
@@ -36,6 +40,7 @@ npm run test:all-simulations
 What this covers:
 
 - `test-simulation.js`: broad product and API behavior
+- `test-market-creation.js`: market creation correctness and validation boundaries
 - `test-money-conservation.js`: balance integrity and payout accounting
 - `test-market-lifecycle.js`: state transitions from OPEN through final settlement
 
@@ -89,6 +94,17 @@ BASE_URL=http://localhost:3001 npm run test:simulation
 - Keep the app running before execution (`npm run dev`).
 - The edge-case section uses a fresh funded user so it remains independent of prior spend in earlier sections.
 
+### Market Creation Simulation Shortcuts
+
+```bash
+npm run test:market-creation
+npm run test:market-creation:binary
+npm run test:market-creation:multi
+npm run test:market-creation:validation
+npm run test:market-creation:balance
+npm run test:market-creation:listing
+```
+
 ---
 
 ## Related Testing Docs
@@ -102,6 +118,45 @@ A complementary simulation focused specifically on **money conservation invarian
 - **Run automated suite:** `npm run test:conservation` (41 tests, all scenarios)
 - **Run API-only tests:** `npm run test:conservation:api` (fast, no DB settlement)
 - **Run lifecycle tests:** `npm run test:conservation:lifecycle` (with settlement)
+
+### Market Creation Simulation
+
+A dedicated simulation focused on **market creation correctness** — verifying valid BINARY and MULTI creation paths, schema validation, insufficient-funds handling, and market discoverability after creation.
+
+- **Full checklist:** `docs/MARKET_CREATION_QA_CHECKLIST.md` — manual verification of all creation scenarios
+- **Smoke checklist:** `docs/MARKET_CREATION_SMOKE_CHECKLIST.md` — short pre-deploy creation pass
+- **Run automated suite:** `npm run test:market-creation` (27 checks)
+- **Run binary-only checks:** `npm run test:market-creation:binary`
+- **Run multi-only checks:** `npm run test:market-creation:multi`
+- **Run validation-only checks:** `npm run test:market-creation:validation`
+- **Run balance-only checks:** `npm run test:market-creation:balance`
+- **Run listing-only checks:** `npm run test:market-creation:listing`
+
+### Creation Tests In Plain English
+
+#### Authentication Setup
+
+This section creates fresh users and verifies they can authenticate so each creation scenario has isolated sessions and deterministic balances.
+
+#### Binary Creation
+
+This section verifies valid BINARY market creation for neutral and skewed priors, and checks that creation responses contain expected market metadata.
+
+#### Multi-Outcome Creation
+
+This section verifies valid MULTI market creation with both 4-outcome and minimal 2-outcome payloads.
+
+#### Validation
+
+This section intentionally sends invalid creation payloads (bad title/description/type/probability/liquidity/url/outcome constraints) and verifies they are rejected.
+
+#### Balance And Funds
+
+This section verifies creation succeeds for valid funded users and rejects oversized market creation when balance is insufficient.
+
+#### Listing
+
+This section verifies newly created markets are visible via list, category filter, and keyword search.
 
 ### Business-Flow Tests In Plain English
 
@@ -245,5 +300,6 @@ Finally, the script forces immutable finalization after the dispute window and v
 Quick pre-deploy verification without full manual testing:
 
 - **Simulation smoke:** `docs/MANUAL_QA_SMOKE_CHECKLIST.md` — 12-step smoke test for test-simulation.js
+- **Creation smoke:** `docs/MARKET_CREATION_SMOKE_CHECKLIST.md` — short smoke test for market creation paths
 - **Conservation smoke:** `docs/MONEY_CONSERVATION_SMOKE_CHECKLIST.md` — 6-check smoke test for money invariants
 - **Lifecycle smoke:** `docs/MARKET_LIFECYCLE_SMOKE_CHECKLIST.md` — short smoke test for lifecycle transitions
