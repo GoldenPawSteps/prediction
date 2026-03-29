@@ -275,6 +275,8 @@ async function marketsSection(users) {
     market2 = await createBinaryMarket(bob.jar, 'ETH Flip', { initialLiquidity: 300, category: 'Crypto' });
     assert(market2.id, 'missing id');
     assert(market2.id !== market1.id, 'ids should differ');
+    assertApprox(Number(market2.initialLiquidity), 300, 'custom liquidity should be persisted', 0.001);
+    assert(market2.category === 'Crypto', 'custom category should be persisted');
   });
 
   await step('Create multi-outcome market', async () => {
@@ -284,6 +286,11 @@ async function marketsSection(users) {
       { name: 'Candidate C', initialLiquidity: 100, priorProbability: 0.25 },
     ]);
     assert(multiMarket.id, 'multi market missing id');
+    const detail = await request('GET', `/api/markets/${multiMarket.id}`);
+    assert(detail.ok, 'fetch multi market detail failed');
+    assert(detail.data.marketType === 'MULTI', `expected MULTI type, got ${detail.data.marketType}`);
+    assert(Array.isArray(detail.data.outcomes), 'multi market should expose outcomes array');
+    assert(detail.data.outcomes.length === 3, `expected 3 outcomes, got ${detail.data.outcomes.length}`);
   });
 
   await step('GET /api/markets lists markets', async () => {
@@ -309,6 +316,11 @@ async function marketsSection(users) {
   await step('GET /api/markets?sortBy=volume sorts', async () => {
     const r = await request('GET', '/api/markets?sortBy=volume');
     assert(r.ok, 'sort failed');
+    if (r.data.markets.length >= 2) {
+      const v0 = Number(r.data.markets[0].totalVolume) || 0;
+      const v1 = Number(r.data.markets[1].totalVolume) || 0;
+      assert(v0 >= v1, `volume sort should be descending, got ${v0} then ${v1}`);
+    }
   });
 
   await step('GET /api/markets/[id] returns full market', async () => {
@@ -357,11 +369,16 @@ async function ammSection(users, markets) {
   });
 
   await step('Buy NO shares (AMM)', async () => {
+    const before = await getBalance(bob.jar);
+    const beforeProb = await request('GET', `/api/markets/${market1.id}/probability`);
+    assert(beforeProb.ok, 'pre-trade probability fetch failed');
     const r = await request('POST', `/api/markets/${market1.id}/trade`, {
       outcome: 'NO', type: 'BUY', shares: 5,
     }, bob.jar);
     assert(r.ok, `buy NO failed: ${JSON.stringify(r.data)}`);
-    assert(r.data.probabilities.no > 0, 'no prob should exist');
+    assert(r.data.probabilities.no > beforeProb.data.no, 'no probability should rise after NO buy');
+    const after = await getBalance(bob.jar);
+    assert(after < before, 'balance should decrease after NO buy');
   });
 
   await step('Sell YES shares (AMM)', async () => {
@@ -459,19 +476,26 @@ async function exchangeSection(users) {
 
   await step('Cancel open order — refund reserve', async () => {
     // Place an order then cancel it via DELETE
+    const prePlaceBal = await getBalance(alice.jar);
     const place = await request('POST', `/api/markets/${market.id}/order`, {
       outcome: 'YES', side: 'BID', orderType: 'GTC', price: 0.30, shares: 10,
     }, alice.jar);
     assert(place.ok, 'place for cancel failed');
     const orderId = place.data.order.id;
-    const beforeBal = await getBalance(alice.jar);
+    const afterPlaceBal = await getBalance(alice.jar);
+    assertApprox(prePlaceBal - afterPlaceBal, 3.0, 'order reserve should equal price×shares', 0.001);
 
     const cancel = await request('DELETE', `/api/markets/${market.id}/order`, {
       orderId,
     }, alice.jar);
     assert(cancel.ok, `cancel failed: ${JSON.stringify(cancel.data)}`);
     const afterBal = await getBalance(alice.jar);
-    assert(afterBal > beforeBal, 'cancel should refund reserved amount');
+    assertApprox(afterBal, prePlaceBal, 'cancel should fully refund reserved amount', 0.001);
+    const detail = await request('GET', `/api/markets/${market.id}`, null, alice.jar);
+    assert(detail.ok, 'fetch market detail after cancel failed');
+    const cancelledOrder = (detail.data.userOrders || []).find((o) => o.id === orderId);
+    assert(cancelledOrder, 'cancelled order should appear in user order history');
+    assert(cancelledOrder.status === 'CANCELLED', `expected CANCELLED status, got ${cancelledOrder.status}`);
   });
 
   await step('FOK order rejected when insufficient liquidity', async () => {
@@ -497,13 +521,10 @@ async function exchangeSection(users) {
       outcome: 'YES', side: 'BID', orderType: 'FAK', price: 0.50, shares: 100,
     }, alice.jar);
     assert(fak.ok, `FAK failed: ${JSON.stringify(fak.data)}`);
-    // FAK fills what's available then kills the rest — status can be PARTIAL, CANCELLED, or FILLED
+    // FAK should fill immediately available liquidity, then cancel remainder.
     if (fak.data.order) {
-      assert(
-        ['CANCELLED', 'FILLED', 'PARTIAL'].includes(fak.data.order.status),
-        `FAK status unexpected: ${fak.data.order.status}`,
-      );
-      // remainder should be zeroed out
+      assert(fak.data.filledShares > 0, 'FAK should fill available liquidity');
+      assert(fak.data.order.status === 'PARTIAL', `FAK should be PARTIAL when remainder is cancelled, got ${fak.data.order.status}`);
       assert(fak.data.order.remainingShares === 0, 'FAK remainder should be 0');
     }
   });
@@ -628,12 +649,19 @@ async function portfolioSection(users) {
   const { alice } = users;
 
   await step('GET portfolio for Alice (has trades)', async () => {
+    const seedMarket = await createBinaryMarket(alice.jar, 'Portfolio Seed');
+    const seedTrade = await request('POST', `/api/markets/${seedMarket.id}/trade`, {
+      outcome: 'YES', type: 'BUY', shares: 2,
+    }, alice.jar);
+    assert(seedTrade.ok, `portfolio seed trade failed: ${JSON.stringify(seedTrade.data)}`);
+
     const r = await request('GET', '/api/portfolio', null, alice.jar);
     assert(r.ok, `portfolio failed: ${JSON.stringify(r.data)}`);
     assert(Array.isArray(r.data.positions), 'missing positions');
     assert(Array.isArray(r.data.trades), 'missing trades');
     assert(r.data.stats, 'missing stats');
     assert(typeof r.data.stats.totalValue === 'number', 'missing totalValue');
+    assert(r.data.positions.length > 0, 'portfolio should contain at least one position after seeding');
   });
 
   await step('Portfolio positions show currentPrice and unrealizedPnl', async () => {
@@ -673,6 +701,13 @@ async function leaderboardSection() {
   await step('GET leaderboard?sortBy=roi', async () => {
     const r = await request('GET', '/api/leaderboard?sortBy=roi');
     assert(r.ok, 'leaderboard roi sort failed');
+    if (r.data.entries.length >= 2) {
+      const roi0 = Number(r.data.entries[0].roi);
+      const roi1 = Number(r.data.entries[1].roi);
+      if (Number.isFinite(roi0) && Number.isFinite(roi1)) {
+        assert(roi0 >= roi1, `leaderboard should be sorted by roi desc, got ${roi0} then ${roi1}`);
+      }
+    }
   });
 }
 
