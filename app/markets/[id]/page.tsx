@@ -199,6 +199,13 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
   const [expandedOutcomeResolution, setExpandedOutcomeResolution] = useState<Record<string, boolean>>({})
   const hasLoggedNavMetricRef = useRef(false)
   const abortControllerRef = useRef<AbortController | null>(null)
+  const latestRequestRef = useRef(0)
+  const marketRef = useRef<Market | null>(null)
+  const abortRetryRef = useRef(0)
+
+  useEffect(() => {
+    marketRef.current = market
+  }, [market])
 
   const translateCategory = (category: string) => {
     switch (category) {
@@ -235,6 +242,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
   }
 
   const fetchMarket = useCallback(async () => {
+    const requestId = ++latestRequestRef.current
     const prefetchKey = `market:${id}`
     const prefetched = consumePrefetchedJson<Market>(prefetchKey)
     const hasPrefetched = Boolean(prefetched)
@@ -245,34 +253,58 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
     }
 
     try {
-      // Create new abort controller for this fetch
-      abortControllerRef.current = new AbortController()
-      const timeoutId = window.setTimeout(() => abortControllerRef.current?.abort(), MARKET_FETCH_TIMEOUT_MS)
-      
-      const res = await fetch(`/api/markets/${id}`, {
-        ...(hasPrefetched ? { cache: 'no-store' as const } : {}),
-        signal: abortControllerRef.current.signal,
-      })
-      window.clearTimeout(timeoutId)
-      
-      if (res.status === 404) { setIsNotFound(true); return }
-      if (res.ok) {
-        const data = await res.json()
-        setFetchError(null)
-        setMarket(data)
-      } else {
-        setFetchError('Failed to fetch market')
+      // Abort prior request before starting a new one to avoid stale races.
+      abortControllerRef.current?.abort()
+      const controller = new AbortController()
+      abortControllerRef.current = controller
+      const timeoutId = window.setTimeout(() => controller.abort(), MARKET_FETCH_TIMEOUT_MS)
+
+      try {
+        const res = await fetch(`/api/markets/${id}`, {
+          ...(hasPrefetched ? { cache: 'no-store' as const } : {}),
+          signal: controller.signal,
+        })
+
+        if (requestId !== latestRequestRef.current) return
+
+        if (res.status === 404) {
+          setIsNotFound(true)
+          return
+        }
+
+        if (res.ok) {
+          const data = await res.json()
+          abortRetryRef.current = 0
+          setFetchError(null)
+          setMarket(data)
+        } else {
+          setFetchError('Failed to fetch market')
+        }
+      } finally {
+        window.clearTimeout(timeoutId)
       }
     } catch (err) {
+      if (requestId !== latestRequestRef.current) return
+
       if (err instanceof Error && err.name === 'AbortError') {
-        // Silently ignore abort errors (from cleanup or timeout)
+        // Retry once if we aborted before loading any market data.
+        if (!marketRef.current && abortRetryRef.current < 1) {
+          abortRetryRef.current += 1
+          window.setTimeout(() => {
+            if (requestId === latestRequestRef.current && !marketRef.current) {
+              void fetchMarket()
+            }
+          }, 150)
+        }
         return
       } else {
         setFetchError(err)
       }
       console.error('Failed to fetch market:', err)
     } finally {
-      setLoading(false)
+      if (requestId === latestRequestRef.current) {
+        setLoading(false)
+      }
     }
   }, [id])
 

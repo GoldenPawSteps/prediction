@@ -10,9 +10,13 @@ import { PrismaPg } from '@prisma/adapter-pg'
 import bcrypt from 'bcryptjs'
 import 'dotenv/config'
 import { lmsrInitialSharesForPrior, lmsrLiquidityParamForMaxLoss } from '../lib/lmsr'
+import { activeOrderWhere } from '../lib/order-expiration'
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! })
 const prisma = new PrismaClient({ adapter })
+
+const ADMIN_INITIAL_BALANCE = 10000
+const DEMO_INITIAL_BALANCE = 1000
 
 type SeedMarket = {
   title: string
@@ -223,6 +227,44 @@ async function ensureMinimumBalance(userId: string, minimumBalance: number) {
   await prisma.user.update({
     where: { id: userId },
     data: { balance: { increment: minimumBalance - user.balance } },
+  })
+}
+
+async function syncAdminSeedBalance(adminId: string, initialBalance: number) {
+  const now = new Date()
+
+  const [lockedMarkets, reservedBidOrders] = await Promise.all([
+    prisma.market.findMany({
+      where: {
+        creatorId: adminId,
+        parentMarketId: null,
+        OR: [
+          { status: { in: ['OPEN', 'CLOSED', 'DISPUTED'] } },
+          { status: { in: ['RESOLVED', 'INVALID'] }, settledAt: null },
+        ],
+      },
+      select: { initialLiquidity: true },
+    }),
+    prisma.marketOrder.aggregate({
+      where: {
+        userId: adminId,
+        side: 'BID',
+        status: { in: ['OPEN', 'PARTIAL'] },
+        remainingShares: { gt: 0 },
+        reservedAmount: { gt: 0 },
+        ...activeOrderWhere(now),
+      },
+      _sum: { reservedAmount: true },
+    }),
+  ])
+
+  const lockedLiquidity = lockedMarkets.reduce((sum, market) => sum + market.initialLiquidity, 0)
+  const reservedAmount = reservedBidOrders._sum.reservedAmount ?? 0
+  const expectedBalance = Math.max(0, initialBalance - lockedLiquidity - reservedAmount)
+
+  await prisma.user.update({
+    where: { id: adminId },
+    data: { balance: expectedBalance },
   })
 }
 
@@ -593,12 +635,12 @@ async function main() {
       email: 'admin@predictify.com',
       username: 'admin',
       passwordHash: adminPassword,
-      balance: 10000,
+      balance: ADMIN_INITIAL_BALANCE,
       isAdmin: true,
       bio: 'Platform administrator',
     },
   })
-  await ensureMinimumBalance(admin.id, 10000)
+  await ensureMinimumBalance(admin.id, ADMIN_INITIAL_BALANCE)
   console.log(`✅ Admin user: ${admin.email}`)
 
   // Create demo user
@@ -614,11 +656,11 @@ async function main() {
       email: 'demo@predictify.com',
       username: 'demo_trader',
       passwordHash: demoPassword,
-      balance: 1000,
+      balance: DEMO_INITIAL_BALANCE,
       bio: 'Demo account for testing',
     },
   })
-  await ensureMinimumBalance(demo.id, 1000)
+  await ensureMinimumBalance(demo.id, DEMO_INITIAL_BALANCE)
   console.log(`✅ Demo user: ${demo.email}`)
 
   const usersByEmail = new Map([
@@ -641,6 +683,7 @@ async function main() {
   }
 
   await ensureResolutionActivity(usersByEmail, marketsByTitle)
+  await syncAdminSeedBalance(admin.id, ADMIN_INITIAL_BALANCE)
 
   console.log('\n✨ Seed complete!')
   console.log('\nDemo credentials:')

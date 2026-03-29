@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode,
 import toast from 'react-hot-toast'
 import { endNavFeedback } from '@/lib/client-nav-feedback'
 
-const AUTH_REFRESH_INTERVAL_MS = 10000
+const AUTH_REFRESH_INTERVAL_MS = 30000
 
 interface User {
   id: string

@@ -3,7 +3,6 @@ import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, apiError, apiSuccess } from '@/lib/api-helpers'
 import { expireStaleUserOrders } from '@/lib/order-expiration'
-import { finalizeImmutableResolutions } from '@/lib/market-status'
 
 type TxClient = Prisma.TransactionClient
 
@@ -15,8 +14,6 @@ export async function GET(req: NextRequest) {
   const authUser = userOrResponse as { userId: string; email: string; isAdmin: boolean }
 
   try {
-    await finalizeImmutableResolutions()
-
     const user = await prisma.$transaction(async (tx: TxClient) => {
       await expireStaleUserOrders(tx, authUser.userId)
 
