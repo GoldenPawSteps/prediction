@@ -10,8 +10,8 @@
  *   6. Market Data – probability, chart / price history
  *   7. Portfolio – positions, trades, stats
  *   8. Leaderboard – profit, roi, trades sort
- *   9. Resolution Voting – initial vote, auto-resolve, settlement payouts, creator refund
- *  10. Dispute & Re-resolution – file dispute, re-vote, reversed settlement
+ *   9. Resolution Voting – initial vote, auto-resolve, pending settlement, immutable finalization
+ *  10. Dispute & Re-resolution – file dispute, re-vote, finalization after latest outcome
  *  11. Edge Cases – expired markets, duplicate users, invalid inputs, insufficient funds
  *
  * Run:
@@ -23,8 +23,22 @@
  * Requires the dev server to be running on BASE_URL (default http://localhost:3001).
  */
 
+require('dotenv/config');
+
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3001';
 const RUN_TAG = Date.now().toString(36);  // unique per run to avoid collisions
+let prisma = null;
+
+function getPrisma() {
+  if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required for finalization checks');
+  if (!prisma) {
+    const { PrismaClient } = require('@prisma/client');
+    const { PrismaPg } = require('@prisma/adapter-pg');
+    const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+    prisma = new PrismaClient({ adapter });
+  }
+  return prisma;
+}
 
 // ─── Utilities ──────────────────────────────────────────────────────────────
 
@@ -147,6 +161,23 @@ async function getBalance(jar) {
   const r = await request('GET', '/api/auth/me', null, jar);
   assert(r.ok, `me failed: ${JSON.stringify(r.data)}`);
   return r.data.balance;
+}
+
+async function getPortfolio(jar) {
+  const r = await request('GET', '/api/portfolio', null, jar);
+  assert(r.ok, `portfolio failed: ${JSON.stringify(r.data)}`);
+  return r.data;
+}
+
+async function forceFinalization(marketId, triggerJar, backdateHours = 2) {
+  await getPrisma().market.update({
+    where: { id: marketId },
+    data: { resolutionTime: new Date(Date.now() - backdateHours * 60 * 60 * 1000) },
+  });
+  await new Promise(r => setTimeout(r, 100));
+  const r = await request('GET', '/api/portfolio', null, triggerJar);
+  assert(r.ok, `finalization trigger failed: ${JSON.stringify(r.data)}`);
+  await new Promise(r => setTimeout(r, 200));
 }
 
 // ─── SECTIONS ───────────────────────────────────────────────────────────────
@@ -648,11 +679,15 @@ async function leaderboardSection() {
 // -- 9  Resolution & Settlement ---------------------------------------------
 async function resolutionSection(users) {
   const { alice, bob } = users;
+  let aliceAfterTrades;
+  let bobAfterTrades;
+  let pendingLiquidityLocked;
 
   // Create a market with a near-future end date, trade, then let it close for resolution tests.
   const resMarket = await createBinaryMarket(alice.jar, 'Resolve2', {
     endDate: new Date(Date.now() + 5000).toISOString(), // 5 s from now
     initialLiquidity: 100,
+    disputeWindowHours: 1,
   });
 
   await step('Trade before expiry then wait for close', async () => {
@@ -670,6 +705,9 @@ async function resolutionSection(users) {
     await new Promise(r => setTimeout(r, 6000));
     // Trigger close-expired
     await request('GET', '/api/markets');
+
+    aliceAfterTrades = await getBalance(alice.jar);
+    bobAfterTrades = await getBalance(bob.jar);
   });
 
   await step('Vote to resolve market as YES', async () => {
@@ -697,11 +735,17 @@ async function resolutionSection(users) {
     assert(r.data.resolutionVotes.length >= 1, 'should have at least 1 vote');
   });
 
-  await step('Winner balance increased (Alice had YES)', async () => {
-    const bal = await getBalance(alice.jar);
-    // Alice started at 1000, spent on trades, but won 20 shares at $1 each
-    // Exact balance depends on cost, but she should have gotten a payout
-    assert(typeof bal === 'number' && bal > 0, 'alice balance should be positive');
+  await step('Balances unchanged before finalization (settlement still pending)', async () => {
+    const aliceBal = await getBalance(alice.jar);
+    const bobBal = await getBalance(bob.jar);
+    const alicePortfolio = await getPortfolio(alice.jar);
+    const bobPortfolio = await getPortfolio(bob.jar);
+    assertApprox(aliceBal, aliceAfterTrades, 'alice balance should not change before finalization', 0.01);
+    assertApprox(bobBal, bobAfterTrades, 'bob balance should not change before finalization', 0.01);
+    assert(alicePortfolio.stats.liquidityLocked > 0, 'creator liquidity should remain locked during dispute window');
+    pendingLiquidityLocked = alicePortfolio.stats.liquidityLocked;
+    assert(alicePortfolio.stats.liquidityLocked >= 100, 'creator liquidity should remain locked during dispute window');
+    assert(bobPortfolio.stats.totalPositions > 0, 'losing trader position should still remain open before finalization');
   });
 
   await step('Cannot trade on resolved market', async () => {
@@ -711,18 +755,34 @@ async function resolutionSection(users) {
     assert(!r.ok, 'trade on resolved market should fail');
   });
 
+  await step('Portfolio updates after finalization', async () => {
+    await forceFinalization(resMarket.id, alice.jar, 2);
+    const aliceBal = await getBalance(alice.jar);
+    const bobBal = await getBalance(bob.jar);
+    const alicePortfolio = await getPortfolio(alice.jar);
+    const bobPortfolio = await getPortfolio(bob.jar);
+    const bobPositionForMarket = bobPortfolio.positions.find((p) => p.market.id === resMarket.id);
+    assert(aliceBal > aliceAfterTrades, 'alice should receive creator refund and YES payout after finalization');
+    assertApprox(bobBal, bobAfterTrades, 'bob should not receive payout on losing outcome', 0.02);
+    assertApprox(alicePortfolio.stats.liquidityLocked, pendingLiquidityLocked - 100,
+      'creator liquidity should decrease by this market\'s initial liquidity after finalization', 0.001);
+    assert(!bobPositionForMarket, 'bob position for this market should close after finalization');
+  });
+
   return { resMarket };
 }
 
 // -- 10  Dispute & Re-resolution -------------------------------------------
 async function disputeSection(users) {
   const { alice, bob } = users;
+  let aliceAfterTrades;
+  let bobAfterTrades;
 
   // Create, trade, close, resolve — then dispute
   const mkt = await createBinaryMarket(alice.jar, 'Dispute Me', {
     endDate: new Date(Date.now() + 3000).toISOString(),
     initialLiquidity: 100,
-    disputeWindowHours: 720, // large window so dispute is always in time
+    disputeWindowHours: 1,
   });
 
   const t1 = await request('POST', `/api/markets/${mkt.id}/trade`, {
@@ -738,6 +798,8 @@ async function disputeSection(users) {
   // Wait for expiry
   await new Promise(r => setTimeout(r, 4000));
   await request('GET', '/api/markets'); // trigger close
+  aliceAfterTrades = await getBalance(alice.jar);
+  bobAfterTrades = await getBalance(bob.jar);
 
   // Resolve as YES
   const vote1 = await request('POST', `/api/markets/${mkt.id}/vote`, {
@@ -760,16 +822,11 @@ async function disputeSection(users) {
     assert(r.data.status === 'DISPUTED', `expected DISPUTED, got ${r.data.status}`);
   });
 
-  await step('Settlement reversed — balances rolled back', async () => {
+  await step('No balance rollback occurs because settlement was still pending', async () => {
     const aliceNow = await getBalance(alice.jar);
     const bobNow = await getBalance(bob.jar);
-    // After dispute, the previous settlement should be reversed
-    // So Alice's balance should decrease (she lost her YES payout)
-    // and Bob's should change too
-    // We just check they aren't the same as right-after-resolve
-    // (exact values depend on implementation)
-    assert(typeof aliceNow === 'number', 'alice balance should exist');
-    assert(typeof bobNow === 'number', 'bob balance should exist');
+    assertApprox(aliceNow, aliceAfterTrades, 'alice balance should stay unchanged after dispute while settlement is pending', 0.01);
+    assertApprox(bobNow, bobAfterTrades, 'bob balance should stay unchanged after dispute while settlement is pending', 0.01);
   });
 
   await step('Re-vote to resolve as NO (requires 2 votes — dispute round 1)', async () => {
@@ -790,6 +847,25 @@ async function disputeSection(users) {
     assert(r.ok, 'fetch re-resolved market failed');
     assert(r.data.status === 'RESOLVED', `expected RESOLVED, got ${r.data.status}`);
     assert(r.data.resolution === 'NO', `expected NO, got ${r.data.resolution}`);
+  });
+
+  await step('Balances still unchanged until finalization after re-resolution', async () => {
+    const aliceNow = await getBalance(alice.jar);
+    const bobNow = await getBalance(bob.jar);
+    assertApprox(aliceNow, aliceAfterTrades, 'alice balance should still be unchanged before finalization', 0.01);
+    assertApprox(bobNow, bobAfterTrades, 'bob balance should still be unchanged before finalization', 0.01);
+  });
+
+  await step('Updates apply after finalization of the latest outcome', async () => {
+    await forceFinalization(mkt.id, bob.jar, 2);
+    const bobNow = await getBalance(bob.jar);
+    const alicePortfolio = await getPortfolio(alice.jar);
+    const bobPortfolio = await getPortfolio(bob.jar);
+    const alicePositionForMarket = alicePortfolio.positions.find((p) => p.market.id === mkt.id);
+    const bobPositionForMarket = bobPortfolio.positions.find((p) => p.market.id === mkt.id);
+    assert(bobNow > bobAfterTrades, 'bob should receive NO payout after finalization');
+    assert(!alicePositionForMarket, 'alice YES position for this market should close after finalization');
+    assert(!bobPositionForMarket, 'bob NO position for this market should close after finalization');
   });
 
   await step('Dispute on non-resolved market rejected', async () => {
@@ -1012,4 +1088,8 @@ async function main() {
   process.exit(failCount > 0 ? 1 : 0);
 }
 
-main().catch(e => { console.error('Fatal:', e); process.exit(2); });
+main()
+  .catch(e => { console.error('Fatal:', e); process.exit(2); })
+  .finally(async () => {
+    if (prisma) await prisma.$disconnect();
+  });

@@ -280,13 +280,21 @@ Expected:
 - Status is `RESOLVED`.
 - Resolution field equals YES.
 
-5. Verify winner payout effect.
+5. Verify settlement is still pending before finalization.
 Expected:
-- Winning side balance/value reflects settlement.
+- Winner/loser balances do not change yet.
+- Creator liquidity remains locked.
+- Positions remain open until finalization.
 
 6. Try trading after resolve.
 Expected:
 - Rejected.
+
+7. After dispute-window expiry or DB-assisted backdating, trigger finalization through portfolio/auth reads.
+Expected:
+- Winner balance updates now.
+- Creator liquidity unlocks now.
+- Positions close now.
 
 ## 10) Dispute and Re-resolution
 
@@ -299,9 +307,9 @@ Expected:
 - Dispute created with status `OPEN`.
 - Market transitions to `DISPUTED`.
 
-3. Verify rollback behavior after dispute.
+3. Verify no rollback is needed immediately after dispute.
 Expected:
-- Prior settlement effects are reversed per system rules.
+- Balances remain unchanged because settlement was still pending.
 
 4. Submit re-votes from two users toward new outcome.
 Expected:
@@ -313,7 +321,13 @@ Expected:
 - Status returns to `RESOLVED`.
 - Resolution reflects re-voted result.
 
-6. Attempt dispute on OPEN market.
+6. Trigger finalization after the dispute window has elapsed.
+Expected:
+- Only the latest outcome is applied.
+- Winning side receives payout now.
+- Losing side does not.
+
+7. Attempt dispute on OPEN market.
 Expected:
 - Rejected.
 

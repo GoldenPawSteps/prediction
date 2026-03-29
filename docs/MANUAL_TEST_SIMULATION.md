@@ -15,8 +15,8 @@ For a short pre-deploy pass, use `docs/MANUAL_QA_SMOKE_CHECKLIST.md`.
 - Market data: probability, chart history, resolution status view
 - Portfolio: positions, trades, account stats
 - Leaderboard: default/trades/ROI sorting
-- Resolution flow: vote, settle payouts, trade lock after resolve
-- Dispute flow: dispute, rollback, re-vote, re-resolution
+- Resolution flow: vote, provisional resolve, finalization, trade lock after resolve
+- Dispute flow: dispute, re-vote, re-resolution, latest-outcome finalization
 - Edge cases: invalid JSON, invalid market/order/trade/vote/login inputs
 
 ## Run full simulation
@@ -139,11 +139,11 @@ This section checks that leaderboard endpoints load and support different sort m
 
 #### Resolution
 
-This section verifies that markets can be resolved, payouts are applied correctly after settlement, and once resolved, the market can no longer accept additional trading.
+This section verifies that markets can be provisionally resolved first, remain frozen while settlement is still pending, and only update balances and portfolio state after immutable finalization. It also verifies that once resolved, the market can no longer accept additional trading.
 
 #### Dispute
 
-This section exercises the rollback path where a provisional resolution is disputed, the market is re-voted, and a later outcome replaces the earlier one.
+This section exercises the deferred-settlement dispute path where a provisional resolution is disputed before any payout happened, the market is re-voted, and only the latest final outcome is applied at finalization time.
 
 #### Edge Cases
 

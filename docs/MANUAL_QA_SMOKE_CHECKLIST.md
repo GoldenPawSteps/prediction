@@ -52,7 +52,7 @@ Expected: Probability is valid (YES + NO ~= 1), chart returns non-empty history.
 Expected: Portfolio shows positions/trades/stats, leaderboard loads with entries.
 
 11. Create a short-expiry market, trade once, wait to expire, then vote to resolve.
-Expected: Market resolves and cannot be traded afterward.
+Expected: Market resolves, remains settlement-pending until finalization, and cannot be traded afterward.
 
 12. Try one protected action while logged out (for example POST comment or trade).
 Expected: Rejected with auth error (or redirect to login).
