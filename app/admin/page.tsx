@@ -72,13 +72,8 @@ export default function AdminPage() {
       const data = await res.json()
 
       if (res.ok) {
-        const refunded = data?.settlement?.refundedToCreator ?? 0
-        if (refunded > 0) {
-          toast.success(t('toastResolvedRefunded', { outcome, amount: formatCurrency(refunded) }))
-        } else {
-          toast.success(t('toastResolved', { outcome }))
-        }
-        setMarkets((prev) => prev.map((m) => m.id === marketId ? { ...m, status: 'RESOLVED' } : m))
+        toast.success(t('toastResolved', { outcome }))
+        setMarkets((prev) => prev.map((m) => m.id === marketId ? { ...m, status: outcome === 'INVALID' ? 'INVALID' : 'RESOLVED' } : m))
         await refreshUser()
       } else {
         toast.error(data.error || t('toastFailed'))

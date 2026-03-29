@@ -44,7 +44,7 @@ export function MarketCommentsSection({
   // Load comments with background refresh every 8 seconds
   const { data: comments, isLoading, error, refetch } = usePageSection<Comment[]>({
     key: `market-comments:${marketId}`,
-    url: `/api/markets/${marketId}/comments`,
+    url: `/api/markets/${marketId}/comment`,
     revalidateInterval: 8000, // Refresh comments every 8 seconds
     shouldConsume: isPrefetched,
     debug: false,

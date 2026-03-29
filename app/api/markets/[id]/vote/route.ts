@@ -2,10 +2,7 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, apiError, apiSuccess } from '@/lib/api-helpers'
 import { getQualifiedMajorityThreshold, getResolutionQuorum, isImmediateResolutionRound } from '@/lib/resolution'
-import { settleMarketResolution } from '@/lib/market-settlement'
 import { z } from 'zod'
-
-type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
 const voteSchema = z.object({
   outcome: z.enum(['YES', 'NO', 'INVALID']),
@@ -46,7 +43,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     })
 
     if (!market) return apiError('Market not found', 404)
-    if (market.status === 'RESOLVED') return apiError('Market is already resolved')
+    if (market.status === 'RESOLVED' || market.status === 'INVALID') return apiError('Market is already resolved')
     // DISPUTED markets allow re-voting so the community can resolve the dispute
 
     const now = new Date()
@@ -109,23 +106,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     // Auto-resolve if majority is clear
     if (shouldResolve && majorityOutcome) {
-      const isReResolution = market.status === 'DISPUTED'
-      const previousResolutionTime = market.resolutionTime
+      await prisma.$transaction(async (tx) => {
+        await tx.market.update({
+          where: { id: marketId },
+          data: {
+            status: majorityOutcome === 'INVALID' ? 'INVALID' : 'RESOLVED',
+            resolution: majorityOutcome,
+            resolutionTime: now,
+            settledAt: null,
+          },
+        })
 
-      // Resolve market
-      await prisma.market.update({
-        where: { id: marketId },
-        data: {
-          status: 'RESOLVED',
-          resolution: majorityOutcome,
-          resolutionTime: now,
-        },
-      })
-
-      // Run resolution payouts (same logic as manual resolve)
-      await runResolution(marketId, majorityOutcome, {
-        isReResolution,
-        previousResolutionTime,
+        const finalYesPrice = majorityOutcome === 'YES' ? 1.0 : majorityOutcome === 'NO' ? 0.0 : 0.5
+        await tx.priceHistory.create({
+          data: { marketId, yesPrice: finalYesPrice, noPrice: 1.0 - finalYesPrice, volume: 0 },
+        })
       })
     }
 
@@ -138,32 +133,4 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     console.error('Vote error:', err)
     return apiError('Internal server error', 500)
   }
-}
-
-async function runResolution(
-  marketId: string,
-  outcome: 'YES' | 'NO' | 'INVALID',
-  options?: { isReResolution?: boolean; previousResolutionTime?: Date | null }
-) {
-  const market = await prisma.market.findUnique({
-    where: { id: marketId },
-    select: {
-      id: true,
-      creatorId: true,
-      initialLiquidity: true,
-    },
-  })
-
-  if (!market) return
-
-  await prisma.$transaction(async (tx: TxClient) => {
-    await settleMarketResolution(tx, {
-      marketId,
-      outcome,
-      creatorId: market.creatorId,
-      initialLiquidity: market.initialLiquidity,
-      isReResolution: Boolean(options?.isReResolution),
-      previousResolutionTime: options?.previousResolutionTime ?? null,
-    })
-  })
 }

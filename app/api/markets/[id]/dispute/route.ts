@@ -38,7 +38,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     })
 
     if (!market) return apiError('Market not found', 404)
-    if (market.status !== 'RESOLVED') return apiError('Market must be resolved to dispute')
+    if (market.status !== 'RESOLVED' && market.status !== 'INVALID') {
+      return apiError('Market must be provisionally resolved to dispute')
+    }
 
     const now = new Date()
     const disputeWindowMs = (market.disputeWindowHours || 24) * 60 * 60 * 1000

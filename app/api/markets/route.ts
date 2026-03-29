@@ -7,6 +7,7 @@ import { getMarketProbabilities } from '@/lib/lmsr'
 import { lmsrLiquidityParamForMaxLoss } from '@/lib/lmsr'
 import { lmsrInitialSharesForPrior } from '@/lib/lmsr'
 import { closeExpiredOpenMarkets } from '@/lib/market-status'
+import { finalizeImmutableResolutions } from '@/lib/market-status'
 import { z } from 'zod'
 
 function isUnknownDisputeWindowFieldError(err: unknown): boolean {
@@ -36,6 +37,7 @@ const createMarketSchema = z.object({
 export async function GET(req: NextRequest) {
   try {
     await closeExpiredOpenMarkets()
+    await finalizeImmutableResolutions()
 
     const { searchParams } = new URL(req.url)
     const category = searchParams.get('category')

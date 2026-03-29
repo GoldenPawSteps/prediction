@@ -18,6 +18,7 @@
     "test:homepage:ssr": "node test-homepage-ssr.js",
     "test:resolution-refund": "node test-resolution-refund.js",
     "test:resolution-reresolution-refund": "node test-reresolution-refund.js",
+    "test:resolution-deferred-finalization": "node test-resolution-deferred-finalization.js",
     "test:simulation": "node test-simulation.js",
     "seed": "tsx prisma/seed.ts",
     "db:reset": "prisma migrate reset --force && npm run seed",

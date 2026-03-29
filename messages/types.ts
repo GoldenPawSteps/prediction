@@ -101,6 +101,7 @@ export interface Messages {
     balance: string
     availableBalance: string
     reservedBalance: string
+    liquidityLocked: string
     portfolioValue: string
     unrealizedPnl: string
     totalPnl: string

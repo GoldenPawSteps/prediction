@@ -91,6 +91,7 @@ model Market {
   resolution       ResolutionOutcome?
   resolutionSource String?
   resolutionTime   DateTime?
+  settledAt        DateTime?
   endDate          DateTime
   creatorId        String
   creator          User             @relation(fields: [creatorId], references: [id])

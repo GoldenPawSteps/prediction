@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth, apiError, apiSuccess } from '@/lib/api-helpers'
 import { getMarketProbabilities } from '@/lib/lmsr'
 import { activeOrderWhere } from '@/lib/order-expiration'
+import { finalizeImmutableResolutions } from '@/lib/market-status'
 
 export async function GET(req: NextRequest) {
   const userOrResponse = await requireAuth(req)
@@ -12,11 +13,13 @@ export async function GET(req: NextRequest) {
   const authUser = userOrResponse as { userId: string }
 
   try {
+    await finalizeImmutableResolutions()
+
     const MATCH_EPSILON = 0.000001
     const MATCH_WINDOW_MS = 60000
     const now = new Date()
 
-    const [user, reservedBidOrders, reservedOrders, positions, trades, fills] = await Promise.all([
+    const [user, reservedBidOrders, reservedOrders, createdMarkets, positions, trades, fills] = await Promise.all([
       prisma.user.findUnique({
         where: { id: authUser.userId },
         select: { balance: true },
@@ -58,6 +61,26 @@ export async function GET(req: NextRequest) {
               title: true,
             },
           },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 25,
+      }),
+      prisma.market.findMany({
+        where: {
+          creatorId: authUser.userId,
+          OR: [
+            { status: { in: ['OPEN', 'CLOSED', 'DISPUTED'] } },
+            { status: { in: ['RESOLVED', 'INVALID'] }, settledAt: null },
+          ],
+          parentMarketId: null,
+        },
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          initialLiquidity: true,
+          endDate: true,
+          marketType: true,
         },
         orderBy: { createdAt: 'desc' },
         take: 25,
@@ -173,6 +196,7 @@ export async function GET(req: NextRequest) {
     const stats = {
       availableBalance: user?.balance ?? 0,
       reservedBalance: reservedBidOrders._sum.reservedAmount ?? 0,
+      liquidityLocked: createdMarkets.reduce((sum, m) => sum + m.initialLiquidity, 0),
       totalPositions: positionsWithValue.length,
       totalValue: positionsWithValue.reduce((sum, p) => sum + p.currentValue, 0),
       totalUnrealizedPnl: positionsWithValue.reduce((sum, p) => sum + p.unrealizedPnl, 0),
@@ -188,6 +212,12 @@ export async function GET(req: NextRequest) {
         expiresAt: order.expiresAt?.toISOString() ?? null,
         outcome: order.outcome as string,
         orderType: order.orderType as string,
+      })),
+      createdMarkets: createdMarkets.map((m) => ({
+        ...m,
+        endDate: m.endDate.toISOString(),
+        status: m.status as string,
+        marketType: m.marketType as string,
       })),
       stats,
     })

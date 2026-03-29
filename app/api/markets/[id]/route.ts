@@ -4,6 +4,7 @@ import { apiError, apiSuccess } from '@/lib/api-helpers'
 import { getUserFromRequest } from '@/lib/api-helpers'
 import { getMarketProbabilities } from '@/lib/lmsr'
 import { closeMarketIfExpired } from '@/lib/market-status'
+import { finalizeImmutableResolutionIfReady } from '@/lib/market-status'
 import { activeOrderWhere, expireStaleMarketOrders } from '@/lib/order-expiration'
 
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
@@ -13,6 +14,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     const { id } = await params
     const viewer = await getUserFromRequest(_req)
     await closeMarketIfExpired(id)
+    await finalizeImmutableResolutionIfReady(id)
     await prisma.$transaction(async (tx: TxClient) => {
       await expireStaleMarketOrders(tx, id)
     })

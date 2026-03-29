@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { settleMarketResolution } from '@/lib/market-settlement'
 
 async function cancelOpenOrdersForMarkets(tx: Prisma.TransactionClient, marketIds: string[]) {
   if (marketIds.length === 0) {
@@ -113,4 +114,93 @@ export async function closeMarketIfExpired(marketId: string) {
 
     return result
   })
+}
+
+function isDisputeWindowClosed(resolutionTime: Date, disputeWindowHours: number, now: Date) {
+  const disputeWindowMs = Math.max(1, disputeWindowHours || 24) * 60 * 60 * 1000
+  return now.getTime() >= resolutionTime.getTime() + disputeWindowMs
+}
+
+async function finalizeMarketResolutionIfImmutable(marketId: string, now: Date) {
+  return prisma.$transaction(async (tx) => {
+    const market = await tx.market.findUnique({
+      where: { id: marketId },
+      select: {
+        id: true,
+        status: true,
+        resolution: true,
+        resolutionTime: true,
+        disputeWindowHours: true,
+        creatorId: true,
+        initialLiquidity: true,
+        settledAt: true,
+      },
+    })
+
+    if (!market) return false
+    if (!market.resolutionTime || !market.resolution) return false
+    if (!['RESOLVED', 'INVALID'].includes(market.status)) return false
+    if (market.settledAt) return false
+    if (!isDisputeWindowClosed(market.resolutionTime, market.disputeWindowHours, now)) return false
+
+    const claimed = await tx.market.updateMany({
+      where: {
+        id: market.id,
+        settledAt: null,
+        status: { in: ['RESOLVED', 'INVALID'] },
+      },
+      data: { settledAt: now },
+    })
+
+    if (claimed.count === 0) return false
+
+    await settleMarketResolution(tx, {
+      marketId: market.id,
+      outcome: market.resolution,
+      creatorId: market.creatorId,
+      initialLiquidity: market.initialLiquidity,
+      isReResolution: false,
+      previousResolutionTime: null,
+    })
+
+    return true
+  })
+}
+
+export async function finalizeImmutableResolutions() {
+  const now = new Date()
+
+  const candidates = await prisma.market.findMany({
+    where: {
+      status: { in: ['RESOLVED', 'INVALID'] },
+      settledAt: null,
+      resolution: { not: null },
+      resolutionTime: { not: null },
+    },
+    select: {
+      id: true,
+      resolutionTime: true,
+      disputeWindowHours: true,
+    },
+    orderBy: { resolutionTime: 'asc' },
+    take: 100,
+  })
+
+  let finalizedCount = 0
+
+  for (const candidate of candidates) {
+    if (!candidate.resolutionTime) continue
+    if (!isDisputeWindowClosed(candidate.resolutionTime, candidate.disputeWindowHours, now)) continue
+
+    const finalized = await finalizeMarketResolutionIfImmutable(candidate.id, now)
+    if (finalized) finalizedCount++
+  }
+
+  return { count: finalizedCount }
+}
+
+export async function finalizeImmutableResolutionIfReady(marketId: string) {
+  const now = new Date()
+  const finalized = await finalizeMarketResolutionIfImmutable(marketId, now)
+  return { count: finalized ? 1 : 0 }
 }

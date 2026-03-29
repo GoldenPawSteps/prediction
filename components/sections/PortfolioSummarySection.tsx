@@ -57,9 +57,18 @@ interface PortfolioStats {
     createdAt: string
     market: { id: string; title: string }
   }>
+  createdMarkets: Array<{
+    id: string
+    title: string
+    status: string
+    initialLiquidity: number
+    endDate: string
+    marketType: string
+  }>
   stats: {
     availableBalance: number
     reservedBalance: number
+    liquidityLocked: number
     totalPositions: number
     totalValue: number
     totalUnrealizedPnl: number
@@ -71,6 +80,7 @@ export function PortfolioSummarySection({ isPrefetched = false }: { isPrefetched
   const t = useT('portfolio')
   const tTradePanel = useT('tradePanel')
   const tAdmin = useT('admin')
+  const tStatus = useT('status')
 
   const translateOutcome = (outcome: string) => {
     switch (outcome) {
@@ -94,6 +104,7 @@ export function PortfolioSummarySection({ isPrefetched = false }: { isPrefetched
 
   const stats = data?.stats
   const reservedOrders = data?.reservedOrders || []
+  const createdMarkets = data?.createdMarkets || []
 
   if (!stats) {
     return (
@@ -108,7 +119,7 @@ export function PortfolioSummarySection({ isPrefetched = false }: { isPrefetched
   return (
     <SectionErrorBoundary sectionName="portfolio-summary">
       <div className="space-y-4">
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-2 sm:gap-4">
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 sm:p-4">
           <p className="text-sm text-gray-600 dark:text-gray-400">{t('availableBalance')}</p>
           <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
@@ -120,6 +131,13 @@ export function PortfolioSummarySection({ isPrefetched = false }: { isPrefetched
           <p className="text-sm text-gray-600 dark:text-gray-400">{t('reservedBalance')}</p>
           <p className="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1">
             {formatCurrency(stats.reservedBalance)}
+          </p>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 sm:p-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400">{t('liquidityLocked')}</p>
+          <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1">
+            {formatCurrency(stats.liquidityLocked)}
           </p>
         </div>
 
@@ -161,6 +179,54 @@ export function PortfolioSummarySection({ isPrefetched = false }: { isPrefetched
           <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{stats.totalPositions}</p>
         </div>
         </div>
+
+        {createdMarkets.length > 0 && (
+          <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-800">
+            <div className="flex items-center justify-between px-3 sm:px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/60">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t('liquidityLocked')}</h3>
+              <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                {formatCurrency(stats.liquidityLocked)}
+              </span>
+            </div>
+            <div className="divide-y divide-gray-200 dark:divide-gray-700">
+              {createdMarkets.map((market) => (
+                <div key={market.id} className="px-3 sm:px-4 py-3 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <Link
+                      href={`/markets/${market.id}`}
+                      onClick={() => beginNavFeedback(`/markets/${market.id}`)}
+                      className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline break-words"
+                    >
+                      {market.title}
+                    </Link>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <Badge
+                        variant={
+                          market.status === 'OPEN' ? 'success'
+                          : market.status === 'DISPUTED' ? 'warning'
+                          : 'default'
+                        }
+                      >
+                        {tStatus(market.status.toLowerCase() as Parameters<typeof tStatus>[0])}
+                      </Badge>
+                      {market.marketType === 'MULTI' && (
+                        <Badge variant="info">MULTI</Badge>
+                      )}
+                    </div>
+                    <p className="mt-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                      {t('date')}: {new Date(market.endDate).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                      {formatCurrency(market.initialLiquidity)}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {reservedOrders.length > 0 && (
           <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-800">
