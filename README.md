@@ -190,7 +190,9 @@ Comprehensive simulations:
 - `npm run test:simulation:<section>` - Run one section (auth, markets, amm, exchange, comments, data, portfolio, leaderboard, resolution, dispute, edge)
 - `npm run test:market-creation` - Full market creation simulation (27 checks)
 - `npm run test:market-creation:<section>` - Run one creation section (`binary`, `multi`, `validation`, `balance`, `listing`)
-- `npm run test:all-simulations` - Run the business-flow, creation, conservation, and lifecycle suites in one command
+- `npm run test:market-trading` - Full market trading simulation (18 checks)
+- `npm run test:market-trading:<section>` - Run one trading section (`amm`, `exchange`)
+- `npm run test:all-simulations` - Run the business-flow, creation, trading, conservation, and lifecycle suites in one command
 - `npm run test:lifecycle` - Market lifecycle simulation (19 checks across state transitions)
 - `npm run test:lifecycle:<mode>` - Run one lifecycle slice (`core`, `invalid`, `dispute`)
 - `npm run test:conservation` - Full money conservation suite (41 tests across 12 scenarios)
@@ -206,6 +208,8 @@ Additional repository test utilities:
 - `docs/MANUAL_QA_SMOKE_CHECKLIST.md` - 12-step pre-deploy smoke test for test-simulation.js
 - `docs/MARKET_CREATION_QA_CHECKLIST.md` - step-by-step human QA checklist for market creation simulation
 - `docs/MARKET_CREATION_SMOKE_CHECKLIST.md` - short pre-deploy smoke test for market creation simulation
+- `docs/MARKET_TRADING_QA_CHECKLIST.md` - step-by-step human QA checklist for market trading simulation
+- `docs/MARKET_TRADING_SMOKE_CHECKLIST.md` - short pre-deploy smoke test for market trading simulation
 - `docs/MONEY_CONSERVATION_QA_CHECKLIST.md` - step-by-step human QA checklist for money invariants
 - `docs/MONEY_CONSERVATION_SMOKE_CHECKLIST.md` - 6-check pre-deploy smoke test for conservation
 - `docs/MARKET_LIFECYCLE_QA_CHECKLIST.md` - step-by-step human QA checklist for lifecycle transitions

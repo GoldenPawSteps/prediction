@@ -9,6 +9,10 @@ The repository also includes a dedicated market-creation simulation in `test-mar
 For manual creation-only verification, use `docs/MARKET_CREATION_QA_CHECKLIST.md`.
 For a short creation pre-deploy pass, use `docs/MARKET_CREATION_SMOKE_CHECKLIST.md`.
 
+The repository also includes a dedicated market-trading simulation in `test-market-trading.js`.
+For manual trading-only verification, use `docs/MARKET_TRADING_QA_CHECKLIST.md`.
+For a short trading pre-deploy pass, use `docs/MARKET_TRADING_SMOKE_CHECKLIST.md`.
+
 ## What it covers
 
 - Authentication lifecycle: register, login, session isolation, logout
@@ -31,7 +35,7 @@ npm run test:simulation
 
 ## Run all simulations
 
-Use this when you want a full regression pass across business flow, market creation, money conservation, and lifecycle state transitions:
+Use this when you want a full regression pass across business flow, market creation, market trading, money conservation, and lifecycle state transitions:
 
 ```bash
 npm run test:all-simulations
@@ -41,6 +45,7 @@ What this covers:
 
 - `test-simulation.js`: broad product and API behavior
 - `test-market-creation.js`: market creation correctness and validation boundaries
+- `test-market-trading.js`: AMM and exchange trading behavior and rejection paths
 - `test-money-conservation.js`: balance integrity and payout accounting
 - `test-market-lifecycle.js`: state transitions from OPEN through final settlement
 
@@ -105,6 +110,14 @@ npm run test:market-creation:balance
 npm run test:market-creation:listing
 ```
 
+### Market Trading Simulation Shortcuts
+
+```bash
+npm run test:market-trading
+npm run test:market-trading:amm
+npm run test:market-trading:exchange
+```
+
 ---
 
 ## Related Testing Docs
@@ -131,6 +144,26 @@ A dedicated simulation focused on **market creation correctness** — verifying 
 - **Run validation-only checks:** `npm run test:market-creation:validation`
 - **Run balance-only checks:** `npm run test:market-creation:balance`
 - **Run listing-only checks:** `npm run test:market-creation:listing`
+
+### Market Trading Simulation
+
+A dedicated simulation focused on **trading correctness** — verifying AMM BUY/SELL behavior, probability invariants, order-book matching and cancellation, time-in-force rules (GTC/GTD/FOK/FAK), and auth/invalid-input rejection paths.
+
+- **Full checklist:** `docs/MARKET_TRADING_QA_CHECKLIST.md` — manual verification of trading scenarios
+- **Smoke checklist:** `docs/MARKET_TRADING_SMOKE_CHECKLIST.md` — short pre-deploy trading pass
+- **Run automated suite:** `npm run test:market-trading` (18 checks)
+- **Run AMM-only checks:** `npm run test:market-trading:amm`
+- **Run exchange-only checks:** `npm run test:market-trading:exchange`
+
+### Trading Tests In Plain English
+
+#### AMM Trading
+
+This section verifies BUY/SELL behavior for YES/NO outcomes, confirms expected probability movement, and ensures invalid or unauthenticated trade attempts are rejected.
+
+#### Exchange Trading
+
+This section verifies order placement and matching flows, cancellation behavior, and time-in-force rules for GTC, GTD, FOK, and FAK.
 
 ### Creation Tests In Plain English
 
@@ -301,5 +334,6 @@ Quick pre-deploy verification without full manual testing:
 
 - **Simulation smoke:** `docs/MANUAL_QA_SMOKE_CHECKLIST.md` — 12-step smoke test for test-simulation.js
 - **Creation smoke:** `docs/MARKET_CREATION_SMOKE_CHECKLIST.md` — short smoke test for market creation paths
+- **Trading smoke:** `docs/MARKET_TRADING_SMOKE_CHECKLIST.md` — short smoke test for market trading paths
 - **Conservation smoke:** `docs/MONEY_CONSERVATION_SMOKE_CHECKLIST.md` — 6-check smoke test for money invariants
 - **Lifecycle smoke:** `docs/MARKET_LIFECYCLE_SMOKE_CHECKLIST.md` — short smoke test for lifecycle transitions
