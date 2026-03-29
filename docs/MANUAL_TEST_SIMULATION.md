@@ -74,3 +74,24 @@ BASE_URL=http://localhost:3001 npm run test:simulation
 - The simulation creates unique users and markets each run.
 - Keep the app running before execution (`npm run dev`).
 - The edge-case section uses a fresh funded user so it remains independent of prior spend in earlier sections.
+
+---
+
+## Related Testing Docs
+
+### Money Conservation Simulation
+
+A complementary simulation focused specifically on **money conservation invariants** — verifying that every code path that touches balances does so precisely, with no money created or destroyed.
+
+- **Full checklist:** `docs/MONEY_CONSERVATION_QA_CHECKLIST.md` — step-by-step manual tests for all 12 scenarios
+- **Smoke checklist:** `docs/MONEY_CONSERVATION_SMOKE_CHECKLIST.md` — 5–10 min pre-deploy verification
+- **Run automated suite:** `npm run test:conservation` (41 tests, all scenarios)
+- **Run API-only tests:** `npm run test:conservation:api` (fast, no DB settlement)
+- **Run lifecycle tests:** `npm run test:conservation:lifecycle` (with settlement)
+
+### Simulation Smoke Tests
+
+Quick pre-deploy verification without full manual testing:
+
+- **Simulation smoke:** `docs/MANUAL_QA_SMOKE_CHECKLIST.md` — 12-step smoke test for test-simulation.js
+- **Conservation smoke:** `docs/MONEY_CONSERVATION_SMOKE_CHECKLIST.md` — 6-check smoke test for money invariants

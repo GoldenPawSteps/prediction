@@ -183,13 +183,24 @@ Exchange and resolution tests:
 - `npm run test:resolution-refund`
 - `npm run test:resolution-reresolution-refund`
 - `npm run test:resolution-deferred-finalization`
-- `npm run test:simulation`
+
+Comprehensive simulations:
+
+- `npm run test:simulation` - Full 11-section business-flow simulation (72 tests)
+- `npm run test:simulation:<section>` - Run one section (auth, markets, amm, exchange, comments, data, portfolio, leaderboard, resolution, dispute, edge)
+- `npm run test:conservation` - Full money conservation suite (41 tests across 12 scenarios)
+- `npm run test:conservation:api` - API-only conservation tests (7 scenarios, fast)
+- `npm run test:conservation:lifecycle` - Full-lifecycle conservation tests (5 scenarios, with DB)
 
 Additional repository test utilities:
 
 - `node test-auth-fix.js`
 - `node test-money-flow-integrity.js`
 - `docs/MANUAL_TEST_SIMULATION.md` - comprehensive manual test simulation scenarios and commands
+- `docs/MANUAL_QA_CHECKLIST.md` - step-by-step human QA checklist for test-simulation.js
+- `docs/MANUAL_QA_SMOKE_CHECKLIST.md` - 12-step pre-deploy smoke test for test-simulation.js
+- `docs/MONEY_CONSERVATION_QA_CHECKLIST.md` - step-by-step human QA checklist for money invariants
+- `docs/MONEY_CONSERVATION_SMOKE_CHECKLIST.md` - 6-check pre-deploy smoke test for conservation
 
 ## Troubleshooting
 
