@@ -99,6 +99,8 @@ export interface Messages {
     loginPrompt: string
     loginLink: string
     balance: string
+    availableBalance: string
+    reservedBalance: string
     portfolioValue: string
     unrealizedPnl: string
     totalPnl: string

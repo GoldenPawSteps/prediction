@@ -101,6 +101,8 @@ export const de: Messages = {
     loginPrompt: 'Bitte melden Sie sich an, um Ihr Portfolio zu sehen.',
     loginLink: 'Anmelden →',
     balance: 'Guthaben',
+    availableBalance: 'Verfügbares Guthaben',
+    reservedBalance: 'Reservierte Mittel',
     portfolioValue: 'Portfoliowert',
     unrealizedPnl: 'Nicht realisierter G/V',
     totalPnl: 'Gesamt-G/V',

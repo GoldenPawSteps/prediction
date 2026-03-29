@@ -101,6 +101,8 @@ export const es: Messages = {
     loginPrompt: 'Inicia sesión para ver tu cartera.',
     loginLink: 'Iniciar sesión →',
     balance: 'Saldo',
+    availableBalance: 'Saldo disponible',
+    reservedBalance: 'Saldo reservado',
     portfolioValue: 'Valor total',
     unrealizedPnl: 'G/P No realizada',
     totalPnl: 'G/P Total',

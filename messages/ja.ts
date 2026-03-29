@@ -101,6 +101,8 @@ export const ja: Messages = {
     loginPrompt: 'ポートフォリオを見るにはログインしてください。',
     loginLink: 'ログイン →',
     balance: '残高',
+    availableBalance: '利用可能残高',
+    reservedBalance: '予約済み資金',
     portfolioValue: 'ポートフォリオ価値',
     unrealizedPnl: '未実現損益',
     totalPnl: '総損益',

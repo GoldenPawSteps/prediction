@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, apiError, apiSuccess } from '@/lib/api-helpers'
 import { getMarketProbabilities } from '@/lib/lmsr'
+import { activeOrderWhere } from '@/lib/order-expiration'
 
 export async function GET(req: NextRequest) {
   const userOrResponse = await requireAuth(req)
@@ -13,25 +14,101 @@ export async function GET(req: NextRequest) {
   try {
     const MATCH_EPSILON = 0.000001
     const MATCH_WINDOW_MS = 60000
+    const now = new Date()
 
-    const positions = await prisma.position.findMany({
-      where: { userId: authUser.userId, shares: { gt: 0 } },
-      include: {
-        market: {
-          select: {
-            id: true,
-            title: true,
-            status: true,
-            resolution: true,
-            yesShares: true,
-            noShares: true,
-            liquidityParam: true,
-            endDate: true,
-            category: true,
+    const [user, reservedBidOrders, reservedOrders, positions, trades, fills] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: authUser.userId },
+        select: { balance: true },
+      }),
+      prisma.marketOrder.aggregate({
+        where: {
+          userId: authUser.userId,
+          side: 'BID',
+          status: { in: ['OPEN', 'PARTIAL'] },
+          remainingShares: { gt: 0 },
+          reservedAmount: { gt: 0 },
+          ...activeOrderWhere(now),
+        },
+        _sum: { reservedAmount: true },
+      }),
+      prisma.marketOrder.findMany({
+        where: {
+          userId: authUser.userId,
+          side: 'BID',
+          status: { in: ['OPEN', 'PARTIAL'] },
+          remainingShares: { gt: 0 },
+          reservedAmount: { gt: 0 },
+          ...activeOrderWhere(now),
+        },
+        select: {
+          id: true,
+          marketId: true,
+          outcome: true,
+          orderType: true,
+          price: true,
+          initialShares: true,
+          remainingShares: true,
+          reservedAmount: true,
+          expiresAt: true,
+          createdAt: true,
+          market: {
+            select: {
+              id: true,
+              title: true,
+            },
           },
         },
-      },
-    })
+        orderBy: { createdAt: 'desc' },
+        take: 25,
+      }),
+      prisma.position.findMany({
+        where: { userId: authUser.userId, shares: { gt: 0 } },
+        include: {
+          market: {
+            select: {
+              id: true,
+              title: true,
+              status: true,
+              resolution: true,
+              yesShares: true,
+              noShares: true,
+              liquidityParam: true,
+              endDate: true,
+              category: true,
+            },
+          },
+        },
+      }),
+      prisma.trade.findMany({
+        where: { userId: authUser.userId },
+        include: { market: { select: { id: true, title: true, category: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      }),
+      prisma.marketOrderFill.findMany({
+        where: {
+          OR: [
+            { makerUserId: authUser.userId },
+            { takerUserId: authUser.userId },
+          ],
+        },
+        select: {
+          id: true,
+          marketId: true,
+          outcome: true,
+          price: true,
+          shares: true,
+          createdAt: true,
+          makerUserId: true,
+          takerUserId: true,
+          makerOrder: { select: { side: true } },
+          takerOrder: { select: { side: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 200,
+      }),
+    ])
 
     const positionsWithValue = positions.map((p) => {
       let currentPrice: number
@@ -53,36 +130,6 @@ export async function GET(req: NextRequest) {
         currentValue,
         unrealizedPnl,
       }
-    })
-
-    const trades = await prisma.trade.findMany({
-      where: { userId: authUser.userId },
-      include: { market: { select: { id: true, title: true, category: true } } },
-      orderBy: { createdAt: 'desc' },
-      take: 50,
-    })
-
-    const fills = await prisma.marketOrderFill.findMany({
-      where: {
-        OR: [
-          { makerUserId: authUser.userId },
-          { takerUserId: authUser.userId },
-        ],
-      },
-      select: {
-        id: true,
-        marketId: true,
-        outcome: true,
-        price: true,
-        shares: true,
-        createdAt: true,
-        makerUserId: true,
-        takerUserId: true,
-        makerOrder: { select: { side: true } },
-        takerOrder: { select: { side: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 200,
     })
 
     const unmatchedFills = [...fills]
@@ -124,13 +171,26 @@ export async function GET(req: NextRequest) {
     })
 
     const stats = {
+      availableBalance: user?.balance ?? 0,
+      reservedBalance: reservedBidOrders._sum.reservedAmount ?? 0,
       totalPositions: positionsWithValue.length,
       totalValue: positionsWithValue.reduce((sum, p) => sum + p.currentValue, 0),
       totalUnrealizedPnl: positionsWithValue.reduce((sum, p) => sum + p.unrealizedPnl, 0),
       totalRealizedPnl: positions.reduce((sum, p) => sum + p.realizedPnl, 0),
     }
 
-    return apiSuccess({ positions: positionsWithValue, trades: tradesWithExchangeInfo, stats })
+    return apiSuccess({
+      positions: positionsWithValue,
+      trades: tradesWithExchangeInfo,
+      reservedOrders: reservedOrders.map((order) => ({
+        ...order,
+        createdAt: order.createdAt.toISOString(),
+        expiresAt: order.expiresAt?.toISOString() ?? null,
+        outcome: order.outcome as string,
+        orderType: order.orderType as string,
+      })),
+      stats,
+    })
   } catch (err) {
     console.error('Portfolio error:', err)
     return apiError('Internal server error', 500)

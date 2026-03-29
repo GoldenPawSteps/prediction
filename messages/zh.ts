@@ -101,6 +101,8 @@ export const zh: Messages = {
     loginPrompt: '请登录以查看您的投资组合。',
     loginLink: '登录 →',
     balance: '余额',
+    availableBalance: '可用余额',
+    reservedBalance: '预留资金',
     portfolioValue: '投资组合价值',
     unrealizedPnl: '未实现盈亏',
     totalPnl: '总盈亏',

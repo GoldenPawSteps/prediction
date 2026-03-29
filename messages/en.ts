@@ -101,6 +101,8 @@ export const en: Messages = {
     loginPrompt: 'Please log in to view your portfolio.',
     loginLink: 'Log in →',
     balance: 'Balance',
+    availableBalance: 'Available Balance',
+    reservedBalance: 'Reserved Balance',
     portfolioValue: 'Portfolio Value',
     unrealizedPnl: 'Unrealized P&L',
     totalPnl: 'Total P&L',

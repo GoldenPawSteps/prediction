@@ -101,6 +101,8 @@ export const pt: Messages = {
     loginPrompt: 'Por favor, entre para visualizar seu portfólio.',
     loginLink: 'Entrar →',
     balance: 'Saldo',
+    availableBalance: 'Saldo disponível',
+    reservedBalance: 'Saldo reservado',
     portfolioValue: 'Valor do portfólio',
     unrealizedPnl: 'L/P não realizado',
     totalPnl: 'L/P total',

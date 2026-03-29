@@ -101,6 +101,8 @@ export const fr: Messages = {
     loginPrompt: 'Veuillez vous connecter pour voir votre portefeuille.',
     loginLink: 'Se connecter →',
     balance: 'Solde',
+    availableBalance: 'Solde disponible',
+    reservedBalance: 'Fonds réservés',
     portfolioValue: 'Valeur du portefeuille',
     unrealizedPnl: 'G/P non réalisé',
     totalPnl: 'G/P total',
