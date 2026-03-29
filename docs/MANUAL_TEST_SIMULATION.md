@@ -2,6 +2,9 @@
 
 The repository includes a comprehensive API and business-flow simulation in `test-simulation.js`.
 
+If you want a human-executed version of the same flow, use `docs/MANUAL_QA_CHECKLIST.md`.
+For a short pre-deploy pass, use `docs/MANUAL_QA_SMOKE_CHECKLIST.md`.
+
 ## What it covers
 
 - Authentication lifecycle: register, login, session isolation, logout
