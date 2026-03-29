@@ -16,10 +16,12 @@ Predictify combines AMM-style pricing (LMSR) with exchange-style order flows, pl
 
 - [Why Predictify](#why-predictify)
 - [Get Running in 2 Minutes](#get-running-in-2-minutes)
+- [Demo Accounts](#demo-accounts)
 - [Features](#features)
 - [Tech Stack](#tech-stack)
 - [Product Screens](#product-screens)
 - [Scripts](#scripts)
+- [Troubleshooting](#troubleshooting)
 - [API Surface](#api-surface)
 - [Project Structure](#project-structure)
 - [Data Model](#data-model)
@@ -35,6 +37,8 @@ Predictify combines AMM-style pricing (LMSR) with exchange-style order flows, pl
 - Internationalization-ready message catalog in `messages/`
 
 ## Get Running in 2 Minutes
+
+Prerequisites: Node.js 20+ and PostgreSQL 15+.
 
 ### 1) Install dependencies
 
@@ -62,6 +66,12 @@ NODE_ENV="development"
 ```bash
 npm run db:generate
 npm run db:migrate
+```
+
+For a fresh local database with seeded demo data, use:
+
+```bash
+npm run db:reset
 ```
 
 ### 4) (Optional) Seed demo data
@@ -157,26 +167,34 @@ Core scripts:
 - `npm run start` - Start production build
 - `npm run lint` - Run ESLint
 - `npm run seed` - Seed database
+- `npm run db:reset` - Reset database and reseed demo data
 - `npm run db:generate` - Generate Prisma client
 - `npm run db:migrate` - Apply Prisma migrations
 - `npm run db:studio` - Open Prisma Studio
 
 Exchange and resolution tests:
 
-- `npm run test:deploy:smoke`
 - `npm run test:exchange`
 - `npm run test:exchange:bid-maker`
 - `npm run test:exchange:ask-maker`
 - `npm run test:exchange:gtd`
 - `npm run test:exchange:fok`
 - `npm run test:exchange:fak`
-- `npm run test:homepage:ssr`
 - `npm run test:resolution-refund`
 - `npm run test:resolution-reresolution-refund`
+- `npm run test:resolution-deferred-finalization`
+- `npm run test:simulation`
 
-`npm run test:deploy:smoke` is self-contained by default: it builds the app, starts a temporary production server on `http://127.0.0.1:3100`, runs the smoke checks, and stops the server.
+Additional repository test utilities:
 
-To point the smoke suite at an already-running server instead, set `SMOKE_USE_EXISTING_SERVER=1` and optionally override `BASE_URL`.
+- `node test-auth-fix.js`
+- `node test-money-flow-integrity.js`
+
+## Troubleshooting
+
+- If `npm run build` fails during auth initialization, ensure `JWT_SECRET` is set.
+- After Prisma schema changes, run `npm run db:generate` and restart the dev server.
+- If section fetches are interrupted on slow networks, occasional aborted requests can be expected during navigation.
 
 ## API Surface
 
