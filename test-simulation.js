@@ -96,13 +96,20 @@ async function step(label, fn) {
 
 async function waitForServer() {
   process.stdout.write('⏳ Waiting for server');
-  for (let i = 0; i < 60; i++) {
-    try { const r = await fetch(`${BASE_URL}/`); if (r.ok) { console.log(' ready.'); return; } }
-    catch { /* retry */ }
+  for (let i = 0; i < 120; i++) {
+    try {
+      const r = await fetch(`${BASE_URL}/api/markets`);
+      if (r.status < 500) {
+        console.log(' ready.');
+        return;
+      }
+    } catch {
+      /* retry */
+    }
     process.stdout.write('.');
     await new Promise(r => setTimeout(r, 500));
   }
-  throw new Error('Server did not start within 30 s');
+  throw new Error('Server did not start within 60 s');
 }
 
 // ─── Helpers that create reusable fixtures ──────────────────────────────────
