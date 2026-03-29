@@ -20,6 +20,7 @@
     "test:resolution-reresolution-refund": "node test-reresolution-refund.js",
     "test:simulation": "node test-simulation.js",
     "seed": "tsx prisma/seed.ts",
+    "db:reset": "prisma migrate reset --force && npm run seed",
     "db:migrate": "prisma migrate deploy",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio"
