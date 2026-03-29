@@ -13,6 +13,10 @@ The repository also includes a dedicated market-trading simulation in `test-mark
 For manual trading-only verification, use `docs/MARKET_TRADING_QA_CHECKLIST.md`.
 For a short trading pre-deploy pass, use `docs/MARKET_TRADING_SMOKE_CHECKLIST.md`.
 
+The repository also includes a dedicated market-settlement simulation in `test-market-settlement.js`.
+For manual settlement-only verification, use `docs/MARKET_SETTLEMENT_QA_CHECKLIST.md`.
+For a short settlement pre-deploy pass, use `docs/MARKET_SETTLEMENT_SMOKE_CHECKLIST.md`.
+
 ## What it covers
 
 - Authentication lifecycle: register, login, session isolation, logout
@@ -35,7 +39,7 @@ npm run test:simulation
 
 ## Run all simulations
 
-Use this when you want a full regression pass across business flow, market creation, market trading, money conservation, and lifecycle state transitions:
+Use this when you want a full regression pass across business flow, market creation, market trading, market settlement, money conservation, and lifecycle state transitions:
 
 ```bash
 npm run test:all-simulations
@@ -46,6 +50,7 @@ What this covers:
 - `test-simulation.js`: broad product and API behavior
 - `test-market-creation.js`: market creation correctness and validation boundaries
 - `test-market-trading.js`: AMM and exchange trading behavior and rejection paths
+- `test-market-settlement.js`: deferred, invalid, and dispute-driven settlement behavior
 - `test-money-conservation.js`: balance integrity and payout accounting
 - `test-market-lifecycle.js`: state transitions from OPEN through final settlement
 
@@ -118,6 +123,15 @@ npm run test:market-trading:amm
 npm run test:market-trading:exchange
 ```
 
+### Market Settlement Simulation Shortcuts
+
+```bash
+npm run test:settlement
+npm run test:settlement:core
+npm run test:settlement:invalid
+npm run test:settlement:dispute
+```
+
 ---
 
 ## Related Testing Docs
@@ -164,6 +178,35 @@ This section verifies BUY/SELL behavior for YES/NO outcomes, confirms expected p
 #### Exchange Trading
 
 This section verifies order placement and matching flows, cancellation behavior, and time-in-force rules for GTC, GTD, FOK, and FAK.
+
+### Market Settlement Simulation
+
+A dedicated simulation focused on **settlement correctness** — verifying deferred settlement after provisional resolution, immutable finalization, zero-trade creator refunds, INVALID cost-basis refunds, and dispute-driven re-resolution that settles only the latest outcome.
+
+- **Full checklist:** `docs/MARKET_SETTLEMENT_QA_CHECKLIST.md` — manual verification of settlement scenarios
+- **Smoke checklist:** `docs/MARKET_SETTLEMENT_SMOKE_CHECKLIST.md` — short pre-deploy settlement pass
+- **Run automated suite:** `npm run test:settlement` (13 checks)
+- **Run core settlement checks:** `npm run test:settlement:core`
+- **Run INVALID-only checks:** `npm run test:settlement:invalid`
+- **Run dispute-only checks:** `npm run test:settlement:dispute`
+
+### Settlement Tests In Plain English
+
+#### Deferred Finalization
+
+This section verifies that provisional resolution does not pay out immediately, and that settlement happens only after immutable finalization.
+
+#### Zero-Trade Refund
+
+This section verifies that when nobody traded on a market, the creator gets the locked liquidity back after finalization.
+
+#### INVALID Refunds
+
+This section verifies that INVALID finalization closes positions and returns traders to their pre-trade cost basis.
+
+#### Dispute Re-Resolution
+
+This section verifies that dispute-driven re-resolution settles only the latest final outcome and does not accidentally pay both sides.
 
 ### Creation Tests In Plain English
 
@@ -335,5 +378,6 @@ Quick pre-deploy verification without full manual testing:
 - **Simulation smoke:** `docs/MANUAL_QA_SMOKE_CHECKLIST.md` — 12-step smoke test for test-simulation.js
 - **Creation smoke:** `docs/MARKET_CREATION_SMOKE_CHECKLIST.md` — short smoke test for market creation paths
 - **Trading smoke:** `docs/MARKET_TRADING_SMOKE_CHECKLIST.md` — short smoke test for market trading paths
+- **Settlement smoke:** `docs/MARKET_SETTLEMENT_SMOKE_CHECKLIST.md` — short smoke test for market settlement paths
 - **Conservation smoke:** `docs/MONEY_CONSERVATION_SMOKE_CHECKLIST.md` — 6-check smoke test for money invariants
 - **Lifecycle smoke:** `docs/MARKET_LIFECYCLE_SMOKE_CHECKLIST.md` — short smoke test for lifecycle transitions
