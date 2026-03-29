@@ -1,6 +1,11 @@
 import type { Prisma } from '@prisma/client'
 import { roundMoney, roundPrice } from '@/lib/money'
 
+function toNumber(value: unknown, fallback: number = 0): number {
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) ? numericValue : fallback
+}
+
 type ResolutionOutcome = 'YES' | 'NO' | 'INVALID'
 
 type SettlementParams = {
@@ -49,13 +54,15 @@ export async function settleMarketResolution(
       where: { marketId: params.marketId, outcome: winningOutcome, shares: { gt: 0 } },
     })
     for (const position of winningPositions) {
-      totalPayout = roundMoney(totalPayout + position.shares)
+      const shares = toNumber(position.shares)
+      const avgEntryPrice = toNumber(position.avgEntryPrice)
+      totalPayout = roundMoney(totalPayout + shares)
       await tx.user.update({
         where: { id: position.userId },
-        data: { balance: { increment: roundMoney(position.shares) } },
+        data: { balance: { increment: roundMoney(shares) } },
       })
 
-      const pnl = roundMoney(position.shares - position.avgEntryPrice * position.shares)
+      const pnl = roundMoney(shares - avgEntryPrice * shares)
       await tx.position.update({
         where: { id: position.id },
         data: { realizedPnl: { increment: pnl } },
@@ -67,9 +74,9 @@ export async function settleMarketResolution(
           marketId: params.marketId,
           outcome: position.outcome,
           type: 'SELL',
-          shares: position.shares,
+          shares,
           price: roundPrice(1.0),
-          totalCost: roundMoney(position.shares),
+          totalCost: roundMoney(shares),
         },
       })
     }
@@ -78,7 +85,9 @@ export async function settleMarketResolution(
       where: { marketId: params.marketId, outcome: losingOutcome, shares: { gt: 0 } },
     })
     for (const position of losingPositions) {
-      const pnl = roundMoney(-(position.avgEntryPrice * position.shares))
+      const shares = toNumber(position.shares)
+      const avgEntryPrice = toNumber(position.avgEntryPrice)
+      const pnl = roundMoney(-(avgEntryPrice * shares))
       await tx.position.update({
         where: { id: position.id },
         data: { realizedPnl: { increment: pnl } },
@@ -90,7 +99,7 @@ export async function settleMarketResolution(
           marketId: params.marketId,
           outcome: position.outcome,
           type: 'SELL',
-          shares: position.shares,
+          shares,
           price: roundPrice(0.0),
           totalCost: roundMoney(0.0),
         },
@@ -101,7 +110,9 @@ export async function settleMarketResolution(
       where: { marketId: params.marketId, shares: { gt: 0 } },
     })
     for (const position of positions) {
-      const refund = roundMoney(position.avgEntryPrice * position.shares)
+      const shares = toNumber(position.shares)
+      const avgEntryPrice = toNumber(position.avgEntryPrice)
+      const refund = roundMoney(avgEntryPrice * shares)
       totalPayout = roundMoney(totalPayout + refund)
       await tx.user.update({
         where: { id: position.userId },
@@ -114,8 +125,8 @@ export async function settleMarketResolution(
           marketId: params.marketId,
           outcome: position.outcome,
           type: 'SELL',
-          shares: position.shares,
-          price: roundPrice(position.avgEntryPrice),
+          shares,
+          price: roundPrice(avgEntryPrice),
           totalCost: refund,
         },
       })
@@ -129,7 +140,7 @@ export async function settleMarketResolution(
 
   const refundedToCreator = roundMoney(Math.max(
     0,
-    params.initialLiquidity + netTradeCostBeforeSettlement - totalPayout
+    params.initialLiquidity + toNumber(netTradeCostBeforeSettlement) - totalPayout
   ))
 
   if (refundedToCreator > 0) {
@@ -143,7 +154,7 @@ export async function settleMarketResolution(
     reversedSettlementTrades: reversal.reversedSettlementTrades,
     reversedCreatorRefund: reversal.reversedCreatorRefund,
     totalPayout,
-    netTradeCost: netTradeCostBeforeSettlement,
+    netTradeCost: toNumber(netTradeCostBeforeSettlement),
     refundedToCreator,
   }
 }
@@ -171,13 +182,13 @@ async function reversePreviousSettlementIfNeeded(
   })
 
   const previousTotalPayout = roundMoney(
-    settlementTrades.reduce((sum, trade) => sum + trade.totalCost, 0)
+    settlementTrades.reduce((sum, trade) => sum + toNumber(trade.totalCost), 0)
   )
   const tradeAggregateWithSettlement = await tx.trade.aggregate({
     where: { marketId: params.marketId },
     _sum: { totalCost: true },
   })
-  const netTradeCostWithSettlement = tradeAggregateWithSettlement._sum.totalCost ?? 0
+  const netTradeCostWithSettlement = toNumber(tradeAggregateWithSettlement._sum.totalCost)
   const previousNetTradeCostBeforeSettlement = roundMoney(
     netTradeCostWithSettlement - previousTotalPayout
   )
@@ -194,7 +205,7 @@ async function reversePreviousSettlementIfNeeded(
   }
 
   for (const trade of settlementTrades) {
-    if (trade.totalCost > 0) {
+    if (toNumber(trade.totalCost) > 0) {
       await tx.user.update({
         where: { id: trade.userId },
         data: { balance: { decrement: roundMoney(trade.totalCost) } },
@@ -213,7 +224,9 @@ async function reversePreviousSettlementIfNeeded(
     })
 
     if (position) {
-      const settlementPnl = roundMoney((trade.price - position.avgEntryPrice) * trade.shares)
+      const settlementPnl = roundMoney(
+        (toNumber(trade.price) - toNumber(position.avgEntryPrice)) * toNumber(trade.shares)
+      )
       await tx.position.update({
         where: { id: position.id },
         data: {

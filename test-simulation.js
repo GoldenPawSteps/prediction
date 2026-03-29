@@ -808,6 +808,8 @@ async function disputeSection(users) {
 // -- 11  Edge Cases ---------------------------------------------------------
 async function edgeCaseSection(users) {
   const { alice } = users;
+  // Use a fresh funded account so this section is independent of prior spend.
+  const edgeUser = await registerUser('edge');
 
   await step('Invalid JSON body returns error', async () => {
     const res = await fetch(`${BASE_URL}/api/auth/login`, {
@@ -825,7 +827,7 @@ async function edgeCaseSection(users) {
       category: 'Test',
       endDate: new Date(Date.now() + 86400_000).toISOString(),
       resolutionSource: 'https://example.com',
-    }, alice.jar);
+    }, edgeUser.jar);
     assert(!r.ok, 'short title should be rejected');
   });
 
@@ -836,38 +838,38 @@ async function edgeCaseSection(users) {
       category: 'Test',
       endDate: new Date(Date.now() + 86400_000).toISOString(),
       resolutionSource: 'https://example.com',
-    }, alice.jar);
+    }, edgeUser.jar);
     assert(!r.ok, 'short description should be rejected');
   });
 
   // Create one market for the remaining edge-case tests to avoid balance exhaustion
-  const edgeMkt = await createBinaryMarket(alice.jar, 'Edge Cases');
+  const edgeMkt = await createBinaryMarket(edgeUser.jar, 'Edge Cases');
 
   await step('Order with price >= 1 rejected', async () => {
     const r = await request('POST', `/api/markets/${edgeMkt.id}/order`, {
       outcome: 'YES', side: 'BID', price: 1.0, shares: 10,
-    }, alice.jar);
+    }, edgeUser.jar);
     assert(!r.ok, 'price=1.0 should be rejected');
   });
 
   await step('Order with price <= 0 rejected', async () => {
     const r = await request('POST', `/api/markets/${edgeMkt.id}/order`, {
       outcome: 'YES', side: 'BID', price: 0, shares: 10,
-    }, alice.jar);
+    }, edgeUser.jar);
     assert(!r.ok, 'price=0 should be rejected');
   });
 
   await step('Negative shares rejected', async () => {
     const r = await request('POST', `/api/markets/${edgeMkt.id}/trade`, {
       outcome: 'YES', type: 'BUY', shares: -5,
-    }, alice.jar);
+    }, edgeUser.jar);
     assert(!r.ok, 'negative shares should be rejected');
   });
 
   await step('Vote on open (non-expired) market rejected', async () => {
     const r = await request('POST', `/api/markets/${edgeMkt.id}/vote`, {
       outcome: 'YES',
-    }, alice.jar);
+    }, edgeUser.jar);
     assert(!r.ok, 'vote on open market should be rejected');
   });
 

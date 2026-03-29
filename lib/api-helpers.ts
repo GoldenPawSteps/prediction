@@ -168,7 +168,7 @@ function normalizeApiData(value: unknown): unknown {
     const numericValue = Number(value.toString())
     return Number.isFinite(numericValue) ? numericValue : 0
   }
-  if (Array.isArray(value)) return value.map(normalizeApiData)
+  if (Array.isArray(value)) return (value as unknown[]).map(normalizeApiData)
   if (typeof value === 'object') {
     const input = value as Record<string, unknown>
     const out: Record<string, unknown> = {}

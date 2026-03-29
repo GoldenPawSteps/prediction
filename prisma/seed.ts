@@ -213,7 +213,12 @@ const SAMPLE_COMMENTS: SeedComment[] = [
 ]
 
 function almostEqual(a: number, b: number, tolerance = 0.000001) {
-  return Math.abs(a - b) <= tolerance
+  return Math.abs(Number(a) - Number(b)) <= tolerance
+}
+
+function toNumber(value: unknown, fallback: number = 0) {
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) ? numericValue : fallback
 }
 
 async function ensureMinimumBalance(userId: string, minimumBalance: number) {
@@ -222,11 +227,11 @@ async function ensureMinimumBalance(userId: string, minimumBalance: number) {
     select: { balance: true },
   })
 
-  if (!user || user.balance >= minimumBalance) return
+  if (!user || toNumber(user.balance) >= minimumBalance) return
 
   await prisma.user.update({
     where: { id: userId },
-    data: { balance: { increment: minimumBalance - user.balance } },
+    data: { balance: { increment: minimumBalance - toNumber(user.balance) } },
   })
 }
 
@@ -258,8 +263,8 @@ async function syncAdminSeedBalance(adminId: string, initialBalance: number) {
     }),
   ])
 
-  const lockedLiquidity = lockedMarkets.reduce((sum, market) => sum + market.initialLiquidity, 0)
-  const reservedAmount = reservedBidOrders._sum.reservedAmount ?? 0
+  const lockedLiquidity = lockedMarkets.reduce((sum, market) => sum + toNumber(market.initialLiquidity), 0)
+  const reservedAmount = toNumber(reservedBidOrders._sum.reservedAmount)
   const expectedBalance = Math.max(0, initialBalance - lockedLiquidity - reservedAmount)
 
   await prisma.user.update({
@@ -342,12 +347,12 @@ async function ensureSampleMarket(adminId: string, marketData: SeedMarket) {
     || existing._count.orderFills > 0
 
   const looksLegacy = !hasActivity
-    && almostEqual(existing.yesShares, 0)
-    && almostEqual(existing.noShares, 0)
-    && almostEqual(existing.totalVolume, 0)
-    && almostEqual(existing.ammVolume, 0)
-    && almostEqual(existing.exchangeVolume, 0)
-    && almostEqual(existing.liquidityParam, existing.initialLiquidity)
+    && almostEqual(toNumber(existing.yesShares), 0)
+    && almostEqual(toNumber(existing.noShares), 0)
+    && almostEqual(toNumber(existing.totalVolume), 0)
+    && almostEqual(toNumber(existing.ammVolume), 0)
+    && almostEqual(toNumber(existing.exchangeVolume), 0)
+    && almostEqual(toNumber(existing.liquidityParam), toNumber(existing.initialLiquidity))
 
   if (looksLegacy) {
     await prisma.market.update({
@@ -388,9 +393,9 @@ async function ensureSampleMarket(adminId: string, marketData: SeedMarket) {
       })
     } else if (
       existing._count.priceHistory === 1
-      && almostEqual(initialPriceHistory.volume, 0)
-      && almostEqual(initialPriceHistory.yesPrice, 0.5)
-      && almostEqual(initialPriceHistory.noPrice, 0.5)
+      && almostEqual(toNumber(initialPriceHistory.volume), 0)
+      && almostEqual(toNumber(initialPriceHistory.yesPrice), 0.5)
+      && almostEqual(toNumber(initialPriceHistory.noPrice), 0.5)
     ) {
       await prisma.priceHistory.update({
         where: { id: initialPriceHistory.id },

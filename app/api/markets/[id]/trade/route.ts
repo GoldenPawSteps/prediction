@@ -15,6 +15,11 @@ const tradeSchema = z.object({
   shares: z.number().positive(),
 })
 
+function toNumber(value: unknown, fallback: number = 0): number {
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) ? numericValue : fallback
+}
+
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const userOrResponse = await requireAuth(req)
   if ('status' in userOrResponse && !('userId' in userOrResponse)) {
@@ -45,9 +50,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       const user = await tx.user.findUnique({ where: { id: authUser.userId } })
       if (!user) throw new Error('User not found')
 
-      const b = market.liquidityParam
-      let newYesShares = market.yesShares
-      let newNoShares = market.noShares
+      const b = toNumber(market.liquidityParam)
+      const currentYesShares = toNumber(market.yesShares)
+      const currentNoShares = toNumber(market.noShares)
+      let newYesShares = currentYesShares
+      let newNoShares = currentNoShares
 
       if (type === 'BUY') {
         if (outcome === 'YES') newYesShares += shares
@@ -60,11 +67,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       if (newYesShares < 0 || newNoShares < 0) throw new Error('Invalid trade: negative shares')
 
       const tradeCost = roundMoney(
-        lmsrTradeCost(market.yesShares, market.noShares, newYesShares, newNoShares, b)
+        lmsrTradeCost(currentYesShares, currentNoShares, newYesShares, newNoShares, b)
       )
       const actualPrice = roundPrice(Math.abs(tradeCost) / shares)
 
-      if (type === 'BUY' && user.balance < tradeCost) {
+      if (type === 'BUY' && toNumber(user.balance) < tradeCost) {
         throw new Error('Insufficient balance')
       }
 
@@ -84,8 +91,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           _sum: { remainingShares: true },
         })
 
-        const reservedShares = openAskReservations._sum.remainingShares ?? 0
-        const availableShares = (position?.shares ?? 0) - reservedShares
+        const reservedShares = toNumber(openAskReservations._sum.remainingShares)
+        const availableShares = toNumber(position?.shares) - reservedShares
 
         if (!position || availableShares < shares) {
           throw new Error('Insufficient shares to sell')
@@ -129,9 +136,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
       if (type === 'BUY') {
         if (existingPosition) {
-          const totalShares = existingPosition.shares + shares
+          const existingShares = toNumber(existingPosition.shares)
+          const existingAvgEntry = toNumber(existingPosition.avgEntryPrice)
+          const totalShares = existingShares + shares
           const avgEntry = roundPrice(
-            (existingPosition.avgEntryPrice * existingPosition.shares + tradeCost) / totalShares
+            (existingAvgEntry * existingShares + tradeCost) / totalShares
           )
           await tx.position.update({
             where: { id: existingPosition.id },
@@ -150,8 +159,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         }
       } else {
         if (existingPosition) {
-          const newShares = existingPosition.shares - shares
-          const realizedPnl = roundMoney(-tradeCost - (existingPosition.avgEntryPrice * shares))
+          const existingShares = toNumber(existingPosition.shares)
+          const existingAvgEntry = toNumber(existingPosition.avgEntryPrice)
+          const newShares = existingShares - shares
+          const realizedPnl = roundMoney(-tradeCost - (existingAvgEntry * shares))
           if (newShares <= 0) {
             await tx.position.delete({ where: { id: existingPosition.id } })
           } else {

@@ -9,6 +9,11 @@ import { activeOrderWhere, expireStaleMarketOrders } from '@/lib/order-expiratio
 
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
+function toNumber(value: unknown, fallback: number = 0): number {
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) ? numericValue : fallback
+}
+
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
@@ -215,10 +220,16 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
     const filledSharesByOrderId = new Map<string, number>()
     for (const fill of makerFillSums) {
-      filledSharesByOrderId.set(fill.makerOrderId, (filledSharesByOrderId.get(fill.makerOrderId) ?? 0) + (fill._sum.shares ?? 0))
+      filledSharesByOrderId.set(
+        fill.makerOrderId,
+        (filledSharesByOrderId.get(fill.makerOrderId) ?? 0) + toNumber(fill._sum.shares)
+      )
     }
     for (const fill of takerFillSums) {
-      filledSharesByOrderId.set(fill.takerOrderId, (filledSharesByOrderId.get(fill.takerOrderId) ?? 0) + (fill._sum.shares ?? 0))
+      filledSharesByOrderId.set(
+        fill.takerOrderId,
+        (filledSharesByOrderId.get(fill.takerOrderId) ?? 0) + toNumber(fill._sum.shares)
+      )
     }
 
     const userOrdersWithFilledShares = userOrders.map((order) => ({
@@ -253,7 +264,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     ) : []
 
     // Build a map of child ID to user orders with filled shares
-    const outcomeUserOrdersMap = new Map<string, Array<{ id: string; userId: string; outcome: string; side: string; status: string; orderType?: string; price: number; initialShares: number; remainingShares: number; expiresAt?: string | null; createdAt: string; updatedAt?: string; filledShares: number }>>()
+    const outcomeUserOrdersMap = new Map<string, Array<Record<string, unknown>>>()
     for (const outcomeOrders of outcomeUserOrders) {
       // Get filled shares for these orders
       const orderIds = outcomeOrders.orders.map((o) => o.id)
@@ -274,10 +285,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
       const filledMap = new Map<string, number>()
       for (const fill of makerFills) {
-        filledMap.set(fill.makerOrderId, (filledMap.get(fill.makerOrderId) ?? 0) + (fill._sum.shares ?? 0))
+        filledMap.set(fill.makerOrderId, (filledMap.get(fill.makerOrderId) ?? 0) + toNumber(fill._sum.shares))
       }
       for (const fill of takerFills) {
-        filledMap.set(fill.takerOrderId, (filledMap.get(fill.takerOrderId) ?? 0) + (fill._sum.shares ?? 0))
+        filledMap.set(fill.takerOrderId, (filledMap.get(fill.takerOrderId) ?? 0) + toNumber(fill._sum.shares))
       }
 
       outcomeUserOrdersMap.set(
@@ -302,7 +313,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       ? { yes: 0, no: 1 }
       : market.resolution === 'INVALID'
       ? { yes: 0.5, no: 0.5 }
-      : getMarketProbabilities(market.yesShares, market.noShares, market.liquidityParam)
+      : getMarketProbabilities(
+          toNumber(market.yesShares),
+          toNumber(market.noShares),
+          toNumber(market.liquidityParam)
+        )
 
     const outcomes = market.children.map((child) => ({
       ...child,
@@ -313,13 +328,17 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         ? { yes: 0, no: 1 }
         : child.resolution === 'INVALID'
         ? { yes: 0.5, no: 0.5 }
-        : getMarketProbabilities(child.yesShares, child.noShares, child.liquidityParam),
+        : getMarketProbabilities(
+            toNumber(child.yesShares),
+            toNumber(child.noShares),
+            toNumber(child.liquidityParam)
+          ),
       userOrders: outcomeUserOrdersMap.get(child.id) ?? [],
     }))
 
     const totalVolume = market.marketType === 'MULTI'
-      ? outcomes.reduce((sum, outcome) => sum + outcome.totalVolume, 0)
-      : market.totalVolume
+      ? outcomes.reduce((sum, outcome) => sum + toNumber(outcome.totalVolume), 0)
+      : toNumber(market.totalVolume)
 
     return apiSuccess({
       ...market,

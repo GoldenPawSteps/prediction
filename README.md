@@ -189,6 +189,7 @@ Additional repository test utilities:
 
 - `node test-auth-fix.js`
 - `node test-money-flow-integrity.js`
+- `docs/MANUAL_TEST_SIMULATION.md` - comprehensive manual test simulation scenarios and commands
 
 ## Troubleshooting
 

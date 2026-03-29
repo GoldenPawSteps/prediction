@@ -23,7 +23,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
     if (!market) return apiError('Market not found', 404)
 
-    const probabilities = getMarketProbabilities(market.yesShares, market.noShares, market.liquidityParam)
+    const probabilities = getMarketProbabilities(
+      Number(market.yesShares),
+      Number(market.noShares),
+      Number(market.liquidityParam)
+    )
 
     return apiSuccess(probabilities as ProbabilityData)
   } catch (err) {

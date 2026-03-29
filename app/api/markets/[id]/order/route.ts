@@ -7,6 +7,11 @@ import { z } from 'zod'
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 type TradeOutcome = 'YES' | 'NO'
 
+function toNumber(value: unknown, fallback: number = 0): number {
+	const numericValue = Number(value)
+	return Number.isFinite(numericValue) ? numericValue : fallback
+}
+
 const placeOrderSchema = z.object({
 	outcome: z.enum(['YES', 'NO']),
 	side: z.enum(['BID', 'ASK']),
@@ -70,7 +75,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 			if (!user) throw new Error('User not found')
 
 			const reserveAmount = side === 'BID' ? price * shares : 0
-			if (side === 'BID' && user.balance < reserveAmount) {
+			if (side === 'BID' && toNumber(user.balance) < reserveAmount) {
 				throw new Error('Insufficient balance')
 			}
 
@@ -80,13 +85,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 					where: { userId_marketId_outcome: { userId: authUser.userId, marketId, outcome } },
 				})
 				const reservedShares = await getReservedAskShares(tx, authUser.userId, marketId, outcome)
-				const availableShares = (position?.shares ?? 0) - reservedShares
+				const availableShares = toNumber(position?.shares) - reservedShares
 
 				if (!position || availableShares < shares) {
 					throw new Error('Insufficient shares to place ask order')
 				}
 
-				avgEntryPriceSnapshot = position.avgEntryPrice
+				avgEntryPriceSnapshot = toNumber(position.avgEntryPrice)
 			}
 
 			const now = new Date()
@@ -106,7 +111,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 					: [{ price: 'desc' }, { createdAt: 'asc' }],
 			})
 
-			const matchableShares = matchingOrders.reduce((total: number, order: { remainingShares: number }) => total + order.remainingShares, 0)
+			const matchableShares = matchingOrders.reduce((total, order) => total + toNumber(order.remainingShares), 0)
 			if (orderType === 'FOK' && matchableShares + 0.0000001 < shares) {
 				throw new Error('FOK order could not be fully matched immediately')
 			}
@@ -142,10 +147,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 			for (const match of matchingOrders) {
 				if (remainingShares <= 0) break
 
-				const fillShares = Math.min(remainingShares, match.remainingShares)
-				const fillPrice = match.price
+				const fillShares = Math.min(remainingShares, toNumber(match.remainingShares))
+				const fillPrice = toNumber(match.price)
 				const fillNotional = fillShares * fillPrice
-				const makerRemainingShares = match.remainingShares - fillShares
+				const makerRemainingShares = toNumber(match.remainingShares) - fillShares
 				const makerStatus = makerRemainingShares <= 0 ? 'FILLED' : 'PARTIAL'
 
 				await tx.marketOrder.update({
@@ -161,7 +166,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
 				const buyerUserId = side === 'BID' ? authUser.userId : match.userId
 				const sellerUserId = side === 'ASK' ? authUser.userId : match.userId
-				const sellerCostBasis = side === 'ASK' ? avgEntryPriceSnapshot : match.avgEntryPriceSnapshot
+				const sellerCostBasis = side === 'ASK' ? avgEntryPriceSnapshot : toNumber(match.avgEntryPriceSnapshot)
 
 				await tx.user.update({
 					where: { id: sellerUserId },
@@ -308,14 +313,14 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 			if (order.userId !== authUser.userId) {
 				throw new Error('You can only cancel your own orders')
 			}
-			if (!['OPEN', 'PARTIAL'].includes(order.status) || order.remainingShares <= 0) {
+			if (!['OPEN', 'PARTIAL'].includes(order.status) || toNumber(order.remainingShares) <= 0) {
 				throw new Error('Order is no longer open')
 			}
 
-			if (order.side === 'BID' && order.reservedAmount > 0) {
+			if (order.side === 'BID' && toNumber(order.reservedAmount) > 0) {
 				await tx.user.update({
 					where: { id: authUser.userId },
-					data: { balance: { increment: order.reservedAmount } },
+					data: { balance: { increment: toNumber(order.reservedAmount) } },
 				})
 			}
 
@@ -357,7 +362,7 @@ async function getReservedAskShares(
 		_sum: { remainingShares: true },
 	})
 
-	return reservations._sum.remainingShares ?? 0
+	return toNumber(reservations._sum.remainingShares)
 }
 
 async function increasePosition(
@@ -385,8 +390,8 @@ async function increasePosition(
 		return
 	}
 
-	const totalShares = existingPosition.shares + shares
-	const weightedCost = (existingPosition.avgEntryPrice * existingPosition.shares) + (price * shares)
+	const totalShares = toNumber(existingPosition.shares) + shares
+	const weightedCost = (toNumber(existingPosition.avgEntryPrice) * toNumber(existingPosition.shares)) + (price * shares)
 
 	await tx.position.update({
 		where: { id: existingPosition.id },
@@ -410,11 +415,11 @@ async function decreasePosition(
 		where: { userId_marketId_outcome: { userId, marketId, outcome } },
 	})
 
-	if (!existingPosition || existingPosition.shares < shares) {
+	if (!existingPosition || toNumber(existingPosition.shares) < shares) {
 		throw new Error('Insufficient shares to settle exchange order')
 	}
 
-	const newShares = existingPosition.shares - shares
+	const newShares = toNumber(existingPosition.shares) - shares
 	const realizedPnl = proceeds - (costBasis * shares)
 
 	if (newShares <= 0) {

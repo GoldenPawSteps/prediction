@@ -2,29 +2,13 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { apiError, apiSuccess } from '@/lib/api-helpers'
 
-type LeaderboardUser = {
-  id: string
-  username: string
-  avatar: string | null
-  balance: number
-  positions: Array<{
-    realizedPnl: number
-    shares: number
-    avgEntryPrice: number
-  }>
-  trades: Array<{
-    totalCost: number
-    type: string
-  }>
-}
-
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const sortBy = searchParams.get('sortBy') || 'profit'
 
     // Fetch top 100 users ordered by basic metrics to avoid loading entire table
-    const users: LeaderboardUser[] = await prisma.user.findMany({
+    const users = await prisma.user.findMany({
       select: {
         id: true,
         username: true,
@@ -45,10 +29,10 @@ export async function GET(req: NextRequest) {
     })
 
     const leaderboard = users.map((user) => {
-      const totalRealizedPnl = user.positions.reduce((sum, p) => sum + p.realizedPnl, 0)
+      const totalRealizedPnl = user.positions.reduce((sum, p) => sum + Number(p.realizedPnl), 0)
       const totalInvested = user.trades
         .filter((t) => t.type === 'BUY')
-        .reduce((sum, t) => sum + Math.abs(t.totalCost), 0)
+        .reduce((sum, t) => sum + Math.abs(Number(t.totalCost)), 0)
       const roi = totalInvested > 0 ? totalRealizedPnl / totalInvested : 0
       const totalTrades = user.trades.length
 
@@ -56,7 +40,7 @@ export async function GET(req: NextRequest) {
         id: user.id,
         username: user.username,
         avatar: user.avatar,
-        balance: user.balance,
+        balance: Number(user.balance),
         totalRealizedPnl,
         roi,
         totalTrades,

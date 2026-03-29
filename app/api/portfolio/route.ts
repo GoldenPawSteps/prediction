@@ -5,6 +5,11 @@ import { getMarketProbabilities } from '@/lib/lmsr'
 import { activeOrderWhere } from '@/lib/order-expiration'
 import { finalizeImmutableResolutions } from '@/lib/market-status'
 
+function toNumber(value: unknown, fallback: number = 0): number {
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) ? numericValue : fallback
+}
+
 export async function GET(req: NextRequest) {
   const userOrResponse = await requireAuth(req)
   if ('status' in userOrResponse && !('userId' in userOrResponse)) {
@@ -138,17 +143,27 @@ export async function GET(req: NextRequest) {
       if (p.market.status === 'RESOLVED') {
         currentPrice = p.market.resolution === p.outcome ? 1.0 : 0.0
       } else if (p.market.status === 'INVALID') {
-        currentPrice = p.avgEntryPrice // break-even (already refunded)
+        currentPrice = toNumber(p.avgEntryPrice) // break-even (already refunded)
       } else {
-        const probs = getMarketProbabilities(p.market.yesShares, p.market.noShares, p.market.liquidityParam)
+        const probs = getMarketProbabilities(
+          toNumber(p.market.yesShares),
+          toNumber(p.market.noShares),
+          toNumber(p.market.liquidityParam)
+        )
         currentPrice = p.outcome === 'YES' ? probs.yes : probs.no
       }
-      const currentValue = p.shares * currentPrice
-      const costBasis = p.avgEntryPrice * p.shares
+      const shares = toNumber(p.shares)
+      const avgEntryPrice = toNumber(p.avgEntryPrice)
+      const realizedPnl = toNumber(p.realizedPnl)
+      const currentValue = shares * currentPrice
+      const costBasis = avgEntryPrice * shares
       const unrealizedPnl = currentValue - costBasis
 
       return {
         ...p,
+        shares,
+        avgEntryPrice,
+        realizedPnl,
         currentPrice,
         currentValue,
         unrealizedPnl,
@@ -162,8 +177,8 @@ export async function GET(req: NextRequest) {
           return false
         }
 
-        if (Math.abs(fill.price - trade.price) > MATCH_EPSILON) return false
-        if (Math.abs(fill.shares - trade.shares) > MATCH_EPSILON) return false
+        if (Math.abs(toNumber(fill.price) - toNumber(trade.price)) > MATCH_EPSILON) return false
+        if (Math.abs(toNumber(fill.shares) - toNumber(trade.shares)) > MATCH_EPSILON) return false
 
         const timeDiff = Math.abs(fill.createdAt.getTime() - trade.createdAt.getTime())
         if (timeDiff > MATCH_WINDOW_MS) return false
@@ -194,13 +209,13 @@ export async function GET(req: NextRequest) {
     })
 
     const stats = {
-      availableBalance: user?.balance ?? 0,
-      reservedBalance: reservedBidOrders._sum.reservedAmount ?? 0,
-      liquidityLocked: createdMarkets.reduce((sum, m) => sum + m.initialLiquidity, 0),
+      availableBalance: toNumber(user?.balance),
+      reservedBalance: toNumber(reservedBidOrders._sum.reservedAmount),
+      liquidityLocked: createdMarkets.reduce((sum, m) => sum + toNumber(m.initialLiquidity), 0),
       totalPositions: positionsWithValue.length,
       totalValue: positionsWithValue.reduce((sum, p) => sum + p.currentValue, 0),
       totalUnrealizedPnl: positionsWithValue.reduce((sum, p) => sum + p.unrealizedPnl, 0),
-      totalRealizedPnl: positions.reduce((sum, p) => sum + p.realizedPnl, 0),
+      totalRealizedPnl: positionsWithValue.reduce((sum, p) => sum + p.realizedPnl, 0),
     }
 
     return apiSuccess({

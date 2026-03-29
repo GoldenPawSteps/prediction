@@ -120,7 +120,11 @@ export async function GET(req: NextRequest) {
           ? { yes: 0, no: 1 }
           : m.resolution === 'INVALID'
           ? { yes: 0.5, no: 0.5 }
-          : getMarketProbabilities(m.yesShares, m.noShares, m.liquidityParam),
+          : getMarketProbabilities(
+              toFiniteNumber(m.yesShares),
+              toFiniteNumber(m.noShares),
+              toFiniteNumber(m.liquidityParam)
+            ),
         outcomes: m.children.map((child) => ({
           id: child.id,
           title: child.title,
@@ -136,7 +140,11 @@ export async function GET(req: NextRequest) {
             ? { yes: 0, no: 1 }
             : child.resolution === 'INVALID'
             ? { yes: 0.5, no: 0.5 }
-            : getMarketProbabilities(child.yesShares, child.noShares, child.liquidityParam),
+            : getMarketProbabilities(
+                toFiniteNumber(child.yesShares),
+                toFiniteNumber(child.noShares),
+                toFiniteNumber(child.liquidityParam)
+              ),
         })),
       }
     })
@@ -195,7 +203,7 @@ export async function POST(req: NextRequest) {
 
     const user = await prisma.user.findUnique({ where: { id: authUser.userId } })
     if (!user) return apiError('User not found', 404)
-    if (user.balance < totalInitialLiquidity) return apiError('Insufficient balance')
+    if (toFiniteNumber(user.balance) < totalInitialLiquidity) return apiError('Insufficient balance')
 
     const createMarketInTransaction = async (tx: Prisma.TransactionClient, includeDisputeWindowHours: boolean) => {
       await tx.user.update({

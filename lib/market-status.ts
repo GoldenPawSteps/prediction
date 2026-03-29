@@ -2,6 +2,11 @@ import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { settleMarketResolution } from '@/lib/market-settlement'
 
+function toNumber(value: unknown, fallback: number = 0): number {
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) ? numericValue : fallback
+}
+
 async function cancelOpenOrdersForMarkets(tx: Prisma.TransactionClient, marketIds: string[]) {
   if (marketIds.length === 0) {
     return 0
@@ -41,10 +46,10 @@ async function cancelOpenOrdersForMarkets(tx: Prisma.TransactionClient, marketId
 
     if (result.count > 0) {
       cancelled++
-      if (order.side === 'BID' && order.reservedAmount > 0) {
+      if (order.side === 'BID' && toNumber(order.reservedAmount) > 0) {
         await tx.user.update({
           where: { id: order.userId },
-          data: { balance: { increment: order.reservedAmount } },
+          data: { balance: { increment: toNumber(order.reservedAmount) } },
         })
       }
     }
@@ -158,7 +163,7 @@ async function finalizeMarketResolutionIfImmutable(marketId: string, now: Date) 
       marketId: market.id,
       outcome: market.resolution,
       creatorId: market.creatorId,
-      initialLiquidity: market.initialLiquidity,
+      initialLiquidity: toNumber(market.initialLiquidity),
       isReResolution: false,
       previousResolutionTime: null,
     })
