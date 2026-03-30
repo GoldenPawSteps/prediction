@@ -301,6 +301,16 @@ export function Navbar() {
             {user ? (
               <>
                 <div className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400">{t('balance')}: <span className="text-green-400 font-semibold">{formatCurrency(user.balance)}</span></div>
+                <Link
+                  href="/profile"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center gap-2 px-3 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md"
+                >
+                  <div className="w-7 h-7 bg-indigo-600 rounded-full flex items-center justify-center text-white font-semibold text-xs">
+                    {user.username[0].toUpperCase()}
+                  </div>
+                  <span className="text-sm">{user.username}</span>
+                </Link>
                 <Link href="/markets/create" onClick={() => setMobileOpen(false)}>
                   <Button size="sm" className="w-full mb-2">{t('createMarket')}</Button>
                 </Link>
