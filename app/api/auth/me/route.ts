@@ -75,7 +75,7 @@ export async function PATCH(req: NextRequest) {
       },
     })
 
-    return apiSuccess(user)
+    return apiSuccess({ user })
   } catch (err) {
     if (err instanceof Error && err.message.includes('Unique constraint failed')) {
       return apiError('Username already taken', 409)
