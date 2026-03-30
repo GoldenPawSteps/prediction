@@ -82,38 +82,54 @@ function getCandidateTokensFromRequest(req: NextRequest): string[] {
 }
 
 export async function getUserFromRequest(req: NextRequest): Promise<JWTPayload | null> {
+  const users = await getValidAuthUsersFromRequest(req)
+  return users[0] ?? null
+}
+
+export async function getValidAuthUsersFromRequest(req: NextRequest): Promise<JWTPayload[]> {
   const tokens = getCandidateTokensFromRequest(req)
-  if (tokens.length === 0) return null
+  if (tokens.length === 0) return []
 
-  for (const token of tokens) {
-    const payload = verifyToken(token)
-    if (!payload) continue
+  const verifiedPayloads = tokens
+    .map((token) => verifyToken(token))
+    .filter((payload): payload is JWTPayload => Boolean(payload?.userId))
 
-    const user = await prisma.user.findUnique({
-      where: { id: payload.userId },
-      select: {
-        id: true,
-        email: true,
-        isAdmin: true,
-        sessionVersion: true,
-      },
+  if (verifiedPayloads.length === 0) return []
+
+  const userIds = Array.from(new Set(verifiedPayloads.map((payload) => payload.userId)))
+  const users = await prisma.user.findMany({
+    where: { id: { in: userIds } },
+    select: {
+      id: true,
+      email: true,
+      isAdmin: true,
+      sessionVersion: true,
+    },
+  })
+
+  const usersById = new Map(users.map((user) => [user.id, user]))
+
+  return verifiedPayloads
+    .filter((payload) => {
+      const user = usersById.get(payload.userId)
+      return Boolean(user && user.sessionVersion === payload.sessionVersion)
     })
-
-    if (!user || user.sessionVersion !== payload.sessionVersion) {
-      continue
-    }
-
-    return {
-      userId: user.id,
-      email: user.email,
-      isAdmin: user.isAdmin,
-      sessionVersion: user.sessionVersion,
-      iat: payload.iat,
-      exp: payload.exp,
-    }
-  }
-
-  return null
+    .map((payload) => {
+      const user = usersById.get(payload.userId)!
+      return {
+        userId: user.id,
+        email: user.email,
+        isAdmin: user.isAdmin,
+        sessionVersion: user.sessionVersion,
+        iat: payload.iat,
+        exp: payload.exp,
+      }
+    })
+    .sort((a, b) => {
+      const aiat = a.iat ?? 0
+      const biat = b.iat ?? 0
+      return biat - aiat
+    })
 }
 
 export async function requireAuth(req: NextRequest): Promise<JWTPayload | NextResponse> {

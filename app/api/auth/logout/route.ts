@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { AUTH_COOKIE_NAME, LEGACY_AUTH_COOKIE_NAME, getUserFromRequest } from '@/lib/api-helpers'
+import { AUTH_COOKIE_NAME, LEGACY_AUTH_COOKIE_NAME, getUserFromRequest, getValidAuthUsersFromRequest } from '@/lib/api-helpers'
 
 function shouldUseSecureCookies(req: NextRequest): boolean {
   if (req.nextUrl.hostname === 'localhost' || req.nextUrl.hostname === '127.0.0.1') {
@@ -32,10 +32,12 @@ function clearAuthCookies(response: NextResponse, req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const authUser = await getUserFromRequest(req)
-    if (authUser) {
-      await prisma.user.update({
-        where: { id: authUser.userId },
+    const authUsers = await getValidAuthUsersFromRequest(req)
+    const userIds = Array.from(new Set(authUsers.map((user) => user.userId)))
+
+    if (userIds.length > 0) {
+      await prisma.user.updateMany({
+        where: { id: { in: userIds } },
         data: { sessionVersion: { increment: 1 } },
       })
     }
@@ -52,10 +54,12 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
-    const authUser = await getUserFromRequest(req)
-    if (authUser) {
-      await prisma.user.update({
-        where: { id: authUser.userId },
+    const authUsers = await getValidAuthUsersFromRequest(req)
+    const userIds = Array.from(new Set(authUsers.map((user) => user.userId)))
+
+    if (userIds.length > 0) {
+      await prisma.user.updateMany({
+        where: { id: { in: userIds } },
         data: { sessionVersion: { increment: 1 } },
       })
     }
