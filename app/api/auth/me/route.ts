@@ -4,6 +4,9 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth, apiError, apiSuccess } from '@/lib/api-helpers'
 import { expireStaleUserOrders } from '@/lib/order-expiration'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 type TxClient = Prisma.TransactionClient
 
 export async function GET(req: NextRequest) {

@@ -67,17 +67,14 @@ function getCandidateTokensFromRequest(req: NextRequest): string[] {
   }
 
   const cookieHeader = req.headers.get('cookie')
-  const cookieCandidates = [
-    ...getVerifiedTokensFromCookieHeader(cookieHeader, AUTH_COOKIE_NAME),
-    ...getVerifiedTokensFromCookieHeader(cookieHeader, LEGACY_AUTH_COOKIE_NAME),
-  ]
+  const cookieCandidates = getVerifiedTokensFromCookieHeader(cookieHeader, AUTH_COOKIE_NAME)
 
   if (cookieCandidates.length > 0) {
     const uniqueTokens = Array.from(new Set(cookieCandidates.map((candidate) => candidate.token)))
     return uniqueTokens
   }
 
-  const fallback = req.cookies.get(AUTH_COOKIE_NAME)?.value || req.cookies.get(LEGACY_AUTH_COOKIE_NAME)?.value
+  const fallback = req.cookies.get(AUTH_COOKIE_NAME)?.value
   return fallback ? [fallback] : []
 }
 
@@ -135,7 +132,7 @@ export async function getValidAuthUsersFromRequest(req: NextRequest): Promise<JW
 export async function requireAuth(req: NextRequest): Promise<JWTPayload | NextResponse> {
   const user = await getUserFromRequest(req)
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return apiError('Unauthorized', 401)
   }
   return user
 }
@@ -143,10 +140,10 @@ export async function requireAuth(req: NextRequest): Promise<JWTPayload | NextRe
 export async function requireAdmin(req: NextRequest): Promise<JWTPayload | NextResponse> {
   const user = await getUserFromRequest(req)
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return apiError('Unauthorized', 401)
   }
   if (!user.isAdmin) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return apiError('Forbidden', 403)
   }
   return user
 }

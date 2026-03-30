@@ -5,6 +5,9 @@ import { getMarketProbabilities } from '@/lib/lmsr'
 import { activeOrderWhere } from '@/lib/order-expiration'
 import { finalizeImmutableResolutions } from '@/lib/market-status'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 function toNumber(value: unknown, fallback: number = 0): number {
   const numericValue = Number(value)
   return Number.isFinite(numericValue) ? numericValue : fallback

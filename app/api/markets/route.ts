@@ -10,6 +10,9 @@ import { closeExpiredOpenMarkets } from '@/lib/market-status'
 import { finalizeImmutableResolutions } from '@/lib/market-status'
 import { z } from 'zod'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 function toFiniteNumber(value: unknown, fallback: number = 0): number {
   const numericValue = Number(value)
   return Number.isFinite(numericValue) ? numericValue : fallback

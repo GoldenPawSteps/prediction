@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { AUTH_COOKIE_NAME, LEGACY_AUTH_COOKIE_NAME, getUserFromRequest, getValidAuthUsersFromRequest } from '@/lib/api-helpers'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 function shouldUseSecureCookies(req: NextRequest): boolean {
   if (req.nextUrl.hostname === 'localhost' || req.nextUrl.hostname === '127.0.0.1') {
     return false

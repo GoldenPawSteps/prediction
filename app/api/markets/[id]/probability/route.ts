@@ -3,6 +3,9 @@ import { prisma } from '@/lib/prisma'
 import { apiError, apiSuccess } from '@/lib/api-helpers'
 import { getMarketProbabilities } from '@/lib/lmsr'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 interface ProbabilityData {
   yes: number
   no: number

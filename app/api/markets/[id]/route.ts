@@ -7,6 +7,9 @@ import { closeMarketIfExpired } from '@/lib/market-status'
 import { finalizeImmutableResolutionIfReady } from '@/lib/market-status'
 import { activeOrderWhere, expireStaleMarketOrders } from '@/lib/order-expiration'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
 function toNumber(value: unknown, fallback: number = 0): number {

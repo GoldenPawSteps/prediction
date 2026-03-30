@@ -2,6 +2,9 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { apiError, apiSuccess } from '@/lib/api-helpers'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 interface Comment {
   id: string
   content: string
