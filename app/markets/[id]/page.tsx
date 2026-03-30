@@ -20,6 +20,7 @@ import { MarketDetailLoadingSkeleton } from '@/components/MarketDetailLoadingSke
 import toast from 'react-hot-toast'
 
 const MARKET_FETCH_TIMEOUT_MS = 12000
+const MARKET_MIN_INITIAL_LOADING_MS = 180
 
 function formatRelativeTime(date: string | Date, locale: string): string {
   const target = new Date(date).getTime()
@@ -203,6 +204,22 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
   const latestRequestRef = useRef(0)
   const marketRef = useRef<Market | null>(null)
   const abortRetryRef = useRef(0)
+  const initialLoadStartedAtRef = useRef<number>(Date.now())
+  const initialLoadReleasedRef = useRef(false)
+
+  const releaseInitialLoading = useCallback((requestId: number) => {
+    if (initialLoadReleasedRef.current) return
+    initialLoadReleasedRef.current = true
+
+    const elapsed = Date.now() - initialLoadStartedAtRef.current
+    const remaining = Math.max(0, MARKET_MIN_INITIAL_LOADING_MS - elapsed)
+
+    window.setTimeout(() => {
+      if (requestId === latestRequestRef.current) {
+        setLoading(false)
+      }
+    }, remaining)
+  }, [])
 
   useEffect(() => {
     marketRef.current = market
@@ -250,7 +267,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
 
     if (prefetched) {
       setMarket(prefetched)
-      setLoading(false)
+      releaseInitialLoading(requestId)
     }
 
     try {
@@ -304,14 +321,17 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
       console.error('Failed to fetch market:', err)
     } finally {
       if (requestId === latestRequestRef.current) {
-        setLoading(false)
+        releaseInitialLoading(requestId)
       }
     }
-  }, [id])
+  }, [id, releaseInitialLoading])
 
   useErrorToast(fetchError, 'Failed to fetch market')
 
   useEffect(() => {
+    initialLoadStartedAtRef.current = Date.now()
+    initialLoadReleasedRef.current = false
+    setLoading(true)
     fetchMarket()
     return () => {
       abortControllerRef.current?.abort()

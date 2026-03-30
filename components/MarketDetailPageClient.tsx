@@ -20,6 +20,7 @@ import toast from 'react-hot-toast'
 
 const MARKET_FETCH_TIMEOUT_MS = 12000
 const MARKET_ACTIVE_POLL_MS = 5000
+const MARKET_MIN_INITIAL_LOADING_MS = 180
 
 async function readJsonResponse<T>(response: Response): Promise<T> {
   const contentType = response.headers.get('content-type') || ''
@@ -273,6 +274,20 @@ export function MarketDetailPageClient({
   const marketJsonRef = useRef<string | null>(initialMarket ? JSON.stringify(initialMarket) : null)
   const fetchInFlightRef = useRef<Promise<void> | null>(null)
   const queuedFetchRef = useRef(false)
+  const initialLoadStartedAtRef = useRef<number>(Date.now())
+  const initialLoadReleasedRef = useRef(false)
+
+  const releaseInitialLoading = useCallback(() => {
+    if (initialLoadReleasedRef.current) return
+    initialLoadReleasedRef.current = true
+
+    const elapsed = Date.now() - initialLoadStartedAtRef.current
+    const remaining = Math.max(0, MARKET_MIN_INITIAL_LOADING_MS - elapsed)
+
+    window.setTimeout(() => {
+      setLoading(false)
+    }, remaining)
+  }, [])
 
   useEffect(() => {
     userRef.current = user
@@ -329,7 +344,7 @@ export function MarketDetailPageClient({
           marketJsonRef.current = prefetchedJson
           setMarket(prefetched)
         }
-        setLoading(false)
+        releaseInitialLoading()
       }
 
       try {
@@ -382,7 +397,7 @@ export function MarketDetailPageClient({
         }
         console.error('Failed to fetch market:', err)
       } finally {
-        setLoading(false)
+        releaseInitialLoading()
       }
     }
 
@@ -396,11 +411,16 @@ export function MarketDetailPageClient({
     })
 
     return fetchInFlightRef.current
-  }, [id, refreshUser])
+  }, [id, refreshUser, releaseInitialLoading])
 
   useErrorToast(fetchError, 'Failed to fetch market')
 
-  useEffect(() => { fetchMarket() }, [fetchMarket])
+  useEffect(() => {
+    initialLoadStartedAtRef.current = Date.now()
+    initialLoadReleasedRef.current = false
+    setLoading(true)
+    fetchMarket()
+  }, [fetchMarket])
 
   useEffect(() => {
     if (!shouldPollMarket(market)) {

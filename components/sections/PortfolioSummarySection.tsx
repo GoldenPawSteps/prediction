@@ -14,6 +14,8 @@ import { useErrorToast } from '@/lib/useErrorToast'
 import { Badge } from '@/components/ui/Badge'
 import Link from 'next/link'
 import { beginNavFeedback } from '@/lib/client-nav-feedback'
+import { useRouter } from 'next/navigation'
+import { prefetchJson } from '@/lib/client-prefetch'
 
 interface PortfolioStats {
   positions: Array<{
@@ -77,10 +79,17 @@ interface PortfolioStats {
 }
 
 export function PortfolioSummarySection({ isPrefetched = false }: { isPrefetched?: boolean }) {
+  const router = useRouter()
   const t = useT('portfolio')
   const tTradePanel = useT('tradePanel')
   const tAdmin = useT('admin')
   const tStatus = useT('status')
+
+  const prefetchMarketDetail = (marketId: string) => {
+    const href = `/markets/${marketId}`
+    router.prefetch(href)
+    void prefetchJson(`market:${marketId}`, `/api/markets/${marketId}`)
+  }
 
   const translateOutcome = (outcome: string) => {
     switch (outcome) {
@@ -194,7 +203,13 @@ export function PortfolioSummarySection({ isPrefetched = false }: { isPrefetched
                   <div className="min-w-0">
                     <Link
                       href={`/markets/${market.id}`}
-                      onClick={() => beginNavFeedback(`/markets/${market.id}`)}
+                      onMouseEnter={() => prefetchMarketDetail(market.id)}
+                      onFocus={() => prefetchMarketDetail(market.id)}
+                      onTouchStart={() => prefetchMarketDetail(market.id)}
+                      onClick={() => {
+                        prefetchMarketDetail(market.id)
+                        beginNavFeedback(`/markets/${market.id}`)
+                      }}
                       className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline break-words"
                     >
                       {market.title}
@@ -242,7 +257,13 @@ export function PortfolioSummarySection({ isPrefetched = false }: { isPrefetched
                   <div className="min-w-0">
                     <Link
                       href={`/markets/${order.market.id}`}
-                      onClick={() => beginNavFeedback(`/markets/${order.market.id}`)}
+                      onMouseEnter={() => prefetchMarketDetail(order.market.id)}
+                      onFocus={() => prefetchMarketDetail(order.market.id)}
+                      onTouchStart={() => prefetchMarketDetail(order.market.id)}
+                      onClick={() => {
+                        prefetchMarketDetail(order.market.id)
+                        beginNavFeedback(`/markets/${order.market.id}`)
+                      }}
                       className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline break-words"
                     >
                       {order.market.title}

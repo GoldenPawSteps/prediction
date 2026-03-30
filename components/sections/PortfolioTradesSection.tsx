@@ -9,6 +9,8 @@ import { useErrorToast } from '@/lib/useErrorToast'
 import { Badge } from '@/components/ui/Badge'
 import Link from 'next/link'
 import { beginNavFeedback } from '@/lib/client-nav-feedback'
+import { useRouter } from 'next/navigation'
+import { prefetchJson } from '@/lib/client-prefetch'
 
 interface Trade {
   id: string
@@ -28,11 +30,18 @@ interface PortfolioTradesData {
 }
 
 export function PortfolioTradesSection({ isPrefetched = false }: { isPrefetched?: boolean }) {
+  const router = useRouter()
   const t = useT('portfolio')
   const tCategories = useT('categories')
   const tMarketDetail = useT('marketDetail')
   const tAdmin = useT('admin')
   const tTradePanel = useT('tradePanel')
+
+  const prefetchMarketDetail = (marketId: string) => {
+    const href = `/markets/${marketId}`
+    router.prefetch(href)
+    void prefetchJson(`market:${marketId}`, `/api/markets/${marketId}`)
+  }
 
   const translateCategory = (category: string) => {
     switch (category) {
@@ -119,7 +128,13 @@ export function PortfolioTradesSection({ isPrefetched = false }: { isPrefetched?
                   <td className="px-2 sm:px-6 py-2 sm:py-4">
                     <Link
                       href={`/markets/${trade.market.id}`}
-                      onClick={() => beginNavFeedback(`/markets/${trade.market.id}`)}
+                      onMouseEnter={() => prefetchMarketDetail(trade.market.id)}
+                      onFocus={() => prefetchMarketDetail(trade.market.id)}
+                      onTouchStart={() => prefetchMarketDetail(trade.market.id)}
+                      onClick={() => {
+                        prefetchMarketDetail(trade.market.id)
+                        beginNavFeedback(`/markets/${trade.market.id}`)
+                      }}
                       className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline truncate max-w-xs"
                     >
                       {trade.market.title}
