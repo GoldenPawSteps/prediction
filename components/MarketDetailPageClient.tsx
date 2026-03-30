@@ -336,7 +336,6 @@ export function MarketDetailPageClient({
     const run = async () => {
       const prefetchKey = `market:${id}`
       const prefetched = consumePrefetchedJson<Market>(prefetchKey)
-      const hasPrefetched = Boolean(prefetched)
 
       if (prefetched) {
         const prefetchedJson = JSON.stringify(prefetched)
@@ -352,7 +351,7 @@ export function MarketDetailPageClient({
         const timeoutId = window.setTimeout(() => controller.abort(), MARKET_FETCH_TIMEOUT_MS)
 
         try {
-          const res = await fetch(`/api/markets/${id}`, {
+          const res = await fetch(`/api/markets/${id}?_ts=${Date.now()}`, {
             cache: 'no-store',
             signal: controller.signal,
           })

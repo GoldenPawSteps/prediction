@@ -98,10 +98,11 @@ export function usePageSection<T>({
       abortControllerRef.current?.abort()
       const controller = new AbortController()
       abortControllerRef.current = controller
+      const requestUrl = url.includes('?') ? `${url}&_ts=${Date.now()}` : `${url}?_ts=${Date.now()}`
 
       // Second: fetch fresh data from network (no visual stale indicator —
       // background revalidations are silent to avoid flickering)
-      const res = await fetch(url, {
+      const res = await fetch(requestUrl, {
         ...fetchInit,
         signal: controller.signal,
         cache: 'no-store',

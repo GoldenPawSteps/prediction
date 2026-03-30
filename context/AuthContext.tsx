@@ -58,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const run = async () => {
       try {
-        const res = await fetch('/api/auth/me', { cache: 'no-store' })
+        const res = await fetch(`/api/auth/me?_ts=${Date.now()}`, { cache: 'no-store' })
         if (logoutInProgressRef.current) {
           return
         }
@@ -76,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // transient cookie propagation/race conditions.
         if (res.status === 401 || res.status === 403) {
           await new Promise((resolve) => window.setTimeout(resolve, 150))
-          const retry = await fetch('/api/auth/me', { cache: 'no-store' })
+          const retry = await fetch(`/api/auth/me?_ts=${Date.now()}`, { cache: 'no-store' })
           if (retry.ok) {
             const data = await retry.json()
             commitUser(data)
