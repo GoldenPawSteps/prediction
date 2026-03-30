@@ -25,6 +25,10 @@ The repository also includes a dedicated market-liquidity simulation in `test-ma
 For manual liquidity-only verification, use `docs/MARKET_LIQUIDITY_QA_CHECKLIST.md`.
 For a short liquidity pre-deploy pass, use `docs/MARKET_LIQUIDITY_SMOKE_CHECKLIST.md`.
 
+The repository also includes a dedicated market-portfolio simulation in `test-market-portfolio.js`.
+For manual portfolio-only verification, use `docs/MARKET_PORTFOLIO_QA_CHECKLIST.md`.
+For a short portfolio pre-deploy pass, use `docs/MARKET_PORTFOLIO_SMOKE_CHECKLIST.md`.
+
 ## What it covers
 
 - Authentication lifecycle: register, login, session isolation, logout
@@ -47,7 +51,7 @@ npm run test:simulation
 
 ## Run all simulations
 
-Use this when you want a full regression pass across business flow, market creation, market trading, market settlement, market probability, market liquidity, money conservation, and lifecycle state transitions:
+Use this when you want a full regression pass across business flow, market creation, market trading, market settlement, market probability, market liquidity, market portfolio, money conservation, and lifecycle state transitions:
 
 ```bash
 npm run test:all-simulations
@@ -61,6 +65,7 @@ What this covers:
 - `test-market-settlement.js`: deferred, invalid, and dispute-driven settlement behavior
 - `test-market-probability.js`: prior calibration, probability movement, endpoint sync, and resolution pinning
 - `test-market-liquidity.js`: creator liquidity locks, multi aggregation, price-impact sensitivity, and unlock finalization
+- `test-market-portfolio.js`: portfolio shape, valuation stats, reserve accounting, and execution classification
 - `test-money-conservation.js`: balance integrity and payout accounting
 - `test-market-lifecycle.js`: state transitions from OPEN through final settlement
 
@@ -160,6 +165,17 @@ npm run test:liquidity:lock
 npm run test:liquidity:sensitivity
 npm run test:liquidity:multi
 npm run test:liquidity:unlock
+```
+
+### Market Portfolio Simulation Shortcuts
+
+```bash
+npm run test:portfolio
+npm run test:portfolio:basics
+npm run test:portfolio:positions
+npm run test:portfolio:reserves
+npm run test:portfolio:created
+npm run test:portfolio:exchange
 ```
 
 ---
@@ -279,6 +295,41 @@ This section verifies that parent market liquidity equals the sum of child liqui
 #### Liquidity Unlock
 
 This section verifies liquidity stays locked through provisional resolution and unlocks exactly once after immutable finalization.
+
+### Market Portfolio Simulation
+
+A dedicated simulation focused on **portfolio correctness** — verifying baseline payload shape and auth enforcement, position valuation math, reserved BID accounting, created-market liquidity visibility, and AMM/exchange trade classification.
+
+- **Full checklist:** `docs/MARKET_PORTFOLIO_QA_CHECKLIST.md` — manual verification of portfolio scenarios
+- **Smoke checklist:** `docs/MARKET_PORTFOLIO_SMOKE_CHECKLIST.md` — short pre-deploy portfolio pass
+- **Run automated suite:** `npm run test:portfolio` (7 checks)
+- **Run baseline/auth checks:** `npm run test:portfolio:basics`
+- **Run valuation checks:** `npm run test:portfolio:positions`
+- **Run reserve-accounting checks:** `npm run test:portfolio:reserves`
+- **Run created-market checks:** `npm run test:portfolio:created`
+- **Run exchange-classification checks:** `npm run test:portfolio:exchange`
+
+### Portfolio Tests In Plain English
+
+#### Basics
+
+This section verifies that authenticated users receive a complete, stable portfolio payload shape, and unauthenticated requests are rejected.
+
+#### Position Valuation
+
+This section verifies per-position math (`currentValue`, `unrealizedPnl`) and aggregate stats totals remain numerically coherent.
+
+#### Reserved Orders
+
+This section verifies open BID reserves are reflected in both `reservedOrders` and `stats.reservedBalance`.
+
+#### Created Markets
+
+This section verifies created open markets are listed and the same funded liquidity appears in `stats.liquidityLocked`.
+
+#### Exchange Classification
+
+This section verifies trade history marks AMM trades as `AMM`, exchange fills as `EXCHANGE`, and correctly assigns `MAKER` or `TAKER` roles.
 
 ### Settlement Tests In Plain English
 
@@ -471,5 +522,6 @@ Quick pre-deploy verification without full manual testing:
 - **Settlement smoke:** `docs/MARKET_SETTLEMENT_SMOKE_CHECKLIST.md` — short smoke test for market settlement paths
 - **Probability smoke:** `docs/MARKET_PROBABILITY_SMOKE_CHECKLIST.md` — short smoke test for probability and pricing behavior
 - **Liquidity smoke:** `docs/MARKET_LIQUIDITY_SMOKE_CHECKLIST.md` — short smoke test for liquidity lock/unlock and sensitivity behavior
+- **Portfolio smoke:** `docs/MARKET_PORTFOLIO_SMOKE_CHECKLIST.md` — short smoke test for portfolio payload and accounting behavior
 - **Conservation smoke:** `docs/MONEY_CONSERVATION_SMOKE_CHECKLIST.md` — 6-check smoke test for money invariants
 - **Lifecycle smoke:** `docs/MARKET_LIFECYCLE_SMOKE_CHECKLIST.md` — short smoke test for lifecycle transitions
