@@ -17,6 +17,10 @@ The repository also includes a dedicated market-settlement simulation in `test-m
 For manual settlement-only verification, use `docs/MARKET_SETTLEMENT_QA_CHECKLIST.md`.
 For a short settlement pre-deploy pass, use `docs/MARKET_SETTLEMENT_SMOKE_CHECKLIST.md`.
 
+The repository also includes a dedicated market-probability simulation in `test-market-probability.js`.
+For manual probability-only verification, use `docs/MARKET_PROBABILITY_QA_CHECKLIST.md`.
+For a short probability pre-deploy pass, use `docs/MARKET_PROBABILITY_SMOKE_CHECKLIST.md`.
+
 ## What it covers
 
 - Authentication lifecycle: register, login, session isolation, logout
@@ -39,7 +43,7 @@ npm run test:simulation
 
 ## Run all simulations
 
-Use this when you want a full regression pass across business flow, market creation, market trading, market settlement, money conservation, and lifecycle state transitions:
+Use this when you want a full regression pass across business flow, market creation, market trading, market settlement, market probability, money conservation, and lifecycle state transitions:
 
 ```bash
 npm run test:all-simulations
@@ -51,6 +55,7 @@ What this covers:
 - `test-market-creation.js`: market creation correctness and validation boundaries
 - `test-market-trading.js`: AMM and exchange trading behavior and rejection paths
 - `test-market-settlement.js`: deferred, invalid, and dispute-driven settlement behavior
+- `test-market-probability.js`: prior calibration, probability movement, endpoint sync, and resolution pinning
 - `test-money-conservation.js`: balance integrity and payout accounting
 - `test-market-lifecycle.js`: state transitions from OPEN through final settlement
 
@@ -132,6 +137,16 @@ npm run test:settlement:invalid
 npm run test:settlement:dispute
 ```
 
+### Market Probability Simulation Shortcuts
+
+```bash
+npm run test:probability
+npm run test:probability:initial
+npm run test:probability:trading
+npm run test:probability:resolution
+npm run test:probability:multi
+```
+
 ---
 
 ## Related Testing Docs
@@ -189,6 +204,36 @@ A dedicated simulation focused on **settlement correctness** — verifying defer
 - **Run core settlement checks:** `npm run test:settlement:core`
 - **Run INVALID-only checks:** `npm run test:settlement:invalid`
 - **Run dispute-only checks:** `npm run test:settlement:dispute`
+
+### Market Probability Simulation
+
+A dedicated simulation focused on **probability correctness** — verifying configured priors, expected post-trade directional movement, normalization for binary markets, consistency between market detail and the probability endpoint, resolved YES pinning, INVALID neutral pinning, and multi-outcome child probabilities.
+
+- **Full checklist:** `docs/MARKET_PROBABILITY_QA_CHECKLIST.md` — manual verification of probability scenarios
+- **Smoke checklist:** `docs/MARKET_PROBABILITY_SMOKE_CHECKLIST.md` — short pre-deploy probability pass
+- **Run automated suite:** `npm run test:probability` (12 checks)
+- **Run initial-prior checks:** `npm run test:probability:initial`
+- **Run trading-movement checks:** `npm run test:probability:trading`
+- **Run resolution-pinning checks:** `npm run test:probability:resolution`
+- **Run multi-outcome checks:** `npm run test:probability:multi`
+
+### Probability Tests In Plain English
+
+#### Initial Priors
+
+This section verifies that new binary and multi-outcome markets expose probabilities that match their configured priors.
+
+#### Trading Movement
+
+This section verifies that YES buys push YES probability upward, NO buys push NO probability upward, and sells move probability back in the opposite direction.
+
+#### Resolution Pinning
+
+This section verifies that resolved YES markets pin to `1 / 0` and INVALID markets pin to `0.5 / 0.5`.
+
+#### Endpoint Sync
+
+This section verifies that the dedicated probability endpoint and the market detail endpoint report the same probabilities for the same market state.
 
 ### Settlement Tests In Plain English
 
@@ -379,5 +424,6 @@ Quick pre-deploy verification without full manual testing:
 - **Creation smoke:** `docs/MARKET_CREATION_SMOKE_CHECKLIST.md` — short smoke test for market creation paths
 - **Trading smoke:** `docs/MARKET_TRADING_SMOKE_CHECKLIST.md` — short smoke test for market trading paths
 - **Settlement smoke:** `docs/MARKET_SETTLEMENT_SMOKE_CHECKLIST.md` — short smoke test for market settlement paths
+- **Probability smoke:** `docs/MARKET_PROBABILITY_SMOKE_CHECKLIST.md` — short smoke test for probability and pricing behavior
 - **Conservation smoke:** `docs/MONEY_CONSERVATION_SMOKE_CHECKLIST.md` — 6-check smoke test for money invariants
 - **Lifecycle smoke:** `docs/MARKET_LIFECYCLE_SMOKE_CHECKLIST.md` — short smoke test for lifecycle transitions
