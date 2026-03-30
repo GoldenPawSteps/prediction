@@ -717,7 +717,15 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
                       return (
                       <div key={outcome.id} className="bg-white/90 dark:bg-gray-900/70 border border-gray-200 dark:border-gray-800 rounded-2xl p-3 sm:p-5 shadow-sm">
                         <div className="mb-3 sm:mb-4">
-                          <h3 className="text-base font-semibold text-gray-900 dark:text-white">{outcome.outcomeName || outcome.title}</h3>
+                          <div className="flex items-start justify-between gap-3">
+                            <h3 className="text-base font-semibold text-gray-900 dark:text-white">{outcome.outcomeName || outcome.title}</h3>
+                            <Link
+                              href={`/markets/${outcome.id}`}
+                              className="shrink-0 text-xs sm:text-sm text-indigo-600 dark:text-indigo-300 hover:underline"
+                            >
+                              {t('showDetails')}
+                            </Link>
+                          </div>
                           <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex flex-wrap items-center gap-2">
                             <span>{tCard('vol')}: {formatCurrency(outcome.totalVolume)} · {outcome._count.trades} {tCommon('trades')}</span>
                             {outcome.status !== 'OPEN' && (
