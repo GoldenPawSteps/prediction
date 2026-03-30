@@ -35,19 +35,9 @@ export function Navbar() {
     // Clear stale post-create back target so the next user doesn't land on
     // the previous user's market detail page.
     try { window.sessionStorage.removeItem('predictify:post-create-back-target') } catch {}
-    // Fire-and-forget: POST invalidates session + clears cookies server-side.
-    // keepalive ensures the request completes even as the page unloads.
-    try {
-      fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
-        keepalive: true,
-      })
-    } catch {
-      // Swallow — hard navigation below is the source of truth.
-    }
-    // Immediate hard navigation. No async gaps, no waiting for the POST.
-    window.location.replace('/auth/login')
+    // Use server-side logout redirect as the source of truth so cookie
+    // invalidation and navigation happen in one deterministic step.
+    window.location.assign('/api/auth/logout?next=/auth/login')
   }
 
   const navLinks = [
