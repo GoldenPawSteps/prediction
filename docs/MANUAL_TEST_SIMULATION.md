@@ -33,6 +33,10 @@ The repository also includes a dedicated market-balance simulation in `test-mark
 For manual balance-only verification, use `docs/MARKET_BALANCE_QA_CHECKLIST.md`.
 For a short balance pre-deploy pass, use `docs/MARKET_BALANCE_SMOKE_CHECKLIST.md`.
 
+The repository also includes a dedicated market-leaderboard simulation in `test-market-leaderboard.js`.
+For manual leaderboard-only verification, use `docs/MARKET_LEADERBOARD_QA_CHECKLIST.md`.
+For a short leaderboard pre-deploy pass, use `docs/MARKET_LEADERBOARD_SMOKE_CHECKLIST.md`.
+
 ## What it covers
 
 - Authentication lifecycle: register, login, session isolation, logout
@@ -55,7 +59,7 @@ npm run test:simulation
 
 ## Run all simulations
 
-Use this when you want a full regression pass across business flow, market creation, market trading, market settlement, market probability, market liquidity, market portfolio, market balance, money conservation, and lifecycle state transitions:
+Use this when you want a full regression pass across business flow, market creation, market trading, market settlement, market probability, market liquidity, market portfolio, market balance, market leaderboard, money conservation, and lifecycle state transitions:
 
 ```bash
 npm run test:all-simulations
@@ -71,6 +75,7 @@ What this covers:
 - `test-market-liquidity.js`: creator liquidity locks, multi aggregation, price-impact sensitivity, and unlock finalization
 - `test-market-portfolio.js`: portfolio shape, valuation stats, reserve accounting, and execution classification
 - `test-market-balance.js`: wallet deltas for funding, AMM, exchange reserve/refund/fill, and rejection safety
+- `test-market-leaderboard.js`: public payload shape, rank sorting modes, and trade-activity ranking behavior
 - `test-money-conservation.js`: balance integrity and payout accounting
 - `test-market-lifecycle.js`: state transitions from OPEN through final settlement
 
@@ -192,6 +197,15 @@ npm run test:balance:funding
 npm run test:balance:amm
 npm run test:balance:exchange
 npm run test:balance:rejections
+```
+
+### Market Leaderboard Simulation Shortcuts
+
+```bash
+npm run test:leaderboard
+npm run test:leaderboard:shape
+npm run test:leaderboard:sorting
+npm run test:leaderboard:trades
 ```
 
 ---
@@ -381,6 +395,31 @@ This section verifies BID reserves are exact, cancel refunds are exact, and dire
 #### Rejection Safety
 
 This section verifies rejected BUY/order requests do not mutate user balances.
+
+### Market Leaderboard Simulation
+
+A dedicated simulation focused on **leaderboard correctness** — verifying public response shape, descending ranking behavior for default/trades/roi modes, safe fallback for unknown sort parameters, and high-activity trade ranking behavior.
+
+- **Full checklist:** `docs/MARKET_LEADERBOARD_QA_CHECKLIST.md` — manual verification of leaderboard scenarios
+- **Smoke checklist:** `docs/MARKET_LEADERBOARD_SMOKE_CHECKLIST.md` — short pre-deploy leaderboard pass
+- **Run automated suite:** `npm run test:leaderboard` (6 checks)
+- **Run shape checks:** `npm run test:leaderboard:shape`
+- **Run sorting checks:** `npm run test:leaderboard:sorting`
+- **Run trade-ranking checks:** `npm run test:leaderboard:trades`
+
+### Leaderboard Tests In Plain English
+
+#### Response Shape
+
+This section verifies leaderboard responses are public, capped, timestamped, and contain expected numeric ranking fields.
+
+#### Sorting Modes
+
+This section verifies default profit, trades, and ROI sorts all return descending rankings, and unknown sort modes fall back safely.
+
+#### Trade Ranking
+
+This section verifies seeded high-activity users are ranked consistently in trades sort behavior relative to lower-activity users when sampled.
 
 ### Settlement Tests In Plain English
 
@@ -575,5 +614,6 @@ Quick pre-deploy verification without full manual testing:
 - **Liquidity smoke:** `docs/MARKET_LIQUIDITY_SMOKE_CHECKLIST.md` — short smoke test for liquidity lock/unlock and sensitivity behavior
 - **Portfolio smoke:** `docs/MARKET_PORTFOLIO_SMOKE_CHECKLIST.md` — short smoke test for portfolio payload and accounting behavior
 - **Balance smoke:** `docs/MARKET_BALANCE_SMOKE_CHECKLIST.md` — short smoke test for wallet and balance movement behavior
+- **Leaderboard smoke:** `docs/MARKET_LEADERBOARD_SMOKE_CHECKLIST.md` — short smoke test for leaderboard sorting and payload behavior
 - **Conservation smoke:** `docs/MONEY_CONSERVATION_SMOKE_CHECKLIST.md` — 6-check smoke test for money invariants
 - **Lifecycle smoke:** `docs/MARKET_LIFECYCLE_SMOKE_CHECKLIST.md` — short smoke test for lifecycle transitions
