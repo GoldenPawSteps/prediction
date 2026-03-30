@@ -29,6 +29,10 @@ The repository also includes a dedicated market-portfolio simulation in `test-ma
 For manual portfolio-only verification, use `docs/MARKET_PORTFOLIO_QA_CHECKLIST.md`.
 For a short portfolio pre-deploy pass, use `docs/MARKET_PORTFOLIO_SMOKE_CHECKLIST.md`.
 
+The repository also includes a dedicated market-balance simulation in `test-market-balance.js`.
+For manual balance-only verification, use `docs/MARKET_BALANCE_QA_CHECKLIST.md`.
+For a short balance pre-deploy pass, use `docs/MARKET_BALANCE_SMOKE_CHECKLIST.md`.
+
 ## What it covers
 
 - Authentication lifecycle: register, login, session isolation, logout
@@ -51,7 +55,7 @@ npm run test:simulation
 
 ## Run all simulations
 
-Use this when you want a full regression pass across business flow, market creation, market trading, market settlement, market probability, market liquidity, market portfolio, money conservation, and lifecycle state transitions:
+Use this when you want a full regression pass across business flow, market creation, market trading, market settlement, market probability, market liquidity, market portfolio, market balance, money conservation, and lifecycle state transitions:
 
 ```bash
 npm run test:all-simulations
@@ -66,6 +70,7 @@ What this covers:
 - `test-market-probability.js`: prior calibration, probability movement, endpoint sync, and resolution pinning
 - `test-market-liquidity.js`: creator liquidity locks, multi aggregation, price-impact sensitivity, and unlock finalization
 - `test-market-portfolio.js`: portfolio shape, valuation stats, reserve accounting, and execution classification
+- `test-market-balance.js`: wallet deltas for funding, AMM, exchange reserve/refund/fill, and rejection safety
 - `test-money-conservation.js`: balance integrity and payout accounting
 - `test-market-lifecycle.js`: state transitions from OPEN through final settlement
 
@@ -176,6 +181,17 @@ npm run test:portfolio:positions
 npm run test:portfolio:reserves
 npm run test:portfolio:created
 npm run test:portfolio:exchange
+```
+
+### Market Balance Simulation Shortcuts
+
+```bash
+npm run test:balance
+npm run test:balance:wallet
+npm run test:balance:funding
+npm run test:balance:amm
+npm run test:balance:exchange
+npm run test:balance:rejections
 ```
 
 ---
@@ -330,6 +346,41 @@ This section verifies created open markets are listed and the same funded liquid
 #### Exchange Classification
 
 This section verifies trade history marks AMM trades as `AMM`, exchange fills as `EXCHANGE`, and correctly assigns `MAKER` or `TAKER` roles.
+
+### Market Balance Simulation
+
+A dedicated simulation focused on **balance correctness** — verifying wallet/portfolio sync, exact liquidity funding debits, AMM BUY/SELL balance movement, exchange reserve/refund/fill accounting, and rejected-operation no-mutation guarantees.
+
+- **Full checklist:** `docs/MARKET_BALANCE_QA_CHECKLIST.md` — manual verification of balance scenarios
+- **Smoke checklist:** `docs/MARKET_BALANCE_SMOKE_CHECKLIST.md` — short pre-deploy balance pass
+- **Run automated suite:** `npm run test:balance` (10 checks)
+- **Run wallet-baseline checks:** `npm run test:balance:wallet`
+- **Run funding-debit checks:** `npm run test:balance:funding`
+- **Run AMM balance checks:** `npm run test:balance:amm`
+- **Run exchange balance checks:** `npm run test:balance:exchange`
+- **Run rejection no-mutation checks:** `npm run test:balance:rejections`
+
+### Balance Tests In Plain English
+
+#### Wallet Baseline
+
+This section verifies a fresh user has a positive wallet balance, portfolio available balance matches wallet state, and unauthenticated balance endpoints are rejected.
+
+#### Funding Debits
+
+This section verifies market creation debits creator balance by exactly the configured initial liquidity and reflects that amount in locked liquidity stats.
+
+#### AMM Movement
+
+This section verifies AMM BUY decreases balance by `totalCost` and AMM SELL increases balance by `abs(totalCost)`.
+
+#### Exchange Movement
+
+This section verifies BID reserves are exact, cancel refunds are exact, and direct fills preserve combined participant balances.
+
+#### Rejection Safety
+
+This section verifies rejected BUY/order requests do not mutate user balances.
 
 ### Settlement Tests In Plain English
 
@@ -523,5 +574,6 @@ Quick pre-deploy verification without full manual testing:
 - **Probability smoke:** `docs/MARKET_PROBABILITY_SMOKE_CHECKLIST.md` — short smoke test for probability and pricing behavior
 - **Liquidity smoke:** `docs/MARKET_LIQUIDITY_SMOKE_CHECKLIST.md` — short smoke test for liquidity lock/unlock and sensitivity behavior
 - **Portfolio smoke:** `docs/MARKET_PORTFOLIO_SMOKE_CHECKLIST.md` — short smoke test for portfolio payload and accounting behavior
+- **Balance smoke:** `docs/MARKET_BALANCE_SMOKE_CHECKLIST.md` — short smoke test for wallet and balance movement behavior
 - **Conservation smoke:** `docs/MONEY_CONSERVATION_SMOKE_CHECKLIST.md` — 6-check smoke test for money invariants
 - **Lifecycle smoke:** `docs/MARKET_LIFECYCLE_SMOKE_CHECKLIST.md` — short smoke test for lifecycle transitions

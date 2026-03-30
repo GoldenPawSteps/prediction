@@ -200,7 +200,9 @@ Comprehensive simulations:
 - `npm run test:liquidity:<section>` - Run one liquidity section (`lock`, `sensitivity`, `multi`, `unlock`)
 - `npm run test:portfolio` - Full market portfolio simulation (7 checks)
 - `npm run test:portfolio:<section>` - Run one portfolio section (`basics`, `positions`, `reserves`, `created`, `exchange`)
-- `npm run test:all-simulations` - Run the business-flow, creation, trading, settlement, probability, liquidity, portfolio, conservation, and lifecycle suites in one command
+- `npm run test:balance` - Full market balance simulation (10 checks)
+- `npm run test:balance:<section>` - Run one balance section (`wallet`, `funding`, `amm`, `exchange`, `rejections`)
+- `npm run test:all-simulations` - Run the business-flow, creation, trading, settlement, probability, liquidity, portfolio, balance, conservation, and lifecycle suites in one command
 - `npm run test:lifecycle` - Market lifecycle simulation (19 checks across state transitions)
 - `npm run test:lifecycle:<mode>` - Run one lifecycle slice (`core`, `invalid`, `dispute`)
 - `npm run test:conservation` - Full money conservation suite (41 tests across 12 scenarios)
@@ -226,6 +228,8 @@ Additional repository test utilities:
 - `docs/MARKET_LIQUIDITY_SMOKE_CHECKLIST.md` - short pre-deploy smoke test for market liquidity simulation
 - `docs/MARKET_PORTFOLIO_QA_CHECKLIST.md` - step-by-step human QA checklist for market portfolio simulation
 - `docs/MARKET_PORTFOLIO_SMOKE_CHECKLIST.md` - short pre-deploy smoke test for market portfolio simulation
+- `docs/MARKET_BALANCE_QA_CHECKLIST.md` - step-by-step human QA checklist for market balance simulation
+- `docs/MARKET_BALANCE_SMOKE_CHECKLIST.md` - short pre-deploy smoke test for market balance simulation
 - `docs/MONEY_CONSERVATION_QA_CHECKLIST.md` - step-by-step human QA checklist for money invariants
 - `docs/MONEY_CONSERVATION_SMOKE_CHECKLIST.md` - 6-check pre-deploy smoke test for conservation
 - `docs/MARKET_LIFECYCLE_QA_CHECKLIST.md` - step-by-step human QA checklist for lifecycle transitions
