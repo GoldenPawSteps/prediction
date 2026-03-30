@@ -1,5 +1,7 @@
 'use client'
 
+import { useEffect, useState } from 'react'
+
 import {
   LineChart,
   Line,
@@ -53,6 +55,19 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
 }
 
 export function PriceChart({ data }: PriceChartProps) {
+  const [interactionReady, setInteractionReady] = useState(false)
+
+  useEffect(() => {
+    // On mobile navigations, the tap that opened this page can carry over and
+    // immediately activate a chart point. Delay chart interaction briefly to
+    // avoid phantom initial selection.
+    const timer = window.setTimeout(() => {
+      setInteractionReady(true)
+    }, 450)
+
+    return () => window.clearTimeout(timer)
+  }, [])
+
   if (!data || data.length === 0) {
     return (
       <div className="h-48 flex items-center justify-center text-gray-500 text-sm">
@@ -93,14 +108,20 @@ export function PriceChart({ data }: PriceChartProps) {
           tickLine={false}
           axisLine={false}
         />
-        <Tooltip content={<CustomTooltip />} />
+        <Tooltip
+          content={(props) => (
+            interactionReady
+              ? <CustomTooltip active={props.active} payload={props.payload as unknown as CustomTooltipProps['payload']} label={props.label} />
+              : null
+          )}
+        />
         <Line
           type="monotone"
           dataKey="YES"
           stroke="#34D399"
           strokeWidth={2}
           dot={false}
-          activeDot={{ r: 4 }}
+          activeDot={interactionReady ? { r: 4 } : false}
         />
         <Line
           type="monotone"
@@ -108,7 +129,7 @@ export function PriceChart({ data }: PriceChartProps) {
           stroke="#F87171"
           strokeWidth={2}
           dot={false}
-          activeDot={{ r: 4 }}
+          activeDot={interactionReady ? { r: 4 } : false}
         />
       </LineChart>
     </ResponsiveContainer>
