@@ -196,7 +196,9 @@ Comprehensive simulations:
 - `npm run test:settlement:<section>` - Run one settlement section (`core`, `invalid`, `dispute`)
 - `npm run test:probability` - Full market probability simulation (12 checks)
 - `npm run test:probability:<section>` - Run one probability section (`initial`, `trading`, `resolution`, `multi`)
-- `npm run test:all-simulations` - Run the business-flow, creation, trading, settlement, probability, conservation, and lifecycle suites in one command
+- `npm run test:liquidity` - Full market liquidity simulation (11 checks)
+- `npm run test:liquidity:<section>` - Run one liquidity section (`lock`, `sensitivity`, `multi`, `unlock`)
+- `npm run test:all-simulations` - Run the business-flow, creation, trading, settlement, probability, liquidity, conservation, and lifecycle suites in one command
 - `npm run test:lifecycle` - Market lifecycle simulation (19 checks across state transitions)
 - `npm run test:lifecycle:<mode>` - Run one lifecycle slice (`core`, `invalid`, `dispute`)
 - `npm run test:conservation` - Full money conservation suite (41 tests across 12 scenarios)
@@ -218,6 +220,8 @@ Additional repository test utilities:
 - `docs/MARKET_SETTLEMENT_SMOKE_CHECKLIST.md` - short pre-deploy smoke test for market settlement simulation
 - `docs/MARKET_PROBABILITY_QA_CHECKLIST.md` - step-by-step human QA checklist for market probability simulation
 - `docs/MARKET_PROBABILITY_SMOKE_CHECKLIST.md` - short pre-deploy smoke test for market probability simulation
+- `docs/MARKET_LIQUIDITY_QA_CHECKLIST.md` - step-by-step human QA checklist for market liquidity simulation
+- `docs/MARKET_LIQUIDITY_SMOKE_CHECKLIST.md` - short pre-deploy smoke test for market liquidity simulation
 - `docs/MONEY_CONSERVATION_QA_CHECKLIST.md` - step-by-step human QA checklist for money invariants
 - `docs/MONEY_CONSERVATION_SMOKE_CHECKLIST.md` - 6-check pre-deploy smoke test for conservation
 - `docs/MARKET_LIFECYCLE_QA_CHECKLIST.md` - step-by-step human QA checklist for lifecycle transitions

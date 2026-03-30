@@ -21,6 +21,10 @@ The repository also includes a dedicated market-probability simulation in `test-
 For manual probability-only verification, use `docs/MARKET_PROBABILITY_QA_CHECKLIST.md`.
 For a short probability pre-deploy pass, use `docs/MARKET_PROBABILITY_SMOKE_CHECKLIST.md`.
 
+The repository also includes a dedicated market-liquidity simulation in `test-market-liquidity.js`.
+For manual liquidity-only verification, use `docs/MARKET_LIQUIDITY_QA_CHECKLIST.md`.
+For a short liquidity pre-deploy pass, use `docs/MARKET_LIQUIDITY_SMOKE_CHECKLIST.md`.
+
 ## What it covers
 
 - Authentication lifecycle: register, login, session isolation, logout
@@ -43,7 +47,7 @@ npm run test:simulation
 
 ## Run all simulations
 
-Use this when you want a full regression pass across business flow, market creation, market trading, market settlement, market probability, money conservation, and lifecycle state transitions:
+Use this when you want a full regression pass across business flow, market creation, market trading, market settlement, market probability, market liquidity, money conservation, and lifecycle state transitions:
 
 ```bash
 npm run test:all-simulations
@@ -56,6 +60,7 @@ What this covers:
 - `test-market-trading.js`: AMM and exchange trading behavior and rejection paths
 - `test-market-settlement.js`: deferred, invalid, and dispute-driven settlement behavior
 - `test-market-probability.js`: prior calibration, probability movement, endpoint sync, and resolution pinning
+- `test-market-liquidity.js`: creator liquidity locks, multi aggregation, price-impact sensitivity, and unlock finalization
 - `test-money-conservation.js`: balance integrity and payout accounting
 - `test-market-lifecycle.js`: state transitions from OPEN through final settlement
 
@@ -147,6 +152,16 @@ npm run test:probability:resolution
 npm run test:probability:multi
 ```
 
+### Market Liquidity Simulation Shortcuts
+
+```bash
+npm run test:liquidity
+npm run test:liquidity:lock
+npm run test:liquidity:sensitivity
+npm run test:liquidity:multi
+npm run test:liquidity:unlock
+```
+
 ---
 
 ## Related Testing Docs
@@ -234,6 +249,36 @@ This section verifies that resolved YES markets pin to `1 / 0` and INVALID marke
 #### Endpoint Sync
 
 This section verifies that the dedicated probability endpoint and the market detail endpoint report the same probabilities for the same market state.
+
+### Market Liquidity Simulation
+
+A dedicated simulation focused on **liquidity correctness** — verifying creator funding locks on creation, portfolio liquidity accounting, low-vs-high liquidity price-impact sensitivity, multi-outcome liquidity aggregation, and immutable post-resolution unlock behavior.
+
+- **Full checklist:** `docs/MARKET_LIQUIDITY_QA_CHECKLIST.md` — manual verification of liquidity scenarios
+- **Smoke checklist:** `docs/MARKET_LIQUIDITY_SMOKE_CHECKLIST.md` — short pre-deploy liquidity pass
+- **Run automated suite:** `npm run test:liquidity` (11 checks)
+- **Run lock-accounting checks:** `npm run test:liquidity:lock`
+- **Run liquidity-sensitivity checks:** `npm run test:liquidity:sensitivity`
+- **Run multi-outcome liquidity checks:** `npm run test:liquidity:multi`
+- **Run unlock/finalization checks:** `npm run test:liquidity:unlock`
+
+### Liquidity Tests In Plain English
+
+#### Liquidity Locking
+
+This section verifies that market creation debits creator balance by the exact funded amount and records the same amount as locked liquidity in portfolio stats.
+
+#### Liquidity Sensitivity
+
+This section verifies that higher-liquidity markets have higher liquidity parameters and smaller probability movement for the same trade size.
+
+#### Multi-Outcome Liquidity
+
+This section verifies that parent market liquidity equals the sum of child liquidities and that child liquidity parameters scale with configured child funding.
+
+#### Liquidity Unlock
+
+This section verifies liquidity stays locked through provisional resolution and unlocks exactly once after immutable finalization.
 
 ### Settlement Tests In Plain English
 
@@ -425,5 +470,6 @@ Quick pre-deploy verification without full manual testing:
 - **Trading smoke:** `docs/MARKET_TRADING_SMOKE_CHECKLIST.md` — short smoke test for market trading paths
 - **Settlement smoke:** `docs/MARKET_SETTLEMENT_SMOKE_CHECKLIST.md` — short smoke test for market settlement paths
 - **Probability smoke:** `docs/MARKET_PROBABILITY_SMOKE_CHECKLIST.md` — short smoke test for probability and pricing behavior
+- **Liquidity smoke:** `docs/MARKET_LIQUIDITY_SMOKE_CHECKLIST.md` — short smoke test for liquidity lock/unlock and sensitivity behavior
 - **Conservation smoke:** `docs/MONEY_CONSERVATION_SMOKE_CHECKLIST.md` — 6-check smoke test for money invariants
 - **Lifecycle smoke:** `docs/MARKET_LIFECYCLE_SMOKE_CHECKLIST.md` — short smoke test for lifecycle transitions
