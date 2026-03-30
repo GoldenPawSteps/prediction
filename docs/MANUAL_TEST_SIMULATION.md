@@ -37,6 +37,10 @@ The repository also includes a dedicated market-leaderboard simulation in `test-
 For manual leaderboard-only verification, use `docs/MARKET_LEADERBOARD_QA_CHECKLIST.md`.
 For a short leaderboard pre-deploy pass, use `docs/MARKET_LEADERBOARD_SMOKE_CHECKLIST.md`.
 
+The repository also includes a dedicated multimarket-multitrader simulation in `test-multimarket-multitrader.js`.
+For manual multimarket-only verification, use `docs/MARKET_MULTIMARKET_MULTITRADER_QA_CHECKLIST.md`.
+For a short multimarket pre-deploy pass, use `docs/MARKET_MULTIMARKET_MULTITRADER_SMOKE_CHECKLIST.md`.
+
 ## What it covers
 
 - Authentication lifecycle: register, login, session isolation, logout
@@ -59,7 +63,7 @@ npm run test:simulation
 
 ## Run all simulations
 
-Use this when you want a full regression pass across business flow, market creation, market trading, market settlement, market probability, market liquidity, market portfolio, market balance, market leaderboard, money conservation, and lifecycle state transitions:
+Use this when you want a full regression pass across business flow, market creation, market trading, market settlement, market probability, market liquidity, market portfolio, market balance, market leaderboard, multimarket-multitrader, money conservation, and lifecycle state transitions:
 
 ```bash
 npm run test:all-simulations
@@ -76,6 +80,7 @@ What this covers:
 - `test-market-portfolio.js`: portfolio shape, valuation stats, reserve accounting, and execution classification
 - `test-market-balance.js`: wallet deltas for funding, AMM, exchange reserve/refund/fill, and rejection safety
 - `test-market-leaderboard.js`: public payload shape, rank sorting modes, and trade-activity ranking behavior
+- `test-multimarket-multitrader.js`: coordinated multi-user activity across many markets with cross-endpoint consistency checks
 - `test-money-conservation.js`: balance integrity and payout accounting
 - `test-market-lifecycle.js`: state transitions from OPEN through final settlement
 
@@ -206,6 +211,16 @@ npm run test:leaderboard
 npm run test:leaderboard:shape
 npm run test:leaderboard:sorting
 npm run test:leaderboard:trades
+```
+
+### MultiMarket MultiTrader Simulation Shortcuts
+
+```bash
+npm run test:multimarket-multitrader
+npm run test:multimarket-multitrader:setup
+npm run test:multimarket-multitrader:amm
+npm run test:multimarket-multitrader:exchange
+npm run test:multimarket-multitrader:validate
 ```
 
 ---
@@ -421,6 +436,36 @@ This section verifies default profit, trades, and ROI sorts all return descendin
 
 This section verifies seeded high-activity users are ranked consistently in trades sort behavior relative to lower-activity users when sampled.
 
+### MultiMarket MultiTrader Simulation
+
+A dedicated simulation focused on **cross-market multi-user robustness** — verifying coordinated AMM and exchange activity across several markets, reserve/refund correctness, portfolio coherence for all participants, and leaderboard stability under concurrent activity.
+
+- **Full checklist:** `docs/MARKET_MULTIMARKET_MULTITRADER_QA_CHECKLIST.md` — manual verification of multimarket scenarios
+- **Smoke checklist:** `docs/MARKET_MULTIMARKET_MULTITRADER_SMOKE_CHECKLIST.md` — short pre-deploy multimarket pass
+- **Run automated suite:** `npm run test:multimarket-multitrader` (9 checks)
+- **Run setup checks:** `npm run test:multimarket-multitrader:setup`
+- **Run AMM checks:** `npm run test:multimarket-multitrader:amm`
+- **Run exchange checks:** `npm run test:multimarket-multitrader:exchange`
+- **Run cross-validation checks:** `npm run test:multimarket-multitrader:validate`
+
+### MultiMarket MultiTrader Tests In Plain English
+
+#### Setup
+
+This section creates multiple users and multiple markets (binary + multi) so all downstream checks run under realistic cross-market conditions.
+
+#### AMM Matrix
+
+This section verifies many traders can trade across many markets while preserving valid price/probability behavior.
+
+#### Exchange Matrix
+
+This section verifies shared-market order matching between different traders plus reserve/cancel accounting in parallel.
+
+#### Cross Validation
+
+This section verifies market detail, all portfolios, and trades leaderboard remain coherent after broad concurrent activity.
+
 ### Settlement Tests In Plain English
 
 #### Deferred Finalization
@@ -615,5 +660,6 @@ Quick pre-deploy verification without full manual testing:
 - **Portfolio smoke:** `docs/MARKET_PORTFOLIO_SMOKE_CHECKLIST.md` — short smoke test for portfolio payload and accounting behavior
 - **Balance smoke:** `docs/MARKET_BALANCE_SMOKE_CHECKLIST.md` — short smoke test for wallet and balance movement behavior
 - **Leaderboard smoke:** `docs/MARKET_LEADERBOARD_SMOKE_CHECKLIST.md` — short smoke test for leaderboard sorting and payload behavior
+- **MultiMarket smoke:** `docs/MARKET_MULTIMARKET_MULTITRADER_SMOKE_CHECKLIST.md` — short smoke test for cross-market multi-user activity
 - **Conservation smoke:** `docs/MONEY_CONSERVATION_SMOKE_CHECKLIST.md` — 6-check smoke test for money invariants
 - **Lifecycle smoke:** `docs/MARKET_LIFECYCLE_SMOKE_CHECKLIST.md` — short smoke test for lifecycle transitions

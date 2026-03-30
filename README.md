@@ -204,7 +204,9 @@ Comprehensive simulations:
 - `npm run test:balance:<section>` - Run one balance section (`wallet`, `funding`, `amm`, `exchange`, `rejections`)
 - `npm run test:leaderboard` - Full market leaderboard simulation (6 checks)
 - `npm run test:leaderboard:<section>` - Run one leaderboard section (`shape`, `sorting`, `trades`)
-- `npm run test:all-simulations` - Run the business-flow, creation, trading, settlement, probability, liquidity, portfolio, balance, leaderboard, conservation, and lifecycle suites in one command
+- `npm run test:multimarket-multitrader` - Comprehensive multi-market multi-trader simulation (9 checks)
+- `npm run test:multimarket-multitrader:<section>` - Run one multimarket section (`setup`, `amm`, `exchange`, `validate`)
+- `npm run test:all-simulations` - Run the business-flow, creation, trading, settlement, probability, liquidity, portfolio, balance, leaderboard, multimarket, conservation, and lifecycle suites in one command
 - `npm run test:lifecycle` - Market lifecycle simulation (19 checks across state transitions)
 - `npm run test:lifecycle:<mode>` - Run one lifecycle slice (`core`, `invalid`, `dispute`)
 - `npm run test:conservation` - Full money conservation suite (41 tests across 12 scenarios)
@@ -234,6 +236,8 @@ Additional repository test utilities:
 - `docs/MARKET_BALANCE_SMOKE_CHECKLIST.md` - short pre-deploy smoke test for market balance simulation
 - `docs/MARKET_LEADERBOARD_QA_CHECKLIST.md` - step-by-step human QA checklist for market leaderboard simulation
 - `docs/MARKET_LEADERBOARD_SMOKE_CHECKLIST.md` - short pre-deploy smoke test for market leaderboard simulation
+- `docs/MARKET_MULTIMARKET_MULTITRADER_QA_CHECKLIST.md` - step-by-step human QA checklist for multimarket-multitrader simulation
+- `docs/MARKET_MULTIMARKET_MULTITRADER_SMOKE_CHECKLIST.md` - short pre-deploy smoke test for multimarket-multitrader simulation
 - `docs/MONEY_CONSERVATION_QA_CHECKLIST.md` - step-by-step human QA checklist for money invariants
 - `docs/MONEY_CONSERVATION_SMOKE_CHECKLIST.md` - 6-check pre-deploy smoke test for conservation
 - `docs/MARKET_LIFECYCLE_QA_CHECKLIST.md` - step-by-step human QA checklist for lifecycle transitions
