@@ -56,9 +56,6 @@ export function Navbar() {
       // potentially stale authenticated UI state.
       window.location.assign('/auth/login')
       return
-    } finally {
-      // In cases where navigation is blocked, re-enable the control.
-      setLoggingOut(false)
     }
   }
 
