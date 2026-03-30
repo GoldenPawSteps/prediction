@@ -104,7 +104,7 @@ export function usePageSection<T>({
       const res = await fetch(url, {
         ...fetchInit,
         signal: controller.signal,
-        cache: hasLoadedDataRef.current ? 'no-store' : undefined, // Bypass cache after first load
+        cache: 'no-store',
       })
 
       if (!res.ok) {

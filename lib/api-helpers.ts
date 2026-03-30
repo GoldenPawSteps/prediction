@@ -152,7 +152,18 @@ export async function requireAdmin(req: NextRequest): Promise<JWTPayload | NextR
 }
 
 export function apiError(message: string, status: number = 400) {
-  return NextResponse.json({ error: message }, { status })
+  return NextResponse.json(
+    { error: message },
+    {
+      status,
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+        Pragma: 'no-cache',
+        Expires: '0',
+        Vary: 'Cookie, Authorization',
+      },
+    }
+  )
 }
 
 function isDecimalLike(value: unknown): value is { toString: () => string } {
@@ -197,5 +208,16 @@ function normalizeApiData(value: unknown): unknown {
 }
 
 export function apiSuccess(data: unknown, status: number = 200) {
-  return NextResponse.json(normalizeApiData(data), { status })
+  return NextResponse.json(
+    normalizeApiData(data),
+    {
+      status,
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+        Pragma: 'no-cache',
+        Expires: '0',
+        Vary: 'Cookie, Authorization',
+      },
+    }
+  )
 }

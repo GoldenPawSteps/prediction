@@ -14,15 +14,32 @@ function shouldUseSecureCookies(req: NextRequest): boolean {
 
 function clearAuthCookies(response: NextResponse, req: NextRequest) {
   const secureCookie = shouldUseSecureCookies(req)
+  const host = req.nextUrl.hostname
+  const hostParts = host.split('.')
+  const parentDomain = hostParts.length >= 3 ? `.${hostParts.slice(-2).join('.')}` : null
 
   for (const name of [AUTH_COOKIE_NAME, LEGACY_AUTH_COOKIE_NAME]) {
     response.cookies.delete(name)
-    for (const path of ['/', '/api']) {
+
+    const clearTargets: Array<{ path: string; domain?: string }> = [
+      { path: '/' },
+      { path: '/api' },
+      { path: '/', domain: host },
+      { path: '/api', domain: host },
+    ]
+
+    if (parentDomain) {
+      clearTargets.push({ path: '/', domain: parentDomain })
+      clearTargets.push({ path: '/api', domain: parentDomain })
+    }
+
+    for (const target of clearTargets) {
       response.cookies.set(name, '', {
         httpOnly: true,
         secure: secureCookie,
         sameSite: 'lax',
-        path,
+        path: target.path,
+        ...(target.domain ? { domain: target.domain } : {}),
         maxAge: 0,
         expires: new Date(0),
       })

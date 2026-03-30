@@ -279,7 +279,7 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
 
       try {
         const res = await fetch(`/api/markets/${id}`, {
-          ...(hasPrefetched ? { cache: 'no-store' as const } : {}),
+          cache: 'no-store',
           signal: controller.signal,
         })
 
