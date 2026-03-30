@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import {
   LineChart,
@@ -57,6 +57,9 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
 export function PriceChart({ data }: PriceChartProps) {
   const [hasUserInteracted, setHasUserInteracted] = useState(false)
   const [isCoarsePointer, setIsCoarsePointer] = useState(false)
+  const [coarseTooltipSuppressed, setCoarseTooltipSuppressed] = useState(false)
+  const [escapeTooltipSuppressed, setEscapeTooltipSuppressed] = useState(false)
+  const chartContainerRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     const media = window.matchMedia('(pointer: coarse)')
@@ -65,6 +68,37 @@ export function PriceChart({ data }: PriceChartProps) {
 
     media.addEventListener('change', update)
     return () => media.removeEventListener('change', update)
+  }, [])
+
+  useEffect(() => {
+    if (!isCoarsePointer) {
+      setCoarseTooltipSuppressed(false)
+      return
+    }
+
+    const handleOutsidePointerDown = (event: PointerEvent) => {
+      const container = chartContainerRef.current
+      if (!container) return
+
+      const target = event.target as Node | null
+      if (target && !container.contains(target)) {
+        setCoarseTooltipSuppressed(true)
+      }
+    }
+
+    document.addEventListener('pointerdown', handleOutsidePointerDown, true)
+    return () => document.removeEventListener('pointerdown', handleOutsidePointerDown, true)
+  }, [isCoarsePointer])
+
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setEscapeTooltipSuppressed(true)
+      }
+    }
+
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
   }, [])
 
   if (!data || data.length === 0) {
@@ -89,15 +123,22 @@ export function PriceChart({ data }: PriceChartProps) {
 
   return (
     <div
+      ref={chartContainerRef}
       className="[&_svg]:outline-none [&_svg]:[-webkit-tap-highlight-color:transparent] [&_.recharts-wrapper]:!outline-none"
       onMouseMove={() => {
         if (!hasUserInteracted) setHasUserInteracted(true)
+        if (escapeTooltipSuppressed) setEscapeTooltipSuppressed(false)
       }}
       onTouchStart={() => {
         if (!hasUserInteracted) setHasUserInteracted(true)
+        if (escapeTooltipSuppressed) setEscapeTooltipSuppressed(false)
       }}
       onPointerDown={() => {
         if (!hasUserInteracted) setHasUserInteracted(true)
+        if (escapeTooltipSuppressed) setEscapeTooltipSuppressed(false)
+        if (isCoarsePointer && coarseTooltipSuppressed) {
+          setCoarseTooltipSuppressed(false)
+        }
       }}
     >
     <ResponsiveContainer width="100%" height={200}>
@@ -120,9 +161,13 @@ export function PriceChart({ data }: PriceChartProps) {
         />
         <Tooltip
           trigger={isCoarsePointer ? 'click' : 'hover'}
-          active={hasUserInteracted ? undefined : false}
-          content={(props) => (
+          active={
             hasUserInteracted
+              ? ((isCoarsePointer && coarseTooltipSuppressed) || escapeTooltipSuppressed ? false : undefined)
+              : false
+          }
+          content={(props) => (
+            hasUserInteracted && !((isCoarsePointer && coarseTooltipSuppressed) || escapeTooltipSuppressed)
               ? <CustomTooltip active={props.active} payload={props.payload as unknown as CustomTooltipProps['payload']} label={props.label} />
               : null
           )}
@@ -133,7 +178,7 @@ export function PriceChart({ data }: PriceChartProps) {
           stroke="#34D399"
           strokeWidth={2}
           dot={false}
-          activeDot={hasUserInteracted ? { r: 4 } : false}
+          activeDot={hasUserInteracted && !((isCoarsePointer && coarseTooltipSuppressed) || escapeTooltipSuppressed) ? { r: 4 } : false}
         />
         <Line
           type="monotone"
@@ -141,7 +186,7 @@ export function PriceChart({ data }: PriceChartProps) {
           stroke="#F87171"
           strokeWidth={2}
           dot={false}
-          activeDot={hasUserInteracted ? { r: 4 } : false}
+          activeDot={hasUserInteracted && !((isCoarsePointer && coarseTooltipSuppressed) || escapeTooltipSuppressed) ? { r: 4 } : false}
         />
       </LineChart>
     </ResponsiveContainer>
