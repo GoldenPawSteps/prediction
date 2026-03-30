@@ -222,16 +222,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
 
       if (!res.ok) {
-        // Fall back to a hard server-side logout that clears cookies and redirects.
-        window.location.href = '/api/auth/logout?next=/auth/login'
+        // Fall back to direct login navigation to avoid host/proxy redirect mismatches.
+        window.location.href = '/auth/login'
         return false
       }
 
       toast.success('Logged out')
       return true
     } catch {
-      // Network/transient fetch failures should still fully log out.
-      window.location.href = '/api/auth/logout?next=/auth/login'
+      // Network/transient fetch failures should still navigate to login.
+      window.location.href = '/auth/login'
       return false
     } finally {
       // Keep refresh blocked briefly so cookie invalidation can settle before

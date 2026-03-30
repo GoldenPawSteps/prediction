@@ -27,7 +27,7 @@ export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (loggingOut) return
     setLoggingOut(true)
     // Cancel any pending navigation watchdog before navigating away.
@@ -35,9 +35,31 @@ export function Navbar() {
     // Clear stale post-create back target so the next user doesn't land on
     // the previous user's market detail page.
     try { window.sessionStorage.removeItem('predictify:post-create-back-target') } catch {}
-    // Use server-side logout redirect as the source of truth so cookie
-    // invalidation and navigation happen in one deterministic step.
-    window.location.assign('/api/auth/logout?next=/auth/login')
+
+    try {
+      const res = await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+        cache: 'no-store',
+      })
+
+      if (!res.ok) {
+        throw new Error(`Logout failed with status ${res.status}`)
+      }
+
+      // Client-side navigation avoids host/proxy mismatch issues from
+      // server-generated absolute redirects in certain dev/mobile setups.
+      window.location.assign('/auth/login')
+      return
+    } catch {
+      // Best effort fallback: still send user to login to break out of
+      // potentially stale authenticated UI state.
+      window.location.assign('/auth/login')
+      return
+    } finally {
+      // In cases where navigation is blocked, re-enable the control.
+      setLoggingOut(false)
+    }
   }
 
   const navLinks = [
@@ -194,7 +216,7 @@ export function Navbar() {
                     </div>
                   </Link>
                   <button
-                    onClick={handleLogout}
+                    onClick={() => { void handleLogout() }}
                     disabled={loggingOut}
                     className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white text-sm transition-colors disabled:opacity-60"
                   >
@@ -281,7 +303,7 @@ export function Navbar() {
                 </Link>
                 <button
                   onClick={() => {
-                    handleLogout()
+                    void handleLogout()
                   }}
                   disabled={loggingOut}
                   className="w-full text-left px-3 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md disabled:opacity-60"
