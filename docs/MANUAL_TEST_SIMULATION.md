@@ -41,6 +41,10 @@ The repository also includes a dedicated multimarket-multitrader simulation in `
 For manual multimarket-only verification, use `docs/MARKET_MULTIMARKET_MULTITRADER_QA_CHECKLIST.md`.
 For a short multimarket pre-deploy pass, use `docs/MARKET_MULTIMARKET_MULTITRADER_SMOKE_CHECKLIST.md`.
 
+The repository also includes a dedicated UI/UX simulation in `test-ui-ux-simulation.js`.
+For manual UI/UX verification, use `docs/UI_UX_SIMULATION_QA_CHECKLIST.md`.
+For a short UI/UX pre-deploy pass, use `docs/UI_UX_SIMULATION_SMOKE_CHECKLIST.md`.
+
 ## What it covers
 
 - Authentication lifecycle: register, login, session isolation, logout
@@ -63,7 +67,7 @@ npm run test:simulation
 
 ## Run all simulations
 
-Use this when you want a full regression pass across business flow, market creation, market trading, market settlement, market probability, market liquidity, market portfolio, market balance, market leaderboard, multimarket-multitrader, money conservation, and lifecycle state transitions:
+Use this when you want a full regression pass across business flow, market creation, market trading, market settlement, market probability, market liquidity, market portfolio, market balance, market leaderboard, multimarket-multitrader, UI/UX, money conservation, and lifecycle state transitions:
 
 ```bash
 npm run test:all-simulations
@@ -81,6 +85,7 @@ What this covers:
 - `test-market-balance.js`: wallet deltas for funding, AMM, exchange reserve/refund/fill, and rejection safety
 - `test-market-leaderboard.js`: public payload shape, rank sorting modes, and trade-activity ranking behavior
 - `test-multimarket-multitrader.js`: coordinated multi-user activity across many markets with cross-endpoint consistency checks
+- `test-ui-ux-simulation.js`: route availability, auth affordances, user-flow coherence, and resilience/error handling UX contracts
 - `test-money-conservation.js`: balance integrity and payout accounting
 - `test-market-lifecycle.js`: state transitions from OPEN through final settlement
 
@@ -221,6 +226,15 @@ npm run test:multimarket-multitrader:setup
 npm run test:multimarket-multitrader:amm
 npm run test:multimarket-multitrader:exchange
 npm run test:multimarket-multitrader:validate
+```
+
+### UI/UX Simulation Shortcuts
+
+```bash
+npm run test:uiux
+npm run test:uiux:surface
+npm run test:uiux:flow
+npm run test:uiux:resilience
 ```
 
 ---
