@@ -41,6 +41,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
             resolutionTime: true,
             disputeWindowHours: true,
             totalVolume: true,
+            ammVolume: true,
+            exchangeVolume: true,
             endDate: true,
             yesShares: true,
             noShares: true,
@@ -340,9 +342,19 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       ? outcomes.reduce((sum, outcome) => sum + toNumber(outcome.totalVolume), 0)
       : toNumber(market.totalVolume)
 
+    const ammVolume = market.marketType === 'MULTI'
+      ? outcomes.reduce((sum, outcome) => sum + toNumber(outcome.ammVolume), 0)
+      : toNumber(market.ammVolume)
+
+    const exchangeVolume = market.marketType === 'MULTI'
+      ? outcomes.reduce((sum, outcome) => sum + toNumber(outcome.exchangeVolume), 0)
+      : toNumber(market.exchangeVolume)
+
     return apiSuccess({
       ...market,
       totalVolume,
+      ammVolume,
+      exchangeVolume,
       outcomes,
       userOrders: userOrdersWithFilledShares,
       probabilities,
