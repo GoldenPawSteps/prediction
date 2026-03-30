@@ -55,17 +55,16 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
 }
 
 export function PriceChart({ data }: PriceChartProps) {
-  const [interactionReady, setInteractionReady] = useState(false)
+  const [hasUserInteracted, setHasUserInteracted] = useState(false)
+  const [isCoarsePointer, setIsCoarsePointer] = useState(false)
 
   useEffect(() => {
-    // On mobile navigations, the tap that opened this page can carry over and
-    // immediately activate a chart point. Delay chart interaction briefly to
-    // avoid phantom initial selection.
-    const timer = window.setTimeout(() => {
-      setInteractionReady(true)
-    }, 450)
+    const media = window.matchMedia('(pointer: coarse)')
+    const update = () => setIsCoarsePointer(media.matches)
+    update()
 
-    return () => window.clearTimeout(timer)
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
   }, [])
 
   if (!data || data.length === 0) {
@@ -89,7 +88,18 @@ export function PriceChart({ data }: PriceChartProps) {
   })
 
   return (
-    <div className="[&_svg]:outline-none [&_svg]:[-webkit-tap-highlight-color:transparent] [&_.recharts-wrapper]:!outline-none">
+    <div
+      className="[&_svg]:outline-none [&_svg]:[-webkit-tap-highlight-color:transparent] [&_.recharts-wrapper]:!outline-none"
+      onMouseMove={() => {
+        if (!hasUserInteracted) setHasUserInteracted(true)
+      }}
+      onTouchStart={() => {
+        if (!hasUserInteracted) setHasUserInteracted(true)
+      }}
+      onPointerDown={() => {
+        if (!hasUserInteracted) setHasUserInteracted(true)
+      }}
+    >
     <ResponsiveContainer width="100%" height={200}>
       <LineChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
@@ -109,8 +119,10 @@ export function PriceChart({ data }: PriceChartProps) {
           axisLine={false}
         />
         <Tooltip
+          trigger={isCoarsePointer ? 'click' : 'hover'}
+          active={hasUserInteracted ? undefined : false}
           content={(props) => (
-            interactionReady
+            hasUserInteracted
               ? <CustomTooltip active={props.active} payload={props.payload as unknown as CustomTooltipProps['payload']} label={props.label} />
               : null
           )}
@@ -121,7 +133,7 @@ export function PriceChart({ data }: PriceChartProps) {
           stroke="#34D399"
           strokeWidth={2}
           dot={false}
-          activeDot={interactionReady ? { r: 4 } : false}
+          activeDot={hasUserInteracted ? { r: 4 } : false}
         />
         <Line
           type="monotone"
@@ -129,7 +141,7 @@ export function PriceChart({ data }: PriceChartProps) {
           stroke="#F87171"
           strokeWidth={2}
           dot={false}
-          activeDot={interactionReady ? { r: 4 } : false}
+          activeDot={hasUserInteracted ? { r: 4 } : false}
         />
       </LineChart>
     </ResponsiveContainer>
