@@ -483,10 +483,6 @@ export function MarketDetailPageClient({
   }, [fetchMarket, market, refreshUser, user])
 
   useEffect(() => {
-    window.scrollTo(0, 0)
-  }, [])
-
-  useEffect(() => {
     if (loading || !market || hasLoggedNavMetricRef.current) return
 
     finishAdminNavMetric(`/markets/${id}`, user?.isAdmin, 'Market detail data')
