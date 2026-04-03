@@ -101,7 +101,9 @@ export const ja: Messages = {
     loginPrompt: 'ポートフォリオを見るにはログインしてください。',
     loginLink: 'ログイン →',
     balance: '残高',
+    totalBalance: '合計残高',
     availableBalance: '利用可能残高',
+    lockedBalance: 'ロック済み残高',
     reservedBalance: '予約済み資金',
     liquidityLocked: 'ロック済み流動性',
     portfolioValue: 'ポートフォリオ価値',
@@ -124,6 +126,8 @@ export const ja: Messages = {
     price: '価格',
     total: '合計',
     date: '日付',
+    locked: 'ロック済み',
+    available: '利用可能',
   },
   createMarket: {
     title: '予測マーケット作成',

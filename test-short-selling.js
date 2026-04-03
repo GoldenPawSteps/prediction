@@ -125,7 +125,8 @@ async function registerUser(prefix) {
   const suffix = `${prefix}_${RUN}_${userSeq}`
   const jar = new CookieJar()
   const email = `${suffix}@example.com`
-  const username = suffix.slice(0, 24)
+  const usernamePrefix = prefix.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 10) || 'user'
+  const username = `${usernamePrefix}_${RUN.slice(-6)}_${userSeq}`.slice(0, 24)
 
   const res = await request('POST', '/api/auth/register', {
     email,
@@ -279,7 +280,12 @@ async function exchangeNakedAskScenario() {
   await check('First fill of 5 increases locked reserve to 8 total', async () => {
     assert(Number(firstBidFill.filledShares) > 0, 'first crossing bid should fill')
     assertApprox(sellerAfterFirstFill - sellerBefore, -6, 'balance unchanged as buyer payment absorbed into collateral', 0.01)
-    assertApprox(Number(sellerPortfolioAfterFirstFill.stats.reservedBalance), 8, 'reserved balance should be 8 after first fill', 0.01)
+    assertApprox(Number(sellerPortfolioAfterFirstFill.stats.reservedBalance), 3,
+      'open ASK reserve should drop to 3 after filling 5 shares at 0.4', 0.01)
+    assertApprox(Number(sellerPortfolioAfterFirstFill.stats.shortCollateral), 5,
+      'short collateral should be 5 after first fill creates a -5 position', 0.01)
+    assertApprox(Number(sellerPortfolioAfterFirstFill.stats.lockedBalance), 8,
+      'total locked balance should be 8 after first fill', 0.01)
   })
 
   const secondBidFill = await placeOrder(buyer.jar, market.id, {
@@ -299,7 +305,12 @@ async function exchangeNakedAskScenario() {
   await check('Second fill completes order and moves locked reserve to 10', async () => {
     assert(Number(secondBidFill.filledShares) > 0, 'second crossing bid should fill remaining shares')
     assertApprox(sellerAfter - sellerBefore, -6, 'balance still unchanged after second fill - all payments absorbed into collateral', 0.01)
-    assertApprox(Number(sellerPortfolio.stats.reservedBalance), 10, 'reserved balance should be 10 after full fill', 0.01)
+    assertApprox(Number(sellerPortfolio.stats.reservedBalance), 0,
+      'open ASK reserve should be released after the order fully fills', 0.01)
+    assertApprox(Number(sellerPortfolio.stats.shortCollateral), 10,
+      'short collateral should be 10 after full fill creates a -10 position', 0.01)
+    assertApprox(Number(sellerPortfolio.stats.lockedBalance), 10,
+      'total locked balance should be 10 after full fill', 0.01)
   })
 
   await check('Exchange naked ask fills and leaves seller short with collateral', async () => {

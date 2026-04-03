@@ -56,6 +56,8 @@ interface PortfolioStats {
     initialShares: number
     remainingShares: number
     reservedAmount: number
+    reservedShares: number
+    balanceCoveredShares: number
     expiresAt: string | null
     createdAt: string
     market: { id: string; title: string }
@@ -77,6 +79,8 @@ interface PortfolioStats {
   }>
   stats: {
     availableBalance: number
+    lockedBalance: number
+    totalBalance: number
     reservedBalance: number
     liquidityLocked: number
     totalPositions: number
@@ -139,16 +143,23 @@ export function PortfolioSummarySection({ isPrefetched = false }: { isPrefetched
       <div className="space-y-4">
         <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-2 sm:gap-4">
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 sm:p-4">
-          <p className="text-sm text-gray-600 dark:text-gray-400">{t('availableBalance')}</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">{t('totalBalance')}</p>
           <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
+            {formatCurrency(stats.totalBalance)}
+          </p>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 sm:p-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400">{t('availableBalance')}</p>
+          <p className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
             {formatCurrency(stats.availableBalance)}
           </p>
         </div>
 
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 sm:p-4">
-          <p className="text-sm text-gray-600 dark:text-gray-400">{t('reservedBalance')}</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">{t('lockedBalance')}</p>
           <p className="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1">
-            {formatCurrency(stats.reservedBalance)}
+            {formatCurrency(stats.lockedBalance)}
           </p>
         </div>
 
@@ -302,6 +313,16 @@ export function PortfolioSummarySection({ isPrefetched = false }: { isPrefetched
                     <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
                       {tTradePanel('reserveHint', { amount: formatCurrency(Number(order.reservedAmount)) })}
                     </p>
+                    {order.side === 'ASK' && (
+                      <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                        {t('locked')} {t('shares').toLowerCase()}: {formatFixed(Number(order.reservedShares))}
+                      </p>
+                    )}
+                    {order.side === 'ASK' && Number(order.balanceCoveredShares) > 0 && (
+                      <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                        {formatFixed(Number(order.balanceCoveredShares))} {t('shares').toLowerCase()} covered by {formatCurrency(Number(order.reservedAmount))}
+                      </p>
+                    )}
                   </div>
                 </div>
               ))}

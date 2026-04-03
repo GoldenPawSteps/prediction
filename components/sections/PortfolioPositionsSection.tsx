@@ -21,6 +21,8 @@ interface Position {
   id: string
   outcome: string
   shares: number
+  lockedShares: number
+  availableShares: number
   avgEntryPrice: number
   currentPrice: number
   currentValue: number
@@ -112,7 +114,7 @@ export function PortfolioPositionsSection({ isPrefetched = false }: { isPrefetch
                 <th className="px-2 sm:px-6 py-2 sm:py-3 text-left font-semibold text-gray-700 dark:text-gray-300">{t('market')}</th>
                 <th className="px-2 sm:px-6 py-2 sm:py-3 text-left font-semibold text-gray-700 dark:text-gray-300">{t('outcome')}</th>
                 <th className="px-2 sm:px-6 py-2 sm:py-3 text-right font-semibold text-gray-700 dark:text-gray-300">{t('shares')}</th>
-                <th className="px-2 sm:px-6 py-2 sm:py-3 text-right font-semibold text-gray-700 dark:text-gray-300">{t('avgEntry')}</th>
+                <th className="hidden md:table-cell px-2 sm:px-6 py-2 sm:py-3 text-right font-semibold text-gray-700 dark:text-gray-300">{t('avgEntry')}</th>
                 <th className="px-2 sm:px-6 py-2 sm:py-3 text-right font-semibold text-gray-700 dark:text-gray-300">{t('currentPrice')}</th>
                 <th className="px-2 sm:px-6 py-2 sm:py-3 text-right font-semibold text-gray-700 dark:text-gray-300">{t('value')}</th>
                 <th className="px-2 sm:px-6 py-2 sm:py-3 text-right font-semibold text-gray-700 dark:text-gray-300">{t('unrealizedPnl')}</th>
@@ -152,9 +154,15 @@ export function PortfolioPositionsSection({ isPrefetched = false }: { isPrefetch
                     </Badge>
                   </td>
                   <td className="px-2 sm:px-6 py-2 sm:py-4 text-right text-gray-900 dark:text-white font-medium">
-                      {formatFixed(position.shares)}
+                    <div className="font-semibold">{formatFixed(position.shares)}</div>
+                    {position.lockedShares > 0 && (
+                      <div className="text-xs mt-0.5 space-y-0.5">
+                        <div className="text-green-600 dark:text-green-400">{t('available')}: {formatFixed(position.availableShares)}</div>
+                        <div className="text-amber-600 dark:text-amber-400">{t('locked')}: {formatFixed(position.lockedShares)}</div>
+                      </div>
+                    )}
                   </td>
-                  <td className="px-2 sm:px-6 py-2 sm:py-4 text-right text-gray-600 dark:text-gray-400">
+                  <td className="hidden md:table-cell px-2 sm:px-6 py-2 sm:py-4 text-right text-gray-600 dark:text-gray-400">
                     {formatCurrency(position.avgEntryPrice)}
                   </td>
                   <td className="px-2 sm:px-6 py-2 sm:py-4 text-right text-gray-600 dark:text-gray-400">

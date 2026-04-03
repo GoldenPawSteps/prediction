@@ -4,9 +4,9 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth, apiError, apiSuccess } from '@/lib/api-helpers'
 import { lmsrTradeCost, getMarketProbabilities } from '@/lib/lmsr'
 import { roundMoney, roundPrice } from '@/lib/money'
-import { expireStaleMarketOrders } from '@/lib/order-expiration'
+import { expireStaleMarketOrders, activeOrderWhere } from '@/lib/order-expiration'
 import { applySignedPositionTrade } from '@/lib/position-accounting'
-import { rebalanceAskReservesForOutcome } from '@/lib/order-reserve-rebalance'
+import { rebalanceAskReservesForOutcome, computeAskAllocation, type AskOrderInput } from '@/lib/order-reserve-rebalance'
 import { z } from 'zod'
 
 // AMM trade handler: buy/sell flow with reservation-aware sell checks.
@@ -96,6 +96,57 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       })
 
       const signedDelta = type === 'BUY' ? shares : -shares
+
+      if (type === 'SELL') {
+        // --- Sell-side validations ---
+        const now2 = new Date()
+        const [positionCheck, openAskOrders, userForCheck] = await Promise.all([
+          tx.position.findUnique({
+            where: { userId_marketId_outcome: { userId: authUser.userId, marketId, outcome } },
+            select: { shares: true },
+          }),
+          tx.marketOrder.findMany({
+            where: {
+              userId: authUser.userId,
+              marketId,
+              outcome,
+              side: 'ASK',
+              status: { in: ['OPEN', 'PARTIAL'] },
+              remainingShares: { gt: 0 },
+              ...activeOrderWhere(now2),
+            },
+            select: { id: true, price: true, remainingShares: true, reservedAmount: true },
+          }),
+          tx.user.findUnique({ where: { id: authUser.userId }, select: { balance: true } }),
+        ])
+
+        const currentShares = toNumber(positionCheck?.shares)
+        const availableBalance = toNumber(userForCheck?.balance)
+
+        // Allow short-selling: only check if there are open ASK orders that need collateral
+        if (openAskOrders.length > 0) {
+          // Compute how much more collateral would be needed after the sell
+          const askInputs: AskOrderInput[] = openAskOrders.map((o) => ({
+            id: o.id,
+            price: toNumber(o.price),
+            remainingShares: toNumber(o.remainingShares),
+            currentReservedAmount: toNumber(o.reservedAmount),
+          }))
+          const posShares = Math.max(0, currentShares)
+          const postSellShares = Math.max(0, currentShares - shares)
+
+          const { totalRequiredBalance: currentRequired } = computeAskAllocation(posShares, askInputs)
+          const { totalRequiredBalance: postRequired } = computeAskAllocation(postSellShares, askInputs)
+          const additionalCollateral = roundMoney(Math.max(0, postRequired - currentRequired))
+
+          // The sell generates proceeds; check if balance + proceeds covers the locked increase
+          // Note: tradeCost is negative for sells (proceeds), so -tradeCost is positive
+          if (availableBalance + roundMoney(-tradeCost) - additionalCollateral < -0.0000001) {
+            throw new Error('Insufficient balance to cover collateral for your open ask orders after this sell')
+          }
+        }
+      }
+
       await applySignedPositionTrade(tx, {
         userId: authUser.userId,
         marketId,

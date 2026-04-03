@@ -337,6 +337,10 @@ async function reservesSection() {
     assert(found.side === 'ASK', `expected reserved order side ASK, got ${found.side}`)
     assertApprox(Number(found.reservedAmount), 6,
       'initial naked ASK reservedAmount should equal shares*(1-price)', 0.001)
+    assertApprox(Number(found.reservedShares), 0,
+      'initial naked ASK reservedShares should be zero because no position shares are covering it', 0.001)
+    assertApprox(Number(found.balanceCoveredShares), 10,
+      'initial naked ASK balanceCoveredShares should match the uncovered ASK size', 0.001)
   })
 }
 

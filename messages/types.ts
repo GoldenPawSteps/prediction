@@ -99,7 +99,9 @@ export interface Messages {
     loginPrompt: string
     loginLink: string
     balance: string
+    totalBalance: string
     availableBalance: string
+    lockedBalance: string
     reservedBalance: string
     liquidityLocked: string
     portfolioValue: string
@@ -112,6 +114,8 @@ export interface Messages {
     noTrades: string
     outcome: string
     shares: string
+    locked: string
+    available: string
     avgEntry: string
     currentPrice: string
     value: string
