@@ -80,7 +80,7 @@
     "test:simulation:resolution": "node test-simulation.js resolution",
     "test:simulation:dispute": "node test-simulation.js dispute",
     "test:simulation:edge": "node test-simulation.js edge",
-    "test:all-simulations": "npm run test:simulation && npm run test:market-creation && npm run test:market-trading && npm run test:settlement && npm run test:probability && npm run test:liquidity && npm run test:portfolio && npm run test:balance && npm run test:leaderboard && npm run test:multimarket-multitrader && npm run test:uiux && npm run test:conservation && npm run test:lifecycle",
+    "test:all-simulations": "npm run test:simulation && npm run test:market-creation && npm run test:market-trading && npm run test:settlement && npm run test:probability && npm run test:liquidity && npm run test:portfolio && npm run test:balance && npm run test:short-selling && npm run test:leaderboard && npm run test:multimarket-multitrader && npm run test:uiux && npm run test:conservation && npm run test:lifecycle",
     "test:lifecycle": "node test-market-lifecycle.js",
     "test:lifecycle:core": "node test-market-lifecycle.js core",
     "test:lifecycle:invalid": "node test-market-lifecycle.js invalid",

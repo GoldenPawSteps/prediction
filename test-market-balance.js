@@ -5,8 +5,8 @@
  * Focuses specifically on user balance behavior:
  *   - baseline wallet and portfolio available-balance sync
  *   - market creation liquidity funding debits
- *   - AMM BUY/SELL balance exactness
- *   - exchange BID reserve, cancel refund, and fill transfer balance effects
+ *   - AMM BUY/SELL balance exactness, including short opens
+ *   - exchange BID reserve, cancel refund, and naked-ASK collateral effects
  *   - rejected operations do not mutate balances
  *
  * Run:
@@ -265,6 +265,20 @@ async function ammSection() {
     assertApprox(after - before, Math.abs(Number(sellTrade.totalCost)),
       'SELL should credit balance by absolute totalCost', 0.001)
   })
+
+  await step('AMM short open credits proceeds minus newly locked collateral', async () => {
+    const shortMarket = await createBinaryMarket(creator.jar, 'AMMShort')
+    const before = await getBalance(trader.jar)
+    const shortTrade = await trade(trader.jar, shortMarket.id, 'YES', 'SELL', 10)
+    const after = await getBalance(trader.jar)
+    const portfolio = await getPortfolio(trader.jar)
+
+    assert(Number(shortTrade.totalCost) < 0, `short SELL totalCost should be negative, got ${shortTrade.totalCost}`)
+    assertApprox(after - before, Math.abs(Number(shortTrade.totalCost)) - 10,
+      'AMM short should move available balance by proceeds minus collateral lock', 0.01)
+    assertApprox(Number(portfolio.stats.shortCollateral), 10,
+      'portfolio shortCollateral should reflect the short exposure payoff cap', 0.001)
+  })
 }
 
 async function exchangeSection() {
@@ -320,6 +334,38 @@ async function exchangeSection() {
     assert(Number(bid.filledShares) > 0, 'crossing BID should fill at least partially')
     assertApprox(buyerBeforeBid - buyerAfterBid, 3.3, 'buyer reserve/use should be 0.55*6', 0.001)
     assertApprox(sumAfter, sumBefore, 'exchange fill should preserve combined buyer+seller balance', 0.001)
+  })
+
+  await step('Naked ASK fill leaves seller available balance unchanged while reserve grows', async () => {
+    const shortMarket = await createBinaryMarket(creator.jar, 'ExchangeShort')
+    const sellerBeforePlace = await getBalance(seller.jar)
+
+    await placeOrder(seller.jar, shortMarket.id, {
+      outcome: 'YES',
+      side: 'ASK',
+      orderType: 'GTC',
+      price: 0.4,
+      shares: 10,
+    })
+
+    const sellerAfterPlace = await getBalance(seller.jar)
+    assertApprox(sellerBeforePlace - sellerAfterPlace, 6,
+      'placing naked ASK should lock initial reserve of shares*(1-price)', 0.001)
+
+    await placeOrder(buyer.jar, shortMarket.id, {
+      outcome: 'YES',
+      side: 'BID',
+      orderType: 'GTC',
+      price: 0.4,
+      shares: 5,
+    })
+
+    const sellerAfterFill = await getBalance(seller.jar)
+    const sellerPortfolio = await getPortfolio(seller.jar)
+    assertApprox(sellerAfterFill, sellerAfterPlace,
+      'buyer payment on naked ASK fill should go into collateral, not available balance', 0.001)
+    assertApprox(Number(sellerPortfolio.stats.reservedBalance), 8,
+      'seller reserved balance should increase to reflect filled short exposure', 0.01)
   })
 }
 

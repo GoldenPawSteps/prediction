@@ -8,6 +8,7 @@
  *   S3. INVALID settlement refunds trader cost basis after finalization
  *   S4. Immutable finalization is idempotent
  *   S5. Dispute re-resolution settles only the latest outcome
+ *   S6. Short positions settle correctly for both winning and losing shorts
  *
  * Run:
  *   node test-market-settlement.js
@@ -444,6 +445,75 @@ async function scenarioDisputeLatestOutcomeSettlement() {
   })
 }
 
+async function scenarioShortPositionSettlement() {
+  heading('S6 — short positions settle correctly after immutable finalization')
+
+  const creator = await registerUser('s6creator')
+  const shortWinner = await registerUser('s6shortwinner')
+  const shortLoser = await registerUser('s6shortloser')
+
+  const winningMarket = await createMarket(creator.jar, {
+    initialLiquidity: 100,
+    disputeWindowHours: 1,
+    endDate: new Date(Date.now() + 6000).toISOString(),
+  })
+  const losingMarket = await createMarket(creator.jar, {
+    initialLiquidity: 100,
+    disputeWindowHours: 1,
+    endDate: new Date(Date.now() + 6000).toISOString(),
+  })
+
+  const winnerStart = await getBalance(shortWinner.jar)
+  const loserStart = await getBalance(shortLoser.jar)
+  const winnerShort = await trade(shortWinner.jar, winningMarket.id, 'NO', 'SELL', 4)
+  const loserShort = await trade(shortLoser.jar, losingMarket.id, 'YES', 'SELL', 4)
+
+  await sleep(6600)
+  await getMarket(winningMarket.id)
+  await getMarket(losingMarket.id)
+
+  await resolveMarket(creator.jar, winningMarket.id, 'YES')
+  await resolveMarket(creator.jar, losingMarket.id, 'YES')
+
+  const winnerPendingPortfolio = await getPortfolio(shortWinner.jar)
+  const loserPendingPortfolio = await getPortfolio(shortLoser.jar)
+  const winnerPendingBalance = await getBalance(shortWinner.jar)
+  const loserPendingBalance = await getBalance(shortLoser.jar)
+
+  await check('S6a: short positions remain open and collateral stays locked before finalization', async () => {
+    assert(winnerPendingPortfolio.stats.totalPositions > 0, 'winning short should remain open pre-finalization')
+    assert(loserPendingPortfolio.stats.totalPositions > 0, 'losing short should remain open pre-finalization')
+    assert(Number(winnerPendingPortfolio.stats.shortCollateral) > 0, 'winning short collateral should remain locked pre-finalization')
+    assert(Number(loserPendingPortfolio.stats.shortCollateral) > 0, 'losing short collateral should remain locked pre-finalization')
+    assertApprox(winnerPendingBalance, winnerStart - winnerShort.totalCost - 4,
+      'winning short balance should equal proceeds minus locked collateral pre-finalization', 0.02)
+    assertApprox(loserPendingBalance, loserStart - loserShort.totalCost - 4,
+      'losing short balance should equal proceeds minus locked collateral pre-finalization', 0.02)
+  })
+
+  await triggerFinalization(creator.jar, winningMarket.id, 2)
+  await triggerFinalization(creator.jar, losingMarket.id, 2)
+
+  const winnerAfterPortfolio = await getPortfolio(shortWinner.jar)
+  const loserAfterPortfolio = await getPortfolio(shortLoser.jar)
+  const winnerAfterBalance = await getBalance(shortWinner.jar)
+  const loserAfterBalance = await getBalance(shortLoser.jar)
+
+  await check('S6b: winning short closes and receives collateral release at finalization', async () => {
+    assert(winnerAfterPortfolio.stats.totalPositions === 0, 'winning short position should close at finalization')
+    assertApprox(Number(winnerAfterPortfolio.stats.shortCollateral), 0, 'winning short collateral should be released', 0.001)
+    assertApprox(winnerAfterBalance, winnerStart - winnerShort.totalCost,
+      'winning short should end with proceeds after collateral is released', 0.02)
+  })
+
+  await check('S6c: losing short closes and collateral is consumed by payout', async () => {
+    assert(loserAfterPortfolio.stats.totalPositions === 0, 'losing short position should close at finalization')
+    assertApprox(Number(loserAfterPortfolio.stats.shortCollateral), 0, 'losing short collateral should be cleared', 0.001)
+    assertApprox(loserAfterBalance, loserPendingBalance,
+      'losing short should not receive additional balance when payout consumes collateral', 0.02)
+  })
+}
+
 async function main() {
   const mode = (process.argv[2] || 'all').toLowerCase()
 
@@ -464,6 +534,7 @@ async function main() {
   if (mode === 'all' || mode === 'core') {
     await scenarioDeferredYesSettlement()
     await scenarioZeroTradeSettlement()
+    await scenarioShortPositionSettlement()
   }
   if (mode === 'all' || mode === 'invalid') {
     await scenarioInvalidSettlement()

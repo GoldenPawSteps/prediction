@@ -16,7 +16,8 @@
  *     4. Multi-user sum: Σ(balance_decrease_i) = Σ(reported_totalCost_i)
  *     5. Exchange BID reservation: balance decreases by exactly price × shares
  *     6. Exchange BID cancel — full exact refund
- *     7. Exchange BID/ASK fill — buyer pays X, seller receives X (net $0)
+ *     7. Exchange BID/ASK fill — buyer pays X, seller receives X (net $0) for long inventory
+ *     8. Exchange naked short ASK fill — buyer pays X, seller available stays flat, reserve increases by X
  *
  *   PART B — Full lifecycle (uses Prisma to backdate dispute window)
  *     8.  Zero-trade market — creator gets full liquidity back
@@ -148,6 +149,12 @@ async function getBalance(jar) {
   const r = await req('GET', '/api/auth/me', null, jar)
   assert(r.ok, `getBalance failed: ${JSON.stringify(r.data)}`)
   return Number(r.data.balance)
+}
+
+async function getPortfolio(jar) {
+  const r = await req('GET', '/api/portfolio', null, jar)
+  assert(r.ok, `getPortfolio failed: ${JSON.stringify(r.data)}`)
+  return r.data
 }
 
 async function createMarket(jar, opts = {}) {
@@ -506,6 +513,51 @@ async function partA_exchangeFillZeroSum() {
     const expectedIncrease = price * filledShares
     assertApprox(sellerIncrease, expectedIncrease,
       `seller balance increase (${sellerIncrease.toFixed(6)}) should equal price×filledShares (${expectedIncrease.toFixed(6)})`, 0.01)
+  })
+}
+
+async function partA_exchangeNakedShortAskReserveFlow() {
+  scenario('A8 — Exchange naked short ASK: buyer payment goes into reserve, not seller available balance')
+
+  const buyer = await registerUser('a8buyer')
+  const seller = await registerUser('a8seller')
+  const market = await createMarket(buyer.jar)
+
+  const price = 0.4
+  const shares = 10
+  const initialReserve = shares * (1 - price)
+
+  const sellerBeforeAsk = await getBalance(seller.jar)
+  const ask = await placeOrder(seller.jar, market.id, {
+    outcome: 'YES', side: 'ASK', orderType: 'GTC', price, shares,
+  })
+  const sellerAfterAsk = await getBalance(seller.jar)
+
+  await check('A8a: naked ASK placement locks initial reserve of shares×(1-price)', async () => {
+    assertApprox(sellerBeforeAsk - sellerAfterAsk, initialReserve,
+      'naked ASK should lock initial reserve', 0.001)
+    assertApprox(Number(ask.order.reservedAmount), initialReserve,
+      'order.reservedAmount should reflect initial naked-ask reserve', 0.001)
+  })
+
+  const buyerBeforeBid = await getBalance(buyer.jar)
+  await placeOrder(buyer.jar, market.id, {
+    outcome: 'YES', side: 'BID', orderType: 'GTC', price, shares: 5,
+  })
+  const buyerAfterBid = await getBalance(buyer.jar)
+  const sellerAfterFill = await getBalance(seller.jar)
+
+  await check('A8b: buyer pays fill notional while seller available balance stays flat', async () => {
+    assertApprox(buyerBeforeBid - buyerAfterBid, 2,
+      'buyer available balance should decrease by fill notional', 0.001)
+    assertApprox(sellerAfterFill, sellerAfterAsk,
+      'seller available balance should not receive or lose cash on naked short fill', 0.001)
+  })
+
+  await check('A8c: remaining order reserve grows to reflect total locked collateral', async () => {
+    const portfolio = await getPortfolio(seller.jar)
+    assertApprox(Number(portfolio.stats.reservedBalance), 8,
+      'after 5-share fill, locked reserve should be 8', 0.001)
   })
 }
 
@@ -869,6 +921,7 @@ async function main() {
     await partA_exchangeBidReservation()
     await partA_exchangeCancelFullRefund()
     await partA_exchangeFillZeroSum()
+    await partA_exchangeNakedShortAskReserveFlow()
   }
 
   if (runLifecycle) {

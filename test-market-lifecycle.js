@@ -10,6 +10,7 @@
  *   L4. Immutable finalization unlocks liquidity, closes positions, and is idempotent
  *   L5. INVALID lifecycle refunds positions after finalization
  *   L6. Dispute -> re-vote -> re-resolution finalizes the latest outcome only
+ *   L7. Short positions remain pending during dispute window and settle correctly at finalization
  *
  * Run:
  *   node test-market-lifecycle.js
@@ -497,6 +498,80 @@ async function scenarioDisputeAndReResolution() {
   })
 }
 
+async function scenarioShortLifecycle() {
+  heading('L7 — short lifecycle keeps exposure pending, then settles definitively')
+
+  const creator = await registerUser('l7creator')
+  const shortWinner = await registerUser('l7shortwinner')
+  const shortLoser = await registerUser('l7shortloser')
+
+  const winningMarket = await createMarket(creator.jar, {
+    initialLiquidity: 100,
+    disputeWindowHours: 1,
+    endDate: new Date(Date.now() + 7000).toISOString(),
+  })
+  const losingMarket = await createMarket(creator.jar, {
+    initialLiquidity: 100,
+    disputeWindowHours: 1,
+    endDate: new Date(Date.now() + 7000).toISOString(),
+  })
+
+  const winnerStart = await getBalance(shortWinner.jar)
+  const loserStart = await getBalance(shortLoser.jar)
+  const winnerShort = await trade(shortWinner.jar, winningMarket.id, 'NO', 'SELL', 4)
+  const loserShort = await trade(shortLoser.jar, losingMarket.id, 'YES', 'SELL', 4)
+
+  await sleep(7600)
+  await getMarket(winningMarket.id)
+  await getMarket(losingMarket.id)
+
+  const winnerResolve = await resolveMarket(creator.jar, winningMarket.id, 'YES')
+  const loserResolve = await resolveMarket(creator.jar, losingMarket.id, 'YES')
+
+  const winnerPendingPortfolio = await getPortfolio(shortWinner.jar)
+  const loserPendingPortfolio = await getPortfolio(shortLoser.jar)
+  const winnerPendingBalance = await getBalance(shortWinner.jar)
+  const loserPendingBalance = await getBalance(shortLoser.jar)
+
+  await check('L7a: short resolutions are provisional first and do not settle immediately', async () => {
+    assert(winnerResolve.settlementPending === true, 'winning short market should remain provisional first')
+    assert(loserResolve.settlementPending === true, 'losing short market should remain provisional first')
+    assert(winnerPendingPortfolio.stats.totalPositions > 0, 'winning short should remain open during dispute window')
+    assert(loserPendingPortfolio.stats.totalPositions > 0, 'losing short should remain open during dispute window')
+    assert(Number(winnerPendingPortfolio.stats.shortCollateral) > 0, 'winning short collateral should remain locked pre-finalization')
+    assert(Number(loserPendingPortfolio.stats.shortCollateral) > 0, 'losing short collateral should remain locked pre-finalization')
+    assertApprox(winnerPendingBalance, winnerStart - winnerShort.totalCost - 4,
+      'winning short should remain at proceeds minus locked collateral before finalization', 0.02)
+    assertApprox(loserPendingBalance, loserStart - loserShort.totalCost - 4,
+      'losing short should remain at proceeds minus locked collateral before finalization', 0.02)
+  })
+
+  await backdateResolutionTime(winningMarket.id, 2)
+  await backdateResolutionTime(losingMarket.id, 2)
+  await getPortfolio(creator.jar)
+
+  const winnerAfterPortfolio = await getPortfolio(shortWinner.jar)
+  const loserAfterPortfolio = await getPortfolio(shortLoser.jar)
+  const winnerAfterBalance = await getBalance(shortWinner.jar)
+  const loserAfterBalance = await getBalance(shortLoser.jar)
+
+  await check('L7b: finalization closes winning short and releases its collateral', async () => {
+    assert(winnerAfterPortfolio.stats.totalPositions === 0, 'winning short should be closed after finalization')
+    assertApprox(Number(winnerAfterPortfolio.stats.shortCollateral), 0,
+      'winning short collateral should be released after finalization', 0.001)
+    assertApprox(winnerAfterBalance, winnerStart - winnerShort.totalCost,
+      'winning short should end with proceeds once collateral is released', 0.02)
+  })
+
+  await check('L7c: finalization closes losing short without extra payout', async () => {
+    assert(loserAfterPortfolio.stats.totalPositions === 0, 'losing short should be closed after finalization')
+    assertApprox(Number(loserAfterPortfolio.stats.shortCollateral), 0,
+      'losing short collateral should be cleared after finalization', 0.001)
+    assertApprox(loserAfterBalance, loserPendingBalance,
+      'losing short collateral should be consumed by payout obligation', 0.02)
+  })
+}
+
 async function main() {
   const mode = (process.argv[2] || 'all').toLowerCase()
 
@@ -517,6 +592,7 @@ async function main() {
   if (mode === 'all' || mode === 'core') {
     await scenarioOpenAndExpiryLifecycle()
     await scenarioProvisionalAndFinalSettlement()
+    await scenarioShortLifecycle()
   }
   if (mode === 'all' || mode === 'invalid') {
     await scenarioInvalidLifecycle()

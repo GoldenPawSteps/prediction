@@ -3,10 +3,11 @@
  *
  * Focuses specifically on trading functionality:
  *   - AMM trading (BUY/SELL YES/NO)
+ *   - Signed positions, including AMM short-selling
  *   - Probability movement and invariants
  *   - Exchange orders (GTC/GTD/FOK/FAK)
  *   - Matching, partial fills, cancellation, and reserve/refund behavior
- *   - Trading validation (insufficient funds, over-sell, auth, bad ids)
+ *   - Trading validation (insufficient funds, auth, bad ids)
  *
  * Run:
  *   node test-market-trading.js            # full suite
@@ -43,6 +44,12 @@ async function request(method, path, body = null, jar = null) {
   let data;
   try { data = await res.json(); } catch { data = null; }
   return { status: res.status, ok: res.ok, data };
+}
+
+async function getPortfolio(jar) {
+  const r = await request('GET', '/api/portfolio', null, jar);
+  assert(r.ok, `GET /api/portfolio failed: ${r.status}`);
+  return r.data;
 }
 
 function assert(cond, msg) {
@@ -205,13 +212,19 @@ async function ammSection(ctx) {
     assert(Number(r.data.trade.totalCost) < 0, `SELL totalCost should be negative, got ${r.data.trade.totalCost}`);
   });
 
-  await step('AMM over-sell is rejected', async () => {
+  await step('AMM over-sell opens a short position when collateral is sufficient', async () => {
     const r = await request('POST', `/api/markets/${market.id}/trade`, {
       outcome: 'YES',
       type: 'SELL',
-      shares: 99999,
+      shares: 20,
     }, alice.jar);
-    assert(!r.ok, 'over-sell should fail');
+
+    assert(r.ok, `short sell should succeed: ${JSON.stringify(r.data)}`);
+    const portfolio = await getPortfolio(alice.jar);
+    const shortPosition = (portfolio.positions || []).find((p) => p.market.id === market.id && p.outcome === 'YES');
+    assert(shortPosition, 'short position should appear in portfolio');
+    assert(Number(shortPosition.shares) < 0, `expected negative shares, got ${shortPosition.shares}`);
+    assert(Number(portfolio.stats.shortCollateral || 0) > 0, 'short collateral should be tracked in portfolio stats');
   });
 
   await step('AMM insufficient-funds BUY is rejected', async () => {
@@ -272,14 +285,7 @@ async function exchangeSection(ctx) {
     assert(Number(r.data.filledShares || 0) >= 0, 'filledShares should be non-negative');
   });
 
-  await step('Non-crossing GTC ASK remains unfilled', async () => {
-    const prep = await request('POST', `/api/markets/${market.id}/trade`, {
-      outcome: 'YES',
-      type: 'BUY',
-      shares: 25,
-    }, bob.jar);
-    assert(prep.ok, 'bob inventory prep failed');
-
+  await step('Non-crossing GTC ASK can be placed naked and remains unfilled', async () => {
     const ask = await request('POST', `/api/markets/${market.id}/order`, {
       outcome: 'YES',
       side: 'ASK',
@@ -290,6 +296,7 @@ async function exchangeSection(ctx) {
 
     assert(ask.ok, `GTC ASK failed: ${JSON.stringify(ask.data)}`);
     assert(Number(ask.data.filledShares || 0) === 0, 'ask should not fill against lower bid');
+    assert(Number(ask.data.order?.reservedAmount || 0) > 0, 'naked ask should reserve short collateral');
   });
 
   await step('Crossing BID matches existing ASK with filled shares', async () => {

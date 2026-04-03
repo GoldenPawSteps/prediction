@@ -5,7 +5,7 @@
  * Focuses specifically on portfolio endpoint behavior:
  *   - baseline portfolio shape and auth enforcement
  *   - position valuation and aggregate stats coherence
- *   - reserved BID order accounting (reservedOrders + reservedBalance)
+ *   - reserved order accounting and short-collateral visibility
  *   - created market tracking and liquidityLocked accounting
  *   - execution venue classification (AMM vs EXCHANGE, maker vs taker)
  *
@@ -207,6 +207,7 @@ async function basicsSection() {
     assert(Array.isArray(portfolio.positions), 'positions should be an array')
     assert(Array.isArray(portfolio.trades), 'trades should be an array')
     assert(Array.isArray(portfolio.reservedOrders), 'reservedOrders should be an array')
+    assert(Array.isArray(portfolio.shortReserves || []), 'shortReserves should be an array')
     assert(Array.isArray(portfolio.createdMarkets), 'createdMarkets should be an array')
 
     assert(portfolio.positions.length === 0, `expected no positions, got ${portfolio.positions.length}`)
@@ -269,6 +270,23 @@ async function positionsSection() {
     assertApprox(Number(portfolio.stats.totalUnrealizedPnl), totalUnrealized, 'stats.totalUnrealizedPnl should match positions sum', 0.001)
     assertApprox(Number(portfolio.stats.totalRealizedPnl), totalRealized, 'stats.totalRealizedPnl should match positions sum', 0.001)
   })
+
+  await step('Negative-share AMM shorts appear in positions and reserve stats', async () => {
+    const shortMarket = await createBinaryMarket(trader.jar, 'SignedPositionCheck', {
+      initialLiquidity: 100,
+      priorProbability: 0.5,
+    })
+
+    await trade(trader.jar, shortMarket.id, 'YES', 'SELL', 6)
+    const portfolio = await getPortfolio(trader.jar)
+    const shortPosition = portfolio.positions.find((p) => p.market.id === shortMarket.id && p.outcome === 'YES')
+
+    assert(shortPosition, 'short AMM position should appear in portfolio positions')
+    assert(Number(shortPosition.shares) < 0, `expected negative shares, got ${shortPosition.shares}`)
+    assert((portfolio.shortReserves || []).some((reserve) => reserve.marketId === shortMarket.id),
+      'short reserve entry should appear for AMM short exposure')
+    assert(Number(portfolio.stats.shortCollateral) > 0, 'portfolio shortCollateral should be positive when a short exists')
+  })
 }
 
 async function reservesSection() {
@@ -301,6 +319,24 @@ async function reservesSection() {
       'stats.reservedBalance should equal sum(reservedOrders.reservedAmount)', 0.001)
     assertApprox(Number(portfolio.stats.reservedBalance), expectedReserve,
       'reservedBalance should equal expected reserve for this single order', 0.001)
+  })
+
+  await step('Naked ASK reserves appear separately from open reserved orders', async () => {
+    const shortMarket = await createBinaryMarket(creator.jar, 'ShortReserveView')
+    const order = await placeOrder(trader.jar, shortMarket.id, {
+      outcome: 'YES',
+      side: 'ASK',
+      orderType: 'GTC',
+      price: 0.4,
+      shares: 10,
+    })
+
+    const portfolio = await getPortfolio(trader.jar)
+    const found = portfolio.reservedOrders.find((o) => o.id === order.order.id)
+    assert(found, 'naked ASK should appear in reservedOrders')
+    assert(found.side === 'ASK', `expected reserved order side ASK, got ${found.side}`)
+    assertApprox(Number(found.reservedAmount), 6,
+      'initial naked ASK reservedAmount should equal shares*(1-price)', 0.001)
   })
 }
 
@@ -335,9 +371,6 @@ async function exchangeSection() {
 
   const market = await createBinaryMarket(creator.jar, 'Exchange')
 
-  // Maker needs YES inventory to place ASK.
-  await trade(maker.jar, market.id, 'YES', 'BUY', 8)
-
   await step('Portfolio trades classify AMM vs EXCHANGE and maker/taker roles', async () => {
     await placeOrder(maker.jar, market.id, {
       outcome: 'YES',
@@ -360,13 +393,14 @@ async function exchangeSection() {
 
     const makerExchangeTrade = makerPortfolio.trades.find((t) => t.marketId === market.id && t.executionVenue === 'EXCHANGE')
     const takerExchangeTrade = takerPortfolio.trades.find((t) => t.marketId === market.id && t.executionVenue === 'EXCHANGE')
-    const makerAmmTrade = makerPortfolio.trades.find((t) => t.marketId === market.id && t.executionVenue === 'AMM')
 
-    assert(makerAmmTrade, 'maker should have an AMM trade from inventory seeding BUY')
     assert(makerExchangeTrade, 'maker should have an EXCHANGE trade after ASK fill')
     assert(takerExchangeTrade, 'taker should have an EXCHANGE trade after BID fill')
     assert(makerExchangeTrade.exchangeRole === 'MAKER', `expected maker exchangeRole=MAKER, got ${makerExchangeTrade.exchangeRole}`)
     assert(takerExchangeTrade.exchangeRole === 'TAKER', `expected taker exchangeRole=TAKER, got ${takerExchangeTrade.exchangeRole}`)
+    assert(makerExchangeTrade.type === 'SELL', `expected maker exchange trade type SELL, got ${makerExchangeTrade.type}`)
+    assertApprox(Number(makerPortfolio.stats.shortCollateral), 5,
+      'naked ask maker should have short collateral after the fill', 0.001)
   })
 }
 

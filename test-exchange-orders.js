@@ -3,7 +3,7 @@
  * Exchange integration test
  * Validates:
  * 1) GTC BID-maker partial fill + cancellation + refund
- * 2) GTC ASK-maker with BID taker reserve release
+ * 2) GTC naked ASK-maker with BID taker short-collateral progression
  * 3) GTD expiry releases reserves and cancels stale orders
  * 4) FOK rejects if full size is not immediately available
  * 5) FAK fills available size and kills the remainder
@@ -257,18 +257,11 @@ async function run() {
   }
 
   if (runAskMakerScenario) {
-    console.log('Scenario 2: ASK maker -> BID taker -> reserve release')
-
-    const buyNoRes = await request(
-      'POST',
-      `/api/markets/${marketId}/trade`,
-      { outcome: 'NO', type: 'BUY', shares: 3 },
-      traderA.jar
-    )
-    assert(buyNoRes.ok, `AMM NO buy failed: ${JSON.stringify(buyNoRes.data)}`)
+    console.log('Scenario 2: naked ASK maker -> BID taker -> short-collateral progression')
 
     const askMakerPrice = 0.55
     const askMakerShares = 2
+    const traderABalanceBeforeAsk = await getBalance(traderA.jar)
     const askMakerRes = await request(
       'POST',
       `/api/markets/${marketId}/order`,
@@ -277,6 +270,11 @@ async function run() {
     )
     assert(askMakerRes.ok, `Place maker ask failed: ${JSON.stringify(askMakerRes.data)}`)
     assert(approxEqual(askMakerRes.data.filledShares, 0), 'Expected maker ask to start with zero fills')
+    const traderABalanceAfterAsk = await getBalance(traderA.jar)
+    assert(
+      approxEqual(traderABalanceBeforeAsk - traderABalanceAfterAsk, askMakerShares * (1 - askMakerPrice)),
+      `Naked ask reserve mismatch. Before=${traderABalanceBeforeAsk} After=${traderABalanceAfterAsk}`
+    )
 
     const balanceBBeforeTakerBid = await getBalance(traderB.jar)
     const bidTakerPrice = 0.6
@@ -300,6 +298,12 @@ async function run() {
       `Taker bid balance mismatch. Reserve=${bidTakerReserve} expected final ${expectedAfterTakerBid}, got ${balanceBAfterTakerBid}`
     )
 
+    const traderABalanceAfterFill = await getBalance(traderA.jar)
+    assert(
+      approxEqual(traderABalanceAfterFill, traderABalanceAfterAsk),
+      `Seller available balance should stay unchanged on naked ask fill. AfterAsk=${traderABalanceAfterAsk} AfterFill=${traderABalanceAfterFill}`
+    )
+
     const marketAfterScenario2 = await request('GET', `/api/markets/${marketId}`, null, traderA.jar)
     assert(marketAfterScenario2.ok, `Fetch market after scenario 2 failed: ${JSON.stringify(marketAfterScenario2.data)}`)
 
@@ -315,6 +319,13 @@ async function run() {
     const askHistory = (marketAfterScenario2.data.userOrders || []).find((o) => o.id === askMakerRes.data.order.id)
     assert(askHistory, 'Expected maker ask in user order history')
     assert(askHistory.status === 'PARTIAL', `Expected maker ask PARTIAL, got ${askHistory.status}`)
+
+    const traderAPortfolio = await request('GET', '/api/portfolio', null, traderA.jar)
+    assert(traderAPortfolio.ok, `Fetch portfolio after scenario 2 failed: ${JSON.stringify(traderAPortfolio.data)}`)
+    assert(
+      approxEqual(traderAPortfolio.data.stats.reservedBalance, 1.45),
+      `Expected total locked reserve to be 1.45, got ${traderAPortfolio.data.stats.reservedBalance}`
+    )
 
     console.log(
       JSON.stringify(
