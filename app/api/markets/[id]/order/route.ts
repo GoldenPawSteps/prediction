@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth, apiError, apiSuccess } from '@/lib/api-helpers'
 import { activeOrderWhere, expireStaleMarketOrders } from '@/lib/order-expiration'
 import { applySignedPositionTrade } from '@/lib/position-accounting'
+import { rebalanceAskReservesForOutcome } from '@/lib/order-reserve-rebalance'
 import { z } from 'zod'
 
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
@@ -165,6 +166,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 			let filledShares = 0
 			let filledNotional = 0
 			let takerAskReserveRemaining = side === 'ASK' ? reserveAmount : 0
+			const usersToRebalance = new Set<string>()
 
 			for (const match of matchingOrders) {
 				if (remainingShares <= 0) break
@@ -222,6 +224,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 					executionPrice: fillPrice,
 					cashDelta: 0,
 				})
+				usersToRebalance.add(buyerUserId)
 
 				await applySignedPositionTrade(tx, {
 					userId: sellerUserId,
@@ -231,6 +234,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 					executionPrice: fillPrice,
 					cashDelta: sellerCashDelta,
 				})
+				usersToRebalance.add(sellerUserId)
 
 				await tx.marketOrderFill.create({
 					data: {
@@ -319,6 +323,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 			})
 
 			if (filledShares > 0) {
+				for (const userId of usersToRebalance) {
+					await rebalanceAskReservesForOutcome(tx, userId, marketId, outcome)
+				}
+
 				await tx.market.update({
 					where: { id: marketId },
 					data: {

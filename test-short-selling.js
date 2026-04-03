@@ -312,6 +312,57 @@ async function exchangeNakedAskScenario() {
   })
 }
 
+async function askReserveRebalanceOnBuyScenario() {
+  heading('Short ask reserve rebalances on buy')
+
+  const creator = await registerUser('ss_creator_rebalance')
+  const trader = await registerUser('ss_trader_rebalance')
+  const market = await createMarket(creator.jar, { title: 'Short ask rebalance on buy' })
+
+  const balanceBeforeAsk = await getBalance(trader.jar)
+  await placeOrder(trader.jar, market.id, {
+    outcome: 'YES',
+    side: 'ASK',
+    orderType: 'GTC',
+    price: 0.4,
+    shares: 10,
+  })
+
+  const balanceAfterAsk = await getBalance(trader.jar)
+  const portfolioAfterAsk = await getPortfolio(trader.jar)
+
+  await check('Initial 10@0.4 naked ASK locks reserve of 6', async () => {
+    assertApprox(balanceAfterAsk - balanceBeforeAsk, -6, 'initial reserve should be 10*(1-0.4)=6', 0.01)
+    const askOrder = (portfolioAfterAsk.reservedOrders || []).find(
+      (order) => order.marketId === market.id && order.side === 'ASK' && Number(order.remainingShares) > 0
+    )
+    assert(askOrder, 'open ASK order should appear in reservedOrders')
+    assertApprox(Number(askOrder.reservedAmount), 6, 'order reservedAmount should be 6 initially', 0.01)
+  })
+
+  const buyTrade = await trade(trader.jar, market.id, 'YES', 'BUY', 3)
+
+  const balanceAfterBuy = await getBalance(trader.jar)
+  const portfolioAfterBuy = await getPortfolio(trader.jar)
+
+  await check('Buying 3 YES reduces corresponding short ASK reserve to 4.2', async () => {
+    const askOrder = (portfolioAfterBuy.reservedOrders || []).find(
+      (order) => order.marketId === market.id && order.side === 'ASK' && Number(order.remainingShares) > 0
+    )
+    assert(askOrder, 'open ASK order should still be present after buy')
+    assertApprox(Number(askOrder.reservedAmount), 4.2, 'updated reserve should be (10-3)*(1-0.4)=4.2', 0.01)
+
+    const reserveRelease = 6 - 4.2
+    const buyCost = Number(buyTrade.totalCost)
+    assertApprox(
+      balanceAfterBuy - balanceAfterAsk,
+      reserveRelease - buyCost,
+      'balance change after buy should include reserve release minus buy cost',
+      0.02
+    )
+  })
+}
+
 async function settlementShortScenario() {
   heading('Settlement payout on short winners/losers')
 
@@ -375,6 +426,7 @@ async function main() {
   await waitForServer()
   await ammShortOpenCoverScenario()
   await exchangeNakedAskScenario()
+  await askReserveRebalanceOnBuyScenario()
   await settlementShortScenario()
 
   console.log('\n' + '═'.repeat(72))
