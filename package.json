@@ -54,6 +54,7 @@
     "test:balance:amm": "node test-market-balance.js amm",
     "test:balance:exchange": "node test-market-balance.js exchange",
     "test:balance:rejections": "node test-market-balance.js rejections",
+    "test:short-selling": "node test-short-selling.js",
     "test:leaderboard": "node test-market-leaderboard.js",
     "test:leaderboard:shape": "node test-market-leaderboard.js shape",
     "test:leaderboard:sorting": "node test-market-leaderboard.js sorting",

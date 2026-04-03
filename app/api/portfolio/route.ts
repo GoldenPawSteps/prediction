@@ -4,6 +4,7 @@ import { requireAuth, apiError, apiSuccess } from '@/lib/api-helpers'
 import { getMarketProbabilities } from '@/lib/lmsr'
 import { activeOrderWhere } from '@/lib/order-expiration'
 import { finalizeImmutableResolutions } from '@/lib/market-status'
+import { getRequiredShortCollateralFromPositions } from '@/lib/position-accounting'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -27,7 +28,7 @@ export async function GET(req: NextRequest) {
     const MATCH_WINDOW_MS = 60000
     const now = new Date()
 
-    const [user, reservedBidOrders, reservedOrders, createdMarkets, positions, trades, fills] = await Promise.all([
+    const [user, reservedOpenOrders, reservedOrders, createdMarkets, positions, trades, fills] = await Promise.all([
       prisma.user.findUnique({
         where: { id: authUser.userId },
         select: { balance: true },
@@ -35,7 +36,6 @@ export async function GET(req: NextRequest) {
       prisma.marketOrder.aggregate({
         where: {
           userId: authUser.userId,
-          side: 'BID',
           status: { in: ['OPEN', 'PARTIAL'] },
           remainingShares: { gt: 0 },
           reservedAmount: { gt: 0 },
@@ -46,7 +46,6 @@ export async function GET(req: NextRequest) {
       prisma.marketOrder.findMany({
         where: {
           userId: authUser.userId,
-          side: 'BID',
           status: { in: ['OPEN', 'PARTIAL'] },
           remainingShares: { gt: 0 },
           reservedAmount: { gt: 0 },
@@ -56,6 +55,7 @@ export async function GET(req: NextRequest) {
           id: true,
           marketId: true,
           outcome: true,
+          side: true,
           orderType: true,
           price: true,
           initialShares: true,
@@ -94,7 +94,7 @@ export async function GET(req: NextRequest) {
         take: 25,
       }),
       prisma.position.findMany({
-        where: { userId: authUser.userId, shares: { gt: 0 } },
+        where: { userId: authUser.userId, shares: { not: 0 } },
         include: {
           market: {
             select: {
@@ -212,14 +212,56 @@ export async function GET(req: NextRequest) {
     })
 
     const stats = {
+      shortCollateral: getRequiredShortCollateralFromPositions(
+        positionsWithValue.map((position) => ({
+          marketId: position.marketId,
+          outcome: position.outcome,
+          shares: position.shares,
+        }))
+      ),
       availableBalance: toNumber(user?.balance),
-      reservedBalance: toNumber(reservedBidOrders._sum.reservedAmount),
+      reservedBalance: 0,
       liquidityLocked: createdMarkets.reduce((sum, m) => sum + toNumber(m.initialLiquidity), 0),
       totalPositions: positionsWithValue.length,
       totalValue: positionsWithValue.reduce((sum, p) => sum + p.currentValue, 0),
       totalUnrealizedPnl: positionsWithValue.reduce((sum, p) => sum + p.unrealizedPnl, 0),
       totalRealizedPnl: positionsWithValue.reduce((sum, p) => sum + p.realizedPnl, 0),
     }
+
+    stats.reservedBalance = toNumber(reservedOpenOrders._sum.reservedAmount) + stats.shortCollateral
+
+    const shortReserves = (() => {
+      const byMarket = new Map<string, {
+        marketId: string
+        marketTitle: string
+        shortYesShares: number
+        shortNoShares: number
+      }>()
+
+      for (const position of positionsWithValue) {
+        if (position.shares >= 0) continue
+
+        const current = byMarket.get(position.marketId) ?? {
+          marketId: position.marketId,
+          marketTitle: position.market.title,
+          shortYesShares: 0,
+          shortNoShares: 0,
+        }
+
+        if (position.outcome === 'YES') current.shortYesShares = Math.max(0, -position.shares)
+        else current.shortNoShares = Math.max(0, -position.shares)
+
+        byMarket.set(position.marketId, current)
+      }
+
+      return Array.from(byMarket.values()).map((entry) => ({
+        marketId: entry.marketId,
+        marketTitle: entry.marketTitle,
+        shortYesShares: entry.shortYesShares,
+        shortNoShares: entry.shortNoShares,
+        reservedAmount: Math.max(entry.shortYesShares, entry.shortNoShares),
+      }))
+    })()
 
     return apiSuccess({
       positions: positionsWithValue,
@@ -229,8 +271,10 @@ export async function GET(req: NextRequest) {
         createdAt: order.createdAt.toISOString(),
         expiresAt: order.expiresAt?.toISOString() ?? null,
         outcome: order.outcome as string,
+        side: order.side as string,
         orderType: order.orderType as string,
       })),
+      shortReserves,
       createdMarkets: createdMarkets.map((m) => ({
         ...m,
         endDate: m.endDate.toISOString(),

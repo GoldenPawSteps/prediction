@@ -2,10 +2,10 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAuth, apiError, apiSuccess } from '@/lib/api-helpers'
 import { activeOrderWhere, expireStaleMarketOrders } from '@/lib/order-expiration'
+import { applySignedPositionTrade } from '@/lib/position-accounting'
 import { z } from 'zod'
 
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
-type TradeOutcome = 'YES' | 'NO'
 
 function toNumber(value: unknown, fallback: number = 0): number {
 	const numericValue = Number(value)
@@ -26,6 +26,28 @@ const cancelOrderSchema = z.object({
 })
 
 type AuthUser = { userId: string; email: string; isAdmin: boolean }
+
+async function getReservedAskShares(
+	tx: TxClient,
+	userId: string,
+	marketId: string,
+	outcome: 'YES' | 'NO'
+) {
+	const reserved = await tx.marketOrder.aggregate({
+		where: {
+			userId,
+			marketId,
+			outcome,
+			side: 'ASK',
+			status: { in: ['OPEN', 'PARTIAL'] },
+			remainingShares: { gt: 0 },
+			...activeOrderWhere(new Date()),
+		},
+		_sum: { remainingShares: true },
+	})
+
+	return toNumber(reserved._sum.remainingShares)
+}
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
 	const userOrResponse = await requireAuth(req)
@@ -74,25 +96,24 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 			const user = await tx.user.findUnique({ where: { id: authUser.userId } })
 			if (!user) throw new Error('User not found')
 
-			const reserveAmount = side === 'BID' ? price * shares : 0
-			if (side === 'BID' && toNumber(user.balance) < reserveAmount) {
-				throw new Error('Insufficient balance')
-			}
-
-			let avgEntryPriceSnapshot = 0
+			let reserveAmount = side === 'BID' ? price * shares : 0
 			if (side === 'ASK') {
 				const position = await tx.position.findUnique({
 					where: { userId_marketId_outcome: { userId: authUser.userId, marketId, outcome } },
+					select: { shares: true },
 				})
-				const reservedShares = await getReservedAskShares(tx, authUser.userId, marketId, outcome)
-				const availableShares = toNumber(position?.shares) - reservedShares
-
-				if (!position || availableShares < shares) {
-					throw new Error('Insufficient shares to place ask order')
-				}
-
-				avgEntryPriceSnapshot = toNumber(position.avgEntryPrice)
+				const currentLongShares = Math.max(0, toNumber(position?.shares))
+				const alreadyReservedAskShares = await getReservedAskShares(tx, authUser.userId, marketId, outcome)
+				const availableLongShares = Math.max(0, currentLongShares - alreadyReservedAskShares)
+				const shortOrderShares = Math.max(0, shares - availableLongShares)
+				reserveAmount = shortOrderShares * (1 - price)
 			}
+
+			if (toNumber(user.balance) < reserveAmount) {
+				throw new Error('Insufficient balance')
+			}
+
+			const avgEntryPriceSnapshot = 0
 
 			const now = new Date()
 			const matchingOrders = await tx.marketOrder.findMany({
@@ -143,6 +164,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 			let remainingShares = shares
 			let filledShares = 0
 			let filledNotional = 0
+			let takerAskReserveRemaining = side === 'ASK' ? reserveAmount : 0
 
 			for (const match of matchingOrders) {
 				if (remainingShares <= 0) break
@@ -150,8 +172,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 				const fillShares = Math.min(remainingShares, toNumber(match.remainingShares))
 				const fillPrice = toNumber(match.price)
 				const fillNotional = fillShares * fillPrice
+				const fillAskReserveRelease = fillShares * (1 - fillPrice)
 				const makerRemainingShares = toNumber(match.remainingShares) - fillShares
 				const makerStatus = makerRemainingShares <= 0 ? 'FILLED' : 'PARTIAL'
+				const makerAskReserveRelease = match.side === 'ASK'
+					? Math.min(toNumber(match.reservedAmount), fillAskReserveRelease)
+					: 0
 
 				await tx.marketOrder.update({
 					where: { id: match.id },
@@ -160,21 +186,51 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 						status: makerStatus,
 						...(match.side === 'BID'
 							? { reservedAmount: { decrement: fillNotional } }
+							: match.side === 'ASK'
+							? { reservedAmount: { decrement: makerAskReserveRelease } }
 							: {}),
 					},
 				})
 
+				if (makerAskReserveRelease > 0) {
+					await tx.user.update({
+						where: { id: match.userId },
+						data: { balance: { increment: makerAskReserveRelease } },
+					})
+				}
+
 				const buyerUserId = side === 'BID' ? authUser.userId : match.userId
 				const sellerUserId = side === 'ASK' ? authUser.userId : match.userId
-				const sellerCostBasis = side === 'ASK' ? avgEntryPriceSnapshot : toNumber(match.avgEntryPriceSnapshot)
+				const sellerCashDelta = fillNotional
 
-				await tx.user.update({
-					where: { id: sellerUserId },
-					data: { balance: { increment: fillNotional } },
+				if (side === 'ASK') {
+					const takerAskReserveRelease = Math.min(takerAskReserveRemaining, fillAskReserveRelease)
+					takerAskReserveRemaining -= takerAskReserveRelease
+					if (takerAskReserveRelease > 0) {
+						await tx.user.update({
+							where: { id: authUser.userId },
+							data: { balance: { increment: takerAskReserveRelease } },
+						})
+					}
+				}
+
+				await applySignedPositionTrade(tx, {
+					userId: buyerUserId,
+					marketId,
+					outcome,
+					deltaShares: fillShares,
+					executionPrice: fillPrice,
+					cashDelta: 0,
 				})
 
-				await increasePosition(tx, buyerUserId, marketId, outcome, fillShares, fillPrice)
-				await decreasePosition(tx, sellerUserId, marketId, outcome, fillShares, fillNotional, sellerCostBasis)
+				await applySignedPositionTrade(tx, {
+					userId: sellerUserId,
+					marketId,
+					outcome,
+					deltaShares: -fillShares,
+					executionPrice: fillPrice,
+					cashDelta: sellerCashDelta,
+				})
 
 				await tx.marketOrderFill.create({
 					data: {
@@ -227,7 +283,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 				filledNotional += fillNotional
 			}
 
-			const remainingReserve = side === 'BID' ? remainingShares * price : 0
+			const remainingReserve = side === 'BID' ? remainingShares * price : takerAskReserveRemaining
 			const refundAmount = side === 'BID' ? reserveAmount - filledNotional - remainingReserve : 0
 
 			if (refundAmount > 0) {
@@ -317,7 +373,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 				throw new Error('Order is no longer open')
 			}
 
-			if (order.side === 'BID' && toNumber(order.reservedAmount) > 0) {
+			if (toNumber(order.reservedAmount) > 0) {
 				await tx.user.update({
 					where: { id: authUser.userId },
 					data: { balance: { increment: toNumber(order.reservedAmount) } },
@@ -344,94 +400,3 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 	}
 }
 
-async function getReservedAskShares(
-	tx: TxClient,
-	userId: string,
-	marketId: string,
-	outcome: TradeOutcome
-) {
-	const reservations = await tx.marketOrder.aggregate({
-		where: {
-			userId,
-			marketId,
-			outcome,
-			side: 'ASK',
-			status: { in: ['OPEN', 'PARTIAL'] },
-			...activeOrderWhere(new Date()),
-		},
-		_sum: { remainingShares: true },
-	})
-
-	return toNumber(reservations._sum.remainingShares)
-}
-
-async function increasePosition(
-	tx: TxClient,
-	userId: string,
-	marketId: string,
-	outcome: TradeOutcome,
-	shares: number,
-	price: number
-) {
-	const existingPosition = await tx.position.findUnique({
-		where: { userId_marketId_outcome: { userId, marketId, outcome } },
-	})
-
-	if (!existingPosition) {
-		await tx.position.create({
-			data: {
-				userId,
-				marketId,
-				outcome,
-				shares,
-				avgEntryPrice: price,
-			},
-		})
-		return
-	}
-
-	const totalShares = toNumber(existingPosition.shares) + shares
-	const weightedCost = (toNumber(existingPosition.avgEntryPrice) * toNumber(existingPosition.shares)) + (price * shares)
-
-	await tx.position.update({
-		where: { id: existingPosition.id },
-		data: {
-			shares: totalShares,
-			avgEntryPrice: weightedCost / totalShares,
-		},
-	})
-}
-
-async function decreasePosition(
-	tx: TxClient,
-	userId: string,
-	marketId: string,
-	outcome: TradeOutcome,
-	shares: number,
-	proceeds: number,
-	costBasis: number
-) {
-	const existingPosition = await tx.position.findUnique({
-		where: { userId_marketId_outcome: { userId, marketId, outcome } },
-	})
-
-	if (!existingPosition || toNumber(existingPosition.shares) < shares) {
-		throw new Error('Insufficient shares to settle exchange order')
-	}
-
-	const newShares = toNumber(existingPosition.shares) - shares
-	const realizedPnl = proceeds - (costBasis * shares)
-
-	if (newShares <= 0) {
-		await tx.position.delete({ where: { id: existingPosition.id } })
-		return
-	}
-
-	await tx.position.update({
-		where: { id: existingPosition.id },
-		data: {
-			shares: newShares,
-			realizedPnl: { increment: realizedPnl },
-		},
-	})
-}

@@ -34,12 +34,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         resolution: true,
         resolutionTime: true,
         disputeWindowHours: true,
+        settledAt: true,
       },
     })
 
     if (!market) return apiError('Market not found', 404)
     if (market.status !== 'RESOLVED' && market.status !== 'INVALID') {
       return apiError('Market must be provisionally resolved to dispute')
+    }
+    if (market.settledAt) {
+      return apiError('Market resolution is definitive and cannot be disputed')
     }
 
     const now = new Date()

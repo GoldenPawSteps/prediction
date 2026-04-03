@@ -4,7 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth, apiError, apiSuccess } from '@/lib/api-helpers'
 import { lmsrTradeCost, getMarketProbabilities } from '@/lib/lmsr'
 import { roundMoney, roundPrice } from '@/lib/money'
-import { activeOrderWhere, expireStaleMarketOrders } from '@/lib/order-expiration'
+import { expireStaleMarketOrders } from '@/lib/order-expiration'
+import { applySignedPositionTrade } from '@/lib/position-accounting'
 import { z } from 'zod'
 
 // AMM trade handler: buy/sell flow with reservation-aware sell checks.
@@ -47,7 +48,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         throw new Error('Market has expired and is no longer accepting trades')
       }
 
-      const user = await tx.user.findUnique({ where: { id: authUser.userId } })
+      const user = await tx.user.findUnique({ where: { id: authUser.userId }, select: { id: true } })
       if (!user) throw new Error('User not found')
 
       const b = toNumber(market.liquidityParam)
@@ -64,46 +65,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         else newNoShares -= shares
       }
 
-      if (newYesShares < 0 || newNoShares < 0) throw new Error('Invalid trade: negative shares')
-
       const tradeCost = roundMoney(
         lmsrTradeCost(currentYesShares, currentNoShares, newYesShares, newNoShares, b)
       )
       const actualPrice = roundPrice(Math.abs(tradeCost) / shares)
-
-      if (type === 'BUY' && toNumber(user.balance) < tradeCost) {
-        throw new Error('Insufficient balance')
-      }
-
-      if (type === 'SELL') {
-        const position = await tx.position.findUnique({
-          where: { userId_marketId_outcome: { userId: authUser.userId, marketId, outcome } },
-        })
-        const openAskReservations = await tx.marketOrder.aggregate({
-          where: {
-            userId: authUser.userId,
-            marketId,
-            outcome,
-            side: 'ASK',
-            status: { in: ['OPEN', 'PARTIAL'] },
-            ...activeOrderWhere(new Date()),
-          },
-          _sum: { remainingShares: true },
-        })
-
-        const reservedShares = toNumber(openAskReservations._sum.remainingShares)
-        const availableShares = toNumber(position?.shares) - reservedShares
-
-        if (!position || availableShares < shares) {
-          throw new Error('Insufficient shares to sell')
-        }
-      }
-
-      // Update user balance (-tradeCost: positive for BUY, negative for SELL since LMSR cost is negative when selling)
-      await tx.user.update({
-        where: { id: authUser.userId },
-        data: { balance: { increment: roundMoney(-tradeCost) } },
-      })
 
       // Update market shares
       await tx.market.update({
@@ -129,50 +94,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         },
       })
 
-      // Update position
-      const existingPosition = await tx.position.findUnique({
-        where: { userId_marketId_outcome: { userId: authUser.userId, marketId, outcome } },
+      const signedDelta = type === 'BUY' ? shares : -shares
+      await applySignedPositionTrade(tx, {
+        userId: authUser.userId,
+        marketId,
+        outcome,
+        deltaShares: signedDelta,
+        executionPrice: actualPrice,
+        cashDelta: roundMoney(-tradeCost),
       })
-
-      if (type === 'BUY') {
-        if (existingPosition) {
-          const existingShares = toNumber(existingPosition.shares)
-          const existingAvgEntry = toNumber(existingPosition.avgEntryPrice)
-          const totalShares = existingShares + shares
-          const avgEntry = roundPrice(
-            (existingAvgEntry * existingShares + tradeCost) / totalShares
-          )
-          await tx.position.update({
-            where: { id: existingPosition.id },
-            data: { shares: totalShares, avgEntryPrice: avgEntry },
-          })
-        } else {
-          await tx.position.create({
-            data: {
-              userId: authUser.userId,
-              marketId,
-              outcome,
-              shares,
-              avgEntryPrice: roundPrice(tradeCost / shares),
-            },
-          })
-        }
-      } else {
-        if (existingPosition) {
-          const existingShares = toNumber(existingPosition.shares)
-          const existingAvgEntry = toNumber(existingPosition.avgEntryPrice)
-          const newShares = existingShares - shares
-          const realizedPnl = roundMoney(-tradeCost - (existingAvgEntry * shares))
-          if (newShares <= 0) {
-            await tx.position.delete({ where: { id: existingPosition.id } })
-          } else {
-            await tx.position.update({
-              where: { id: existingPosition.id },
-              data: { shares: newShares, realizedPnl: { increment: realizedPnl } },
-            })
-          }
-        }
-      }
 
       // Record price history
       const newProbs = getMarketProbabilities(newYesShares, newNoShares, b)

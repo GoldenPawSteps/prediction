@@ -50,6 +50,7 @@ interface PortfolioStats {
     id: string
     marketId: string
     outcome: string
+    side: string
     orderType: string
     price: number
     initialShares: number
@@ -58,6 +59,13 @@ interface PortfolioStats {
     expiresAt: string | null
     createdAt: string
     market: { id: string; title: string }
+  }>
+  shortReserves: Array<{
+    marketId: string
+    marketTitle: string
+    shortYesShares: number
+    shortNoShares: number
+    reservedAmount: number
   }>
   createdMarkets: Array<{
     id: string
@@ -113,6 +121,7 @@ export function PortfolioSummarySection({ isPrefetched = false }: { isPrefetched
 
   const stats = data?.stats
   const reservedOrders = data?.reservedOrders || []
+  const shortReserves = data?.shortReserves || []
   const createdMarkets = data?.createdMarkets || []
 
   if (!stats) {
@@ -243,7 +252,7 @@ export function PortfolioSummarySection({ isPrefetched = false }: { isPrefetched
           </div>
         )}
 
-        {reservedOrders.length > 0 && (
+        {(reservedOrders.length > 0 || shortReserves.length > 0) && (
           <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-800">
             <div className="flex items-center justify-between px-3 sm:px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/60">
               <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t('reservedBalance')}</h3>
@@ -272,7 +281,9 @@ export function PortfolioSummarySection({ isPrefetched = false }: { isPrefetched
                       <Badge variant={order.outcome === 'YES' ? 'success' : 'danger'}>
                         {translateOutcome(order.outcome)}
                       </Badge>
-                      <Badge variant="info">{tTradePanel('bidBuy')}</Badge>
+                      <Badge variant="info">
+                        {order.side === 'ASK' ? tTradePanel('askSell') : tTradePanel('bidBuy')}
+                      </Badge>
                       {order.orderType !== 'GTC' && <Badge variant="default">{order.orderType}</Badge>}
                       {order.orderType === 'GTD' && order.expiresAt && (
                         <span className="text-xs text-gray-600 dark:text-gray-400">
@@ -290,6 +301,39 @@ export function PortfolioSummarySection({ isPrefetched = false }: { isPrefetched
                     </p>
                     <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
                       {tTradePanel('reserveHint', { amount: formatCurrency(Number(order.reservedAmount)) })}
+                    </p>
+                  </div>
+                </div>
+              ))}
+              {shortReserves.map((reserve) => (
+                <div key={`short-${reserve.marketId}`} className="px-3 sm:px-4 py-3 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <Link
+                      href={`/markets/${reserve.marketId}`}
+                      onMouseEnter={() => prefetchMarketDetail(reserve.marketId)}
+                      onFocus={() => prefetchMarketDetail(reserve.marketId)}
+                      onTouchStart={() => prefetchMarketDetail(reserve.marketId)}
+                      onClick={() => {
+                        prefetchMarketDetail(reserve.marketId)
+                        beginNavFeedback(`/markets/${reserve.marketId}`)
+                      }}
+                      className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline break-words"
+                    >
+                      {reserve.marketTitle}
+                    </Link>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <Badge variant="warning">Short Collateral</Badge>
+                    </div>
+                    <p className="mt-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                      YES: {formatFixed(reserve.shortYesShares)} · NO: {formatFixed(reserve.shortNoShares)}
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">
+                      {formatCurrency(Number(reserve.reservedAmount))}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                      Max payout reserve
                     </p>
                   </div>
                 </div>

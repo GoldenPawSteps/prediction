@@ -46,7 +46,7 @@ async function cancelOpenOrdersForMarkets(tx: Prisma.TransactionClient, marketId
 
     if (result.count > 0) {
       cancelled++
-      if (order.side === 'BID' && toNumber(order.reservedAmount) > 0) {
+      if (toNumber(order.reservedAmount) > 0) {
         await tx.user.update({
           where: { id: order.userId },
           data: { balance: { increment: toNumber(order.reservedAmount) } },
@@ -164,8 +164,6 @@ async function finalizeMarketResolutionIfImmutable(marketId: string, now: Date) 
       outcome: market.resolution,
       creatorId: market.creatorId,
       initialLiquidity: toNumber(market.initialLiquidity),
-      isReResolution: false,
-      previousResolutionTime: null,
     })
 
     return true

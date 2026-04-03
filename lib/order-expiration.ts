@@ -8,7 +8,7 @@ function toNumber(value: unknown, fallback: number = 0): number {
 }
 
 /**
- * Atomically cancel an order and refund the BID reserve.
+ * Atomically cancel an order and refund any reserved amount.
  * Uses `updateMany` with a status guard so only the first concurrent
  * transaction that hits the row actually performs the refund.
  */
@@ -31,7 +31,7 @@ async function safeCancelAndRefund(
 
   const reservedAmount = toNumber(order.reservedAmount)
 
-  if (result.count > 0 && order.side === 'BID' && reservedAmount > 0) {
+  if (result.count > 0 && reservedAmount > 0) {
     await tx.user.update({
       where: { id: order.userId },
       data: { balance: { increment: reservedAmount } },
