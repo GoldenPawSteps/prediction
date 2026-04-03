@@ -294,8 +294,10 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
           abortRetryRef.current = 0
           setFetchError(null)
           setMarket(data)
+          releaseInitialLoading(requestId)
         } else {
           setFetchError('Failed to fetch market')
+          releaseInitialLoading(requestId)
         }
       } finally {
         window.clearTimeout(timeoutId)
@@ -538,12 +540,12 @@ export default function MarketPage({ params }: { params: Promise<{ id: string }>
     }
   }
 
-  if (loading || !market) {
-    return <MarketDetailLoadingSkeleton />
-  }
 
   if (isNotFound) return notFound()
 
+  if (loading || !market) {
+    return <MarketDetailLoadingSkeleton />
+  }
   const isMultiMarket = market.marketType === 'MULTI'
   const outcomeMarkets = market.outcomes ?? []
   const aggregateTrades = isMultiMarket

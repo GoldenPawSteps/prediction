@@ -5,6 +5,7 @@ import { AuthProvider } from '@/context/AuthContext'
 import { I18nProvider } from '@/context/I18nContext'
 import { Navbar } from '@/components/Navbar'
 import { NavProgressCleanup } from '@/components/NavProgressCleanup'
+import { GlobalErrorBoundary } from '@/components/GlobalErrorBoundary'
 
 export const metadata: Metadata = {
   title: 'Predictify - Prediction Markets',
@@ -16,6 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <head />
       <body className="font-sans bg-gray-50 text-gray-900 dark:bg-gray-950 dark:text-gray-100 min-h-screen transition-colors">
+          <GlobalErrorBoundary>
         <NavProgressCleanup />
         <I18nProvider>
           <AuthProvider>
@@ -35,6 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             />
           </AuthProvider>
         </I18nProvider>
+        </GlobalErrorBoundary>
       </body>
     </html>
   )

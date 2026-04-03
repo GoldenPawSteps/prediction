@@ -1,6 +1,6 @@
 const NAV_PENDING_ATTR = 'data-nav-pending'
 const NAV_FEEDBACK_TIMEOUT_MS = 1000
-const NAV_WATCHDOG_MS = 8000
+const NAV_WATCHDOG_MS = 3000
 
 function logNavDebug(message: string, meta?: Record<string, unknown>) {
   if (process.env.NODE_ENV !== 'development' || typeof window === 'undefined') return
@@ -10,6 +10,16 @@ function logNavDebug(message: string, meta?: Record<string, unknown>) {
     return
   }
   console.debug(`[nav-feedback] ${ts} ${message}`)
+}
+
+function logNavWarning(message: string, meta?: Record<string, unknown>) {
+  if (typeof window === 'undefined') return
+  const ts = new Date().toISOString()
+  if (meta) {
+    console.warn(`[nav-feedback] ${ts} ${message}`, meta)
+    return
+  }
+  console.warn(`[nav-feedback] ${ts} ${message}`)
 }
 
 function getNavWindow() {
@@ -69,6 +79,18 @@ export function beginNavFeedback(targetHref?: string) {
       navWindow.__predictifyNavTarget = undefined
       navWindow.__predictifyNavWatchdogId = undefined
     }, NAV_WATCHDOG_MS)
+    // Also log warning in production when watchdog fires
+    if (process.env.NODE_ENV === 'production' && targetHref) {
+      const warnTimeoutId = window.setTimeout(() => {
+        if (navWindow.__predictifyNavTarget === targetHref) {
+          logNavWarning('Navigation appears stuck', {
+            target: targetHref,
+            pathname: window.location.pathname,
+            timeout_ms: NAV_WATCHDOG_MS,
+          })
+        }
+      }, NAV_WATCHDOG_MS - 500) // Warn 500ms before watchdog fires
+    }
   }
 }
 
