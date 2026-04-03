@@ -2,7 +2,7 @@
 
 This checklist mirrors the dedicated portfolio simulation in `test-market-portfolio.js`, but in human-executable steps.
 
-Use this when you want to manually verify portfolio endpoint shape, valuation math, reserved-order accounting, created-market liquidity tracking, and trade execution classification.
+Use this when you want to manually verify portfolio endpoint shape, valuation math, reserved-order accounting, short-collateral tracking, created-market liquidity tracking, and trade execution classification.
 
 For a shorter pre-deploy pass, use `docs/MARKET_PORTFOLIO_SMOKE_CHECKLIST.md`.
 
@@ -62,7 +62,7 @@ Expected:
 - `stats.totalUnrealizedPnl` equals sum of `positions.unrealizedPnl`.
 - `stats.totalRealizedPnl` equals sum of `positions.realizedPnl`.
 
-## 3. Reserved Order Accounting
+## 3. Reserved Order And Short Collateral Accounting
 
 1. Create a binary market.
 2. As trader, place open BID order (example: price `0.40`, shares `10`).
@@ -72,9 +72,23 @@ Expected:
 
 4. Call `/api/portfolio` for trader.
 Expected:
-- Order appears in `reservedOrders` with market metadata.
-- `stats.reservedBalance` equals sum of `reservedOrders.reservedAmount`.
+- Order appears in `reservedOrders` with market metadata and `side = BID`.
+- `stats.reservedBalance` equals sum of open-order reserves plus any `shortReserves` collateral.
 - For a single open BID, reserved balance equals that order's reserved amount.
+
+5. On a fresh market, as the same trader, place a naked ASK order (for example: price `0.40`, shares `10`) without buying inventory first.
+Expected:
+- Order appears in `reservedOrders` with `side = ASK`.
+- Trader balance decreases by the initial short collateral reserve (`shares × (1 - price)`, `6.00` in this example).
+- `stats.shortCollateral` increases.
+- `shortReserves` contains an entry for the market.
+- `stats.reservedBalance` now includes both the BID reserve and short collateral.
+
+6. On another fresh market, open an AMM short by selling more shares than currently owned.
+Expected:
+- Open position remains visible with negative `shares`.
+- `shortReserves` reflects the market-level collateral requirement.
+- `stats.shortCollateral` and `stats.reservedBalance` include that AMM short exposure.
 
 ## 4. Created Markets And Liquidity Lock
 
@@ -106,7 +120,7 @@ Treat as release blockers if any occur:
 - Unauthenticated portfolio access is not rejected
 - Position valuation fields are missing or numerically inconsistent
 - `stats` totals do not match sums derived from `positions`
-- Reserved BID cash is not reflected in `reservedOrders` and `stats.reservedBalance`
+- Reserved order or short collateral accounting is missing from `reservedOrders`, `shortReserves`, `stats.shortCollateral`, or `stats.reservedBalance`
 - Created-market liquidity does not appear in `stats.liquidityLocked`
 - Exchange fills are not classified as `EXCHANGE` or maker/taker roles are wrong
 

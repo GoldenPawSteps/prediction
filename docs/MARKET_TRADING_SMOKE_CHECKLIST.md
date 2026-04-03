@@ -4,6 +4,7 @@ Use this for a quick pre-deploy verification of the dedicated trading simulation
 
 It focuses on the highest-risk trading paths:
 - AMM buy/sell behavior
+- collateralized short-selling behavior
 - probability integrity
 - order matching and cancellation
 - time-in-force validation (FOK/FAK/GTD)
@@ -38,14 +39,14 @@ Expected: setup succeeds and market is open.
 2. User A buys YES via AMM.
 Expected: success, positive `totalCost`, YES probability increases.
 
-3. User B buys NO via AMM, then User A sells some YES.
-Expected: both requests succeed; BUY has positive `totalCost`, SELL has negative `totalCost`.
+3. User B buys NO via AMM, then User A sells some YES and oversells on a fresh funded market.
+Expected: BUY has positive `totalCost`, SELL has negative `totalCost`, and funded oversell opens short exposure instead of failing.
 
 4. Verify `GET /api/markets/[id]/probability`.
 Expected: YES and NO are valid and sum to about 1.
 
-5. Place non-crossing BID/ASK orders, then place a crossing order.
-Expected: non-crossing orders stay unfilled; crossing order fills at least partially.
+5. Place non-crossing BID/ASK orders, including one naked ASK, then place a crossing order.
+Expected: non-crossing orders stay unfilled, naked ASK reserves collateral immediately, and crossing order fills at least partially.
 
 6. Place and cancel a BID order.
 Expected: cancel succeeds and order shows `CANCELLED` in user history.
@@ -59,6 +60,7 @@ Expected: all rejected.
 ## Fast Failure Signals
 
 - Valid AMM trades fail
+- Funded short sells fail, or undercollateralized short sells succeed
 - Probability no longer sums to ~1
 - Crossing orders fail to fill
 - Cancel does not move order to `CANCELLED`

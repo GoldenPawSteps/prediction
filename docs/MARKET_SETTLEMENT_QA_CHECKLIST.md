@@ -2,7 +2,7 @@
 
 This checklist mirrors the dedicated settlement simulation in `test-market-settlement.js`, but in human-executable steps.
 
-Use this when you want to manually verify deferred settlement behavior, immutable finalization, INVALID refunds, creator liquidity unlocks, idempotent finalization, and dispute-driven re-resolution settlement.
+Use this when you want to manually verify deferred settlement behavior, definitive admin settlement, immutable finalization, INVALID refunds, creator liquidity unlocks, short-position settlement, idempotent finalization, and dispute-driven latest-outcome settlement.
 
 For a shorter pre-deploy pass, use `docs/MARKET_SETTLEMENT_SMOKE_CHECKLIST.md`.
 
@@ -144,6 +144,33 @@ Expected:
 - NO trader receives payout.
 - YES trader does not receive payout.
 
+## 6. Definitive Admin Resolution
+
+1. Create a market with open orders or positions.
+2. Open the admin page and resolve the market from the admin panel.
+Expected:
+- Resolve succeeds immediately.
+- Response indicates `definitive: true` and settlement is not pending.
+- Open orders are cancelled/refunded immediately.
+- The market cannot be disputed afterward.
+
+## 7. Short Position Settlement
+
+1. Create a market and open a short position by selling more shares than owned.
+2. Wait for expiry and resolve the market to the outcome that makes the short win.
+Expected before finalization:
+- Short collateral remains locked while settlement is pending.
+
+3. Trigger immutable finalization.
+Expected:
+- Short position closes.
+- Locked collateral is released and the trader keeps the sale proceeds on a winning short.
+
+4. Repeat on a fresh market where the short loses.
+Expected:
+- Locked collateral is consumed to fund the payout.
+- No extra balance mutation occurs outside the reserved collateral path.
+
 ## Fast Failure Signals
 
 Treat as release blockers if any occur:
@@ -153,6 +180,8 @@ Treat as release blockers if any occur:
 - Winning trader is paid before finalization
 - INVALID does not refund cost basis after finalization
 - Repeated finalization duplicates payout/refund side effects
+- Definitive admin resolution stays disputable or leaves settlement pending
+- Short winners/losers settle from the wrong balance path
 - Dispute flow pays both old and new outcomes
 
 ## Suggested Timing

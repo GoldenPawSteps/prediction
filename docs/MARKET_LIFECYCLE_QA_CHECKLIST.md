@@ -2,7 +2,7 @@
 
 This checklist mirrors the dedicated lifecycle simulation in `test-market-lifecycle.js`, but in human-executable steps.
 
-Use this when you want to manually verify market state transitions end to end: `OPEN -> CLOSED -> RESOLVED/INVALID -> settled`, plus the dispute and re-resolution path.
+Use this when you want to manually verify market state transitions end to end: `OPEN -> CLOSED -> RESOLVED/INVALID -> settled`, plus definitive admin resolution, short-settlement behavior, and the dispute latest-outcome path.
 
 For a shorter pre-deploy pass, use `docs/MARKET_LIFECYCLE_SMOKE_CHECKLIST.md`.
 
@@ -232,6 +232,30 @@ Expected:
 Expected:
 - No duplicate payout or refund occurs on repeated reads.
 
+## 5. Definitive Admin Resolution And Short Lifecycle
+
+### L7. Admin resolve settles immediately and blocks disputes
+
+1. Create a fresh market with at least one open order.
+2. Resolve it from the admin page.
+Expected:
+- Market moves directly to settled state.
+- Open orders are cancelled and refunded immediately.
+- Trading and disputes are both blocked afterward.
+
+### L8. Short lifecycle keeps collateral pending until finalization
+
+1. Create a fresh market and open a short position by selling more shares than owned.
+2. Resolve the market through the standard non-admin path.
+Expected:
+- Market is `RESOLVED`, but settlement is still pending.
+- Short collateral stays locked.
+
+3. Trigger immutable finalization.
+Expected:
+- Short position closes exactly once.
+- Collateral is either released or consumed depending on the resolved outcome.
+
 ## Fast Failure Signals
 
 Treat these as release blockers:
@@ -243,6 +267,8 @@ Treat these as release blockers:
 - Finalization fails to unlock creator liquidity
 - Finalization duplicates payout/refund on repeated portfolio refreshes
 - INVALID does not refund cost basis on finalization
+- Definitive admin resolution leaves orders open or still allows dispute
+- Short collateral disappears before finalization or settles twice
 - Dispute fails to move market to DISPUTED or re-resolve with quorum
 - Re-resolution settles the wrong final outcome
 

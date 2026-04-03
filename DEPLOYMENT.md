@@ -82,6 +82,7 @@ npm run dev
 
 ### Production build:
 ```bash
+npm run test:short-selling
 npm run build
 npm start
 ```
@@ -165,14 +166,25 @@ docker run -p 3000:3000 --env-file .env predictify
 | POST | `/api/auth/login` | — | Login and get JWT |
 | POST | `/api/auth/logout` | — | Clear auth cookie |
 | GET | `/api/auth/me` | ✓ | Get current user |
+| PATCH | `/api/auth/me` | ✓ | Update current user profile |
 | GET | `/api/markets` | — | List markets (filterable) |
 | POST | `/api/markets` | ✓ | Create market |
 | GET | `/api/markets/:id` | — | Get market details |
+| GET | `/api/markets/:id/chart` | — | Get market price history |
+| GET | `/api/markets/:id/probability` | — | Get current YES/NO probabilities |
 | POST | `/api/markets/:id/trade` | ✓ | Buy/sell shares |
-| POST | `/api/markets/:id/resolve` | Admin | Resolve market |
+| POST | `/api/markets/:id/order` | ✓ | Place or match exchange orders |
+| GET | `/api/markets/:id/resolution` | — | Get resolution state |
+| POST | `/api/markets/:id/resolve` | Admin | Resolve market; admin may send `definitive: true` for immediate settlement |
 | POST | `/api/markets/:id/comment` | ✓ | Post comment |
 | GET | `/api/portfolio` | ✓ | Get user portfolio |
 | GET | `/api/leaderboard` | — | Get leaderboard |
+
+### Trading And Settlement Notes
+
+- AMM sells and exchange ASK orders can open collateralized short exposure.
+- Portfolio reserved balance includes BID reserves, ASK reserves, and short-position collateral.
+- Admin-panel resolution is definitive and immediately settled; community resolution remains provisional until dispute-window finalization.
 
 ### Query Parameters for `GET /api/markets`:
 - `search` — filter by title

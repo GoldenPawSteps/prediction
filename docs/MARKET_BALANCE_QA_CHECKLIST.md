@@ -2,7 +2,7 @@
 
 This checklist mirrors the dedicated balance simulation in `test-market-balance.js`, but in human-executable steps.
 
-Use this when you want to manually verify wallet balance behavior across market funding, AMM trades, exchange reservation/refund/fill flows, and rejected operations.
+Use this when you want to manually verify wallet balance behavior across market funding, AMM trades, short collateral locking, exchange reservation/refund/fill flows, and rejected operations.
 
 For a shorter pre-deploy pass, use `docs/MARKET_BALANCE_SMOKE_CHECKLIST.md`.
 
@@ -64,6 +64,13 @@ Expected:
 - SELL response returns negative `trade.totalCost`.
 - Trader balance increases by `abs(trade.totalCost)`.
 
+4. Perform AMM SELL YES for more shares than currently owned on a fresh market.
+Expected:
+- Trade succeeds if the trader has enough free balance for short collateral.
+- SELL response returns negative `trade.totalCost`.
+- Trader balance increases by `abs(trade.totalCost)`.
+- Portfolio `stats.shortCollateral` increases to reflect the new short exposure.
+
 ## 4. Exchange Reservation And Refund
 
 1. Use buyer account and place GTC BID (example: `price=0.42`, `shares=10`).
@@ -74,14 +81,16 @@ Expected:
 Expected:
 - Buyer balance returns to the exact pre-order level.
 
-## 5. Exchange Fill Transfer
+## 5. Exchange Short ASK Collateral And Fill Transfer
 
-1. Give seller inventory by AMM BUY YES.
+1. Use a fresh seller without YES inventory.
 2. Record combined balances of buyer + seller.
 3. Place seller ASK and matching buyer BID at same price/shares (example: `0.55 × 6`).
 Expected:
 - Fill occurs (`filledShares > 0`).
 - Buyer balance decreases by the matched amount (`3.3` in example).
+- Seller balance does not take a second debit when the buyer fills the order.
+- Seller short collateral increases toward the full worst-case payout as fills arrive.
 - Combined buyer + seller balances remain unchanged (no money created/destroyed by fill).
 
 ## 6. Rejected Operations Do Not Mutate Balance
@@ -104,7 +113,8 @@ Treat as release blockers if any occur:
 - Market creation debit differs from configured initial liquidity
 - AMM BUY/SELL deltas do not match `trade.totalCost`
 - BID reserve debit differs from `price × shares`
-- Cancel does not fully refund reserved BID amount
+- Cancel does not fully refund the reserved order amount
+- Short ASK placement/fills debit the wrong amount or leak money from seller available balance
 - Matching fills create/destroy net money across participants
 - Rejected operations mutate balances
 

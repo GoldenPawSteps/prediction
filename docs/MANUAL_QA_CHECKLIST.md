@@ -286,6 +286,10 @@ Expected:
 - Creator liquidity remains locked.
 - Positions remain open until finalization.
 
+Note:
+- This applies to the standard community resolution path.
+- Admin-panel resolution is definitive, settles immediately, cancels open orders, and cannot be disputed.
+
 6. Try trading after resolve.
 Expected:
 - Rejected.
@@ -296,7 +300,7 @@ Expected:
 - Creator liquidity unlocks now.
 - Positions close now.
 
-## 10) Dispute and Re-resolution
+## 10) Dispute and Latest-Outcome Finalization
 
 1. Create/expire/resolve a test market.
 Expected:
@@ -327,7 +331,11 @@ Expected:
 - Winning side receives payout now.
 - Losing side does not.
 
-7. Attempt dispute on OPEN market.
+7. Attempt dispute on an admin-definitively resolved market.
+Expected:
+- Rejected because definitive settlement cannot be disputed.
+
+8. Attempt dispute on OPEN market.
 Expected:
 - Rejected.
 

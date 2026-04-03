@@ -4,9 +4,11 @@ Use this for a quick pre-deploy verification of the dedicated settlement simulat
 
 It focuses on the highest-risk settlement paths:
 - provisional resolution without immediate payout
+- definitive admin resolution
 - immutable finalization
 - zero-trade creator refund
 - INVALID refund behavior
+- short-position payout/collateral release behavior
 - dispute re-resolution settling the latest outcome only
 
 ## Setup
@@ -30,7 +32,7 @@ npm run test:settlement
 Expected:
 - `RESULTS: 13 passed, 0 failed`
 
-## 7-Step Smoke Flow
+## 9-Step Smoke Flow
 
 1. Create a market, buy YES shares, expire it, and resolve YES.
 Expected: market becomes provisionally resolved but payout is still pending.
@@ -50,7 +52,13 @@ Expected: trader gets cost-basis refund and creator liquidity unlocks.
 6. Run dispute flow: provisional YES -> dispute -> two NO votes -> finalization.
 Expected: final outcome is NO and only NO trader is paid.
 
-7. Refresh the same finalized markets again.
+7. Resolve a separate market from the admin panel.
+Expected: settlement happens immediately, open orders are cancelled, and disputes are blocked.
+
+8. Resolve a separate market containing a short position.
+Expected: short collateral stays locked until finalization, then is released or consumed correctly.
+
+9. Refresh the same finalized markets again.
 Expected: no duplicate payouts or duplicate creator refunds.
 
 ## Fast Failure Signals
@@ -59,6 +67,8 @@ Expected: no duplicate payouts or duplicate creator refunds.
 - Finalization does not unlock liquidity
 - INVALID settlement does not refund trader cost basis
 - Repeated reads trigger duplicate settlement effects
+- Definitive admin resolution leaves the market disputable or settlement-pending
+- Short settlement releases or consumes the wrong collateral amount
 - Dispute flow settles both old and new outcomes
 
 ## Suggested Timing

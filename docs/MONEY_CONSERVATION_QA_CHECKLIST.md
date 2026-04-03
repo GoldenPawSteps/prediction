@@ -191,6 +191,31 @@ These tests verify that each trade operation conserves money at the transaction 
 
 ---
 
+### **A7b – Naked short ASK: collateral grows without double-debiting seller**
+
+**Setup:**
+1. Two users: buyer "a7b_buyer", seller "a7b_seller".
+2. Fresh market. Seller owns no YES inventory.
+
+**Manual steps:**
+1. **Seller:** Place ASK at $0.40 for 10 YES.
+2. Check seller balance and `/api/portfolio`.
+3. Expected initial collateral: `10 × (1 - 0.40) = 6.00`.
+4. **Buyer:** Place matching BID for 5 YES at $0.40.
+5. Re-check seller balance and portfolio.
+6. **Buyer:** Fill the remaining 5 YES at the same price.
+7. Re-check seller balance and portfolio again.
+
+**Verify:**
+- On placement, seller balance decreases by exactly `6.00`.
+- After first 5-share fill, seller available balance does not take a second debit; total locked short collateral rises to `8.00`.
+- After full fill, total locked short collateral reaches `10.00`.
+- Buyer payments flow into collateral rather than leaking from seller available balance.
+
+**Why:** Proves naked short ASK orders follow the implemented `6 -> 8 -> 10` collateral path and remain money-conserving.
+
+---
+
 ## PART B: Full Lifecycle Invariants (With Settlement)
 
 These tests verify money conservation across entire market lifecycles, including resolution and settlement.
@@ -268,7 +293,7 @@ These tests verify money conservation across entire market lifecycles, including
 
 ---
 
-### **B11 – Dispute rollback: Conservation across dispute + re-resolve**
+### **B11 – Latest-outcome dispute: Conservation across dispute + re-resolve**
 
 **Setup:**
 1. Three users: "b11_creator" (1000), "b11_alice" (1000), "b11_bob" (1000).
@@ -315,7 +340,7 @@ These tests verify money conservation across entire market lifecycles, including
 - Phase 2: No settlement yet (in dispute window).
 - Phase 3: Dispute doesn't change balances.
 - Phase 4: Market re-resolves correctly.
-- Phase 5: Settlement applies new resolution, old YES payout reversed, new NO payout applied.
+- Phase 5: Settlement applies only the latest NO outcome; no rollback is needed because nothing was paid during the dispute window.
 - Total conserved through **all phases**.
 
 **Why:** Most complex scenario; proves the system can handle market disputes without losing money.
@@ -361,10 +386,11 @@ SELL 1:  proceeds=-0.49, balance=999.98  (net=-0.01)
 - [ ] **A5:** BID: reserve = price × shares ✓
 - [ ] **A6:** Cancel: full refund ✓
 - [ ] **A7:** Fill: buyer pays = seller receives ✓
+- [ ] **A7b:** Naked ASK collateral path: `6 -> 8 -> 10`, no extra seller debit ✓
 - [ ] **B8:** Zero-trade: creator recovers full $100 ✓
 - [ ] **B9:** Single-sided: YES buyers, resolved YES, conserved ✓
 - [ ] **B10:** Creator as trader: dual payout, conserved ✓
-- [ ] **B11:** Dispute+re-resolve: conserved all phases ✓
+- [ ] **B11:** Latest-outcome dispute: conserved all phases ✓
 - [ ] **B12:** 20 micro-trades: error < $0.02 ✓
 
 ---

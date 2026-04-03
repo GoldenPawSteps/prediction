@@ -5,7 +5,7 @@ Use this for a quick pre-deploy verification of the dedicated portfolio simulati
 It focuses on the highest-risk portfolio paths:
 - authenticated baseline payload shape
 - position valuation and stats coherence
-- BID reserve tracking in `reservedOrders` and `stats`
+- BID/ASK reserve tracking plus short collateral visibility in `reservedOrders`, `shortReserves`, and `stats`
 - created-market liquidity lock visibility
 - AMM vs EXCHANGE trade classification
 
@@ -41,8 +41,8 @@ Expected: returns `401`.
 3. Create market and execute AMM buys as trader.
 Expected: trader portfolio shows positions with `currentPrice`, `currentValue`, and `unrealizedPnl`; stats totals are coherent.
 
-4. Place open BID order (for example `0.40 × 10`).
-Expected: balance drops by reserve amount, order appears in `reservedOrders`, and `stats.reservedBalance` matches reserved sum.
+4. Place open BID order (for example `0.40 × 10`) and a naked ASK order (for example `0.40 × 10`) on another market.
+Expected: BID appears with `side = BID`, ASK appears with `side = ASK`, balance drops by the appropriate reserve amounts, `shortReserves` becomes non-empty, and `stats.reservedBalance` includes both order reserves and short collateral.
 
 5. Create two open markets as creator (for example liquidity `90` and `110`).
 Expected: both appear in `createdMarkets`; `stats.liquidityLocked` equals `200`.
@@ -55,7 +55,7 @@ Expected: portfolio trades classify correctly as `AMM` vs `EXCHANGE` and roles a
 - Authenticated portfolio response missing expected arrays/stats
 - Unauthenticated portfolio call does not return `401`
 - Position valuation fields missing or inconsistent with stats totals
-- Reserved BID amount not reflected in `reservedOrders` and `stats.reservedBalance`
+- Reserved orders or short collateral missing from `reservedOrders`, `shortReserves`, `stats.shortCollateral`, or `stats.reservedBalance`
 - Created market liquidity not reflected in `stats.liquidityLocked`
 - Exchange fills missing `EXCHANGE` classification or wrong maker/taker role
 

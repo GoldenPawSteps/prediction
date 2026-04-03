@@ -2,7 +2,7 @@
 
 This checklist mirrors the dedicated trading simulation in `test-market-trading.js`, but in human-executable steps.
 
-Use this to manually verify AMM and order-book behavior: trade execution, probability movement, matching, cancellation, time-in-force rules, and rejection paths.
+Use this to manually verify AMM and order-book behavior: long and short trade execution, probability movement, matching, cancellation, time-in-force rules, and rejection paths.
 
 For a shorter pre-deploy pass, use `docs/MARKET_TRADING_SMOKE_CHECKLIST.md`.
 
@@ -56,23 +56,29 @@ Expected:
 - Trade succeeds.
 - `trade.totalCost` is negative (proceeds).
 
-4. Attempt over-sell (sell far more shares than owned).
+4. Attempt over-sell (sell more shares than owned) on a funded account.
+Expected:
+- Trade succeeds and opens short exposure.
+- Position `shares` can go negative.
+- Portfolio reserved balance increases via short collateral.
+
+5. Attempt the same over-sell on an underfunded account.
+Expected:
+- Rejected for insufficient collateral.
+
+6. Attempt oversized buy that exceeds funds.
 Expected:
 - Rejected.
 
-5. Attempt oversized buy that exceeds funds.
+7. Attempt unauthenticated trade request.
 Expected:
 - Rejected.
 
-6. Attempt unauthenticated trade request.
+8. Attempt trade on non-existent market id.
 Expected:
 - Rejected.
 
-7. Attempt trade on non-existent market id.
-Expected:
-- Rejected.
-
-8. Verify probability endpoint.
+9. Verify probability endpoint.
 Expected:
 - YES and NO are in `(0, 1)`.
 - YES + NO is approximately `1`.
@@ -84,14 +90,16 @@ Expected:
 - Order accepted as open/partial.
 - Order fields match request.
 
-2. Give Trader B YES inventory (AMM buy), then place non-crossing GTC ASK (for example YES @ 0.80).
+2. Place non-crossing GTC ASK (for example YES @ 0.80) from Trader B, with or without inventory.
 Expected:
 - Order accepted.
 - No immediate fill.
+- If Trader B lacks inventory, ASK still opens as a naked short order and locks collateral immediately.
 
 3. Place crossing BID (for example YES @ 0.80).
 Expected:
 - Immediate fill occurs (`filledShares > 0`).
+- Buyer payment increases the seller's short collateral rather than causing an extra available-balance debit.
 
 4. Place another BID and cancel it.
 Expected:
@@ -127,9 +135,10 @@ Expected:
 
 Treat as release blockers if any occur:
 
-- AMM BUY/SELL accepts invalid payloads or rejects valid payloads
+- Funded oversells fail to open short exposure, or undercollateralized oversells succeed
 - Probability endpoint returns invalid values
 - Crossing orders fail to match
+- Naked ASK orders do not reserve collateral correctly
 - Cancelled orders do not show `CANCELLED`
 - FOK/FAK/GTD constraints are not enforced
 - Trading/order actions succeed without authentication

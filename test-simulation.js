@@ -59,12 +59,26 @@ async function request(method, path, body = null, jar = null) {
   const opts = { method, headers: { 'Content-Type': 'application/json' } };
   if (jar) opts.headers.Cookie = jar.getCookieHeader();
   if (body) opts.body = JSON.stringify(body);
-  const res = await fetch(`${BASE_URL}${path}`, opts);
-  const setCookies = res.headers.getSetCookie?.() || [];
-  if (jar && setCookies.length) jar.setCookies(setCookies);
-  let data;
-  try { data = await res.json(); } catch { data = null; }
-  return { status: res.status, ok: res.ok, data };
+
+  let lastErr = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(`${BASE_URL}${path}`, opts);
+      const setCookies = res.headers.getSetCookie?.() || [];
+      if (jar && setCookies.length) jar.setCookies(setCookies);
+      let data;
+      try { data = await res.json(); } catch { data = null; }
+      return { status: res.status, ok: res.ok, data };
+    } catch (err) {
+      lastErr = err;
+      if (attempt < 2) {
+        await new Promise(r => setTimeout(r, 200 * (attempt + 1)));
+        continue;
+      }
+    }
+  }
+
+  throw lastErr || new Error('request failed');
 }
 
 function assert(cond, msg) { if (!cond) throw new Error(`ASSERTION FAILED: ${msg}`); }
@@ -723,7 +737,6 @@ async function resolutionSection(users) {
   const { alice, bob } = users;
   let aliceAfterTrades;
   let bobAfterTrades;
-  let pendingLiquidityLocked;
 
   // Create a market with a near-future end date, trade, then let it close for resolution tests.
   const resMarket = await createBinaryMarket(alice.jar, 'Resolve2', {
@@ -785,7 +798,6 @@ async function resolutionSection(users) {
     assertApprox(aliceBal, aliceAfterTrades, 'alice balance should not change before finalization', 0.01);
     assertApprox(bobBal, bobAfterTrades, 'bob balance should not change before finalization', 0.01);
     assert(alicePortfolio.stats.liquidityLocked > 0, 'creator liquidity should remain locked during dispute window');
-    pendingLiquidityLocked = alicePortfolio.stats.liquidityLocked;
     assert(alicePortfolio.stats.liquidityLocked >= 100, 'creator liquidity should remain locked during dispute window');
     assert(bobPortfolio.stats.totalPositions > 0, 'losing trader position should still remain open before finalization');
   });
@@ -798,6 +810,8 @@ async function resolutionSection(users) {
   });
 
   await step('Portfolio updates after finalization', async () => {
+    const preFinalizePortfolio = await getPortfolio(alice.jar);
+    const preFinalizeLocked = preFinalizePortfolio.stats.liquidityLocked;
     await forceFinalization(resMarket.id, alice.jar, 2);
     const aliceBal = await getBalance(alice.jar);
     const bobBal = await getBalance(bob.jar);
@@ -806,7 +820,7 @@ async function resolutionSection(users) {
     const bobPositionForMarket = bobPortfolio.positions.find((p) => p.market.id === resMarket.id);
     assert(aliceBal > aliceAfterTrades, 'alice should receive creator refund and YES payout after finalization');
     assertApprox(bobBal, bobAfterTrades, 'bob should not receive payout on losing outcome', 0.02);
-    assertApprox(alicePortfolio.stats.liquidityLocked, pendingLiquidityLocked - 100,
+    assertApprox(alicePortfolio.stats.liquidityLocked, preFinalizeLocked - 100,
       'creator liquidity should decrease by this market\'s initial liquidity after finalization', 0.001);
     assert(!bobPositionForMarket, 'bob position for this market should close after finalization');
   });

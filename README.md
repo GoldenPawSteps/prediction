@@ -100,18 +100,20 @@ Available after `npm run seed`:
 ### Trading & Market Creation
 
 - Create binary markets with configurable liquidity and metadata
-- Trade YES/NO outcomes through market and order endpoints
+- Trade YES/NO outcomes through AMM and order-book endpoints
+- Open collateralized short exposure through AMM sells or naked ASK orders
 - Track market probabilities and chart data over time
 
 ### Trust & Resolution
 
 - Resolution routes for market outcome finalization
 - Dispute and voting workflows for contested outcomes
-- Admin controls for moderation and resolution actions
+- Admin controls for moderation and definitive immediate resolution actions
 
 ### User Insights
 
 - Portfolio views for positions and trade history
+- Reserved-balance reporting for BID reserves, ASK reserves, and short collateral
 - Leaderboard rankings and performance surfaces
 - Comments and discussion threads per market
 
@@ -183,6 +185,7 @@ Exchange and resolution tests:
 - `npm run test:resolution-refund`
 - `npm run test:resolution-reresolution-refund`
 - `npm run test:resolution-deferred-finalization`
+- `npm run test:short-selling`
 
 Comprehensive simulations:
 
@@ -202,6 +205,7 @@ Comprehensive simulations:
 - `npm run test:portfolio:<section>` - Run one portfolio section (`basics`, `positions`, `reserves`, `created`, `exchange`)
 - `npm run test:balance` - Full market balance simulation (10 checks)
 - `npm run test:balance:<section>` - Run one balance section (`wallet`, `funding`, `amm`, `exchange`, `rejections`)
+- `npm run test:short-selling` - Focused AMM short, naked ASK reserve, and short settlement simulation
 - `npm run test:leaderboard` - Full market leaderboard simulation (6 checks)
 - `npm run test:leaderboard:<section>` - Run one leaderboard section (`shape`, `sorting`, `trades`)
 - `npm run test:multimarket-multitrader` - Comprehensive multi-market multi-trader simulation (9 checks)
@@ -261,21 +265,22 @@ Additional repository test utilities:
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
 - `GET /api/auth/me`
+- `PATCH /api/auth/me`
 
 ### Markets
 
 - `GET /api/markets`
 - `POST /api/markets`
 - `GET /api/markets/[id]`
-- `POST /api/markets/[id]/chart`
+- `GET /api/markets/[id]/chart`
 - `POST /api/markets/[id]/comment`
 - `GET /api/markets/[id]/comments`
-- `POST /api/markets/[id]/probability`
+- `GET /api/markets/[id]/probability`
 - `POST /api/markets/[id]/trade`
 - `POST /api/markets/[id]/order`
 - `POST /api/markets/[id]/vote`
 - `POST /api/markets/[id]/dispute`
-- `POST /api/markets/[id]/resolution`
+- `GET /api/markets/[id]/resolution`
 - `POST /api/markets/[id]/resolve`
 
 ### User Data
@@ -313,6 +318,12 @@ Resolution and governance:
 Exchange support:
 
 - `MarketOrder`, `MarketOrderFill`
+
+Trading semantics:
+
+- Positions can be positive or negative; negative exposure is collateralized and settled at finalization.
+- Portfolio `reservedBalance` includes open-order reserves plus short collateral.
+- Admin-panel resolutions are definitive and settle immediately; community resolution remains provisional until the dispute window closes.
 
 Enums cover market status, trade type/outcome, order side/type/status, and resolution outcomes.
 

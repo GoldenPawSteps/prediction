@@ -40,7 +40,7 @@ Expected: Trade succeeds, Alice balance decreases, YES probability increases.
 Expected: Trade succeeds and market probability updates.
 
 7. Bob places GTC ASK and Alice places crossing BID.
-Expected: Orders are accepted and at least partial fill occurs.
+Expected: Orders are accepted and at least partial fill occurs. If Bob had no inventory, the ASK still opens as a collateralized short order.
 
 8. Alice posts a comment; Bob sees it in comments list.
 Expected: Comment persists and appears in newest-first order.
@@ -52,7 +52,7 @@ Expected: Probability is valid (YES + NO ~= 1), chart returns non-empty history.
 Expected: Portfolio shows positions/trades/stats, leaderboard loads with entries.
 
 11. Create a short-expiry market, trade once, wait to expire, then vote to resolve.
-Expected: Market resolves, remains settlement-pending until finalization, and cannot be traded afterward.
+Expected: Standard resolution remains settlement-pending until finalization and cannot be traded afterward. Admin-panel resolution is definitive and settles immediately.
 
 12. Try one protected action while logged out (for example POST comment or trade).
 Expected: Rejected with auth error (or redirect to login).

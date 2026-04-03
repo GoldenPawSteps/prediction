@@ -6,7 +6,9 @@ It focuses on the highest-risk state transitions:
 - OPEN creation
 - expiry auto-close
 - provisional resolution
+- definitive admin resolution
 - immutable finalization
+- short-position settlement
 - dispute-driven re-resolution
 
 ## Setup
@@ -30,7 +32,7 @@ npm run test:lifecycle
 Expected:
 - `RESULTS: 19 passed, 0 failed`
 
-## 6-Step Smoke Flow
+## 8-Step Smoke Flow
 
 1. Register a fresh creator and create a market with initial liquidity 100.
 Expected: Balance drops by 100, market appears as `OPEN`, and creator portfolio shows `liquidityLocked = 100`.
@@ -50,6 +52,12 @@ Expected: Creator liquidity unlocks, open positions close, and the winning trade
 6. On a separate market, run the dispute flow: provisional YES -> dispute -> two NO votes.
 Expected: Market moves `RESOLVED -> DISPUTED -> RESOLVED`, final outcome is NO, and only the latest outcome is settled after finalization.
 
+7. On a separate market, resolve through the admin page.
+Expected: settlement is immediate, open orders are cancelled, and disputes are blocked.
+
+8. On another market, open a short position before expiry and then resolve it.
+Expected: short collateral stays locked until finalization and is then released or consumed exactly once.
+
 ## Fast Failure Signals
 
 - Market does not auto-close after expiry
@@ -57,6 +65,8 @@ Expected: Market moves `RESOLVED -> DISPUTED -> RESOLVED`, final outcome is NO, 
 - Provisional resolution pays out immediately
 - Portfolio refresh does not finalize an immutable market
 - Repeated refresh duplicates settlement side effects
+- Definitive admin resolution still allows disputes or leaves orders uncleared
+- Short collateral unlocks too early or settles twice
 - Dispute flow does not require quorum or does not settle the latest outcome
 
 ## Suggested Timing

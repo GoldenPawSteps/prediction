@@ -6,7 +6,7 @@ It focuses on the highest-risk balance paths:
 - wallet and portfolio available-balance sync
 - market funding debits
 - AMM BUY/SELL exactness
-- exchange reserve and cancel refund exactness
+- short collateral locking plus exchange reserve/cancel exactness
 - rejected-operation no-mutation guarantees
 
 ## Setup
@@ -38,14 +38,14 @@ Expected: `stats.availableBalance` matches wallet balance.
 2. Create market with `initialLiquidity=135`.
 Expected: creator balance drops by `135` and liquidity lock reflects the funding.
 
-3. Perform AMM BUY then SELL.
-Expected: BUY debits by `trade.totalCost`, SELL credits by `abs(trade.totalCost)`.
+3. Perform AMM BUY then SELL, including one SELL larger than current inventory on a fresh market.
+Expected: BUY debits by `trade.totalCost`, SELL credits by `abs(trade.totalCost)`, and funded oversells open collateralized short exposure instead of failing.
 
 4. Place GTC BID (`0.42 × 10`) and then cancel.
 Expected: reserve debit is exact and cancel fully restores balance.
 
-5. Execute crossing ASK/BID fill after seller inventory setup.
-Expected: fill executes and combined buyer+seller balances remain conserved.
+5. Execute crossing naked ASK/BID fill.
+Expected: initial ASK locks short collateral, fill executes, buyer payment goes into collateral rather than double-debiting the seller, and combined buyer+seller balances remain conserved.
 
 6. Submit one oversized AMM BUY and one invalid order payload.
 Expected: both fail and balances do not change.
@@ -55,7 +55,7 @@ Expected: both fail and balances do not change.
 - Balance mismatch between wallet and portfolio stats
 - Funding debits not equal to initial liquidity
 - BUY/SELL deltas inconsistent with reported trade cost
-- BID reserve/cancel not exact
+- BID reserve/cancel not exact, or naked ASK collateral is miscomputed
 - Net money drift on direct fills
 - Rejected mutation requests changing balances
 

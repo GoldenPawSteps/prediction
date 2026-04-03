@@ -70,6 +70,18 @@ If all 41 tests pass, you can skip to the manual spot-checks below. If any fail,
 
 ---
 
+### 4b. **Naked ASK: collateral grows without double-debiting seller** (45 sec)
+
+- Register buyer and seller on a fresh market.
+- Seller places ASK: price=0.40, shares=10 without prior YES inventory.
+- Check seller portfolio/balance: initial collateral lock should be $6.00.
+- Buyer fills 5 shares at 0.40.
+- Verify seller available balance did not take a second debit and total locked collateral rises to $8.00.
+
+**Pass:** ✓ (Collateral grows, seller cash does not leak)
+
+---
+
 ### 5. **Full lifecycle: Zero-trade → resolve → settle** (2 min)
 
 - Register "smoke_settle".
@@ -115,6 +127,7 @@ If all 41 tests pass, you can skip to the manual spot-checks below. If any fail,
 | 2 | Buy+Sell | residual ≤ $0.01 | ✓ |
 | 3 | Multi-user | Σ decreases = Σ costs | ✓ |
 | 4 | BID cancel | exact refund | ✓ |
+| 4b | Naked ASK collateral | reserve grows, no seller cash leak | ✓ |
 | 5 | Zero-trade settle | creator = 1000 | ✓ |
 | 6 | Dispute system | total = 3000 | ✓ |
 

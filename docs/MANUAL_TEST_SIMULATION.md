@@ -50,13 +50,13 @@ For a short UI/UX pre-deploy pass, use `docs/UI_UX_SIMULATION_SMOKE_CHECKLIST.md
 - Authentication lifecycle: register, login, session isolation, logout
 - Markets lifecycle: create, list, filter, search, fetch by id
 - AMM trading: buy/sell, probability movement, insufficient funds validation
-- Exchange orders: GTC, GTD, FOK, FAK, matching, cancellation, expiry checks
+- Exchange orders: GTC, GTD, FOK, FAK, matching, cancellation, expiry checks, and naked ASK collateral
 - Comments: post/list and validation constraints
 - Market data: probability, chart history, resolution status view
-- Portfolio: positions, trades, account stats
+- Portfolio: positions, trades, reserved orders, short collateral, and account stats
 - Leaderboard: default/trades/ROI sorting
-- Resolution flow: vote, provisional resolve, finalization, trade lock after resolve
-- Dispute flow: dispute, re-vote, re-resolution, latest-outcome finalization
+- Resolution flow: vote, provisional resolve, definitive admin resolve, finalization, trade lock after resolve
+- Dispute flow: dispute, re-vote, latest-outcome finalization without rollback
 - Edge cases: invalid JSON, invalid market/order/trade/vote/login inputs
 
 ## Run full simulation
@@ -67,7 +67,7 @@ npm run test:simulation
 
 ## Run all simulations
 
-Use this when you want a full regression pass across business flow, market creation, market trading, market settlement, market probability, market liquidity, market portfolio, market balance, market leaderboard, multimarket-multitrader, UI/UX, money conservation, and lifecycle state transitions:
+Use this when you want a full regression pass across business flow, market creation, market trading, market settlement, market probability, market liquidity, market portfolio, market balance, short-selling, market leaderboard, multimarket-multitrader, UI/UX, money conservation, and lifecycle state transitions:
 
 ```bash
 npm run test:all-simulations
@@ -83,6 +83,7 @@ What this covers:
 - `test-market-liquidity.js`: creator liquidity locks, multi aggregation, price-impact sensitivity, and unlock finalization
 - `test-market-portfolio.js`: portfolio shape, valuation stats, reserve accounting, and execution classification
 - `test-market-balance.js`: wallet deltas for funding, AMM, exchange reserve/refund/fill, and rejection safety
+- `test-short-selling.js`: AMM shorts, naked ASK collateral growth, and short settlement behavior
 - `test-market-leaderboard.js`: public payload shape, rank sorting modes, and trade-activity ranking behavior
 - `test-multimarket-multitrader.js`: coordinated multi-user activity across many markets with cross-endpoint consistency checks
 - `test-ui-ux-simulation.js`: route availability, auth affordances, user-flow coherence, and resilience/error handling UX contracts
@@ -209,6 +210,12 @@ npm run test:balance:exchange
 npm run test:balance:rejections
 ```
 
+### Short-Selling Simulation Shortcuts
+
+```bash
+npm run test:short-selling
+```
+
 ### Market Leaderboard Simulation Shortcuts
 
 ```bash
@@ -266,7 +273,7 @@ A dedicated simulation focused on **market creation correctness** — verifying 
 
 ### Market Trading Simulation
 
-A dedicated simulation focused on **trading correctness** — verifying AMM BUY/SELL behavior, probability invariants, order-book matching and cancellation, time-in-force rules (GTC/GTD/FOK/FAK), and auth/invalid-input rejection paths.
+A dedicated simulation focused on **trading correctness** — verifying AMM BUY/SELL behavior including collateralized shorts, probability invariants, order-book matching and cancellation, naked ASK reserve behavior, time-in-force rules (GTC/GTD/FOK/FAK), and auth/invalid-input rejection paths.
 
 - **Full checklist:** `docs/MARKET_TRADING_QA_CHECKLIST.md` — manual verification of trading scenarios
 - **Smoke checklist:** `docs/MARKET_TRADING_SMOKE_CHECKLIST.md` — short pre-deploy trading pass
@@ -278,15 +285,15 @@ A dedicated simulation focused on **trading correctness** — verifying AMM BUY/
 
 #### AMM Trading
 
-This section verifies BUY/SELL behavior for YES/NO outcomes, confirms expected probability movement, and ensures invalid or unauthenticated trade attempts are rejected.
+This section verifies BUY/SELL behavior for YES/NO outcomes, confirms expected probability movement, checks that funded oversells can open short exposure, and ensures invalid or unauthenticated trade attempts are rejected.
 
 #### Exchange Trading
 
-This section verifies order placement and matching flows, cancellation behavior, and time-in-force rules for GTC, GTD, FOK, and FAK.
+This section verifies order placement and matching flows, cancellation behavior, naked ASK collateral locking, and time-in-force rules for GTC, GTD, FOK, and FAK.
 
 ### Market Settlement Simulation
 
-A dedicated simulation focused on **settlement correctness** — verifying deferred settlement after provisional resolution, immutable finalization, zero-trade creator refunds, INVALID cost-basis refunds, and dispute-driven re-resolution that settles only the latest outcome.
+A dedicated simulation focused on **settlement correctness** — verifying deferred settlement after provisional resolution, definitive admin settlement, immutable finalization, zero-trade creator refunds, INVALID cost-basis refunds, short-position settlement, and dispute-driven latest-outcome finalization.
 
 - **Full checklist:** `docs/MARKET_SETTLEMENT_QA_CHECKLIST.md` — manual verification of settlement scenarios
 - **Smoke checklist:** `docs/MARKET_SETTLEMENT_SMOKE_CHECKLIST.md` — short pre-deploy settlement pass
@@ -357,7 +364,7 @@ This section verifies liquidity stays locked through provisional resolution and 
 
 ### Market Portfolio Simulation
 
-A dedicated simulation focused on **portfolio correctness** — verifying baseline payload shape and auth enforcement, position valuation math, reserved BID accounting, created-market liquidity visibility, and AMM/exchange trade classification.
+A dedicated simulation focused on **portfolio correctness** — verifying baseline payload shape and auth enforcement, position valuation math for signed positions, reserved BID/ASK accounting, short-collateral visibility, created-market liquidity visibility, and AMM/exchange trade classification.
 
 - **Full checklist:** `docs/MARKET_PORTFOLIO_QA_CHECKLIST.md` — manual verification of portfolio scenarios
 - **Smoke checklist:** `docs/MARKET_PORTFOLIO_SMOKE_CHECKLIST.md` — short pre-deploy portfolio pass
@@ -380,7 +387,7 @@ This section verifies per-position math (`currentValue`, `unrealizedPnl`) and ag
 
 #### Reserved Orders
 
-This section verifies open BID reserves are reflected in both `reservedOrders` and `stats.reservedBalance`.
+This section verifies open BID/ASK reserves are reflected in `reservedOrders`, and that short-position collateral is reflected in `shortReserves`, `stats.shortCollateral`, and `stats.reservedBalance`.
 
 #### Created Markets
 
@@ -392,7 +399,7 @@ This section verifies trade history marks AMM trades as `AMM`, exchange fills as
 
 ### Market Balance Simulation
 
-A dedicated simulation focused on **balance correctness** — verifying wallet/portfolio sync, exact liquidity funding debits, AMM BUY/SELL balance movement, exchange reserve/refund/fill accounting, and rejected-operation no-mutation guarantees.
+A dedicated simulation focused on **balance correctness** — verifying wallet/portfolio sync, exact liquidity funding debits, AMM BUY/SELL balance movement including shorts, exchange reserve/refund/fill accounting, and rejected-operation no-mutation guarantees.
 
 - **Full checklist:** `docs/MARKET_BALANCE_QA_CHECKLIST.md` — manual verification of balance scenarios
 - **Smoke checklist:** `docs/MARKET_BALANCE_SMOKE_CHECKLIST.md` — short pre-deploy balance pass
@@ -419,7 +426,7 @@ This section verifies AMM BUY decreases balance by `totalCost` and AMM SELL incr
 
 #### Exchange Movement
 
-This section verifies BID reserves are exact, cancel refunds are exact, and direct fills preserve combined participant balances.
+This section verifies BID reserves are exact, naked ASK collateral is exact, cancel refunds are exact, and direct fills preserve combined participant balances without double-debiting short sellers.
 
 #### Rejection Safety
 
@@ -494,9 +501,17 @@ This section verifies that when nobody traded on a market, the creator gets the 
 
 This section verifies that INVALID finalization closes positions and returns traders to their pre-trade cost basis.
 
+#### Admin Definitive Resolution
+
+This section verifies that admin-panel resolution can settle a market immediately, cancel open orders, and block disputes on that market.
+
+#### Short Settlement
+
+This section verifies that signed positions settle correctly: winning shorts keep their sale proceeds after collateral release, and losing shorts pay out through the locked reserve.
+
 #### Dispute Re-Resolution
 
-This section verifies that dispute-driven re-resolution settles only the latest final outcome and does not accidentally pay both sides.
+This section verifies that dispute-driven re-resolution settles only the latest final outcome and does not accidentally pay both sides. No rollback is needed because provisional resolution never paid out during the dispute window.
 
 ### Creation Tests In Plain English
 
@@ -600,6 +615,10 @@ The test cancels reserved BID orders and verifies that the exact reserved amount
 
 The test matches a buyer and seller and verifies that the buyer's payment and seller's proceeds offset exactly, so the fill itself creates no money.
 
+#### A7b — Naked ASK collateral conservation
+
+This test places a naked ASK, verifies the initial collateral reserve, and checks that buyer payments increase locked collateral instead of reducing seller available balance again.
+
 #### B8 — Zero-trade settlement
 
 The test resolves a market with no trades and verifies that the creator gets the full initial liquidity back.
@@ -612,9 +631,9 @@ The test creates a market where only YES is bought, resolves YES, and verifies t
 
 The test puts the creator on both sides of the lifecycle, as market funder and trader, and verifies that payout plus creator refund are still accounted for correctly.
 
-#### B11 — Dispute rollback conservation
+#### B11 — Latest-outcome dispute conservation
 
-The test walks through provisional resolution, dispute, re-vote, and final settlement while checking that the money in the system is conserved at every phase.
+The test walks through provisional resolution, dispute, re-vote, and final settlement while checking that the money in the system is conserved at every phase. Because no payout occurs before finalization, the latest outcome can settle without any rollback step.
 
 #### B12 — Precision drift
 
@@ -622,7 +641,7 @@ The test repeats many tiny buy/sell pairs and verifies that rounding drift stays
 
 ### Market Lifecycle Simulation
 
-A dedicated simulation focused on **market status transitions and settlement phases** — verifying end-to-end progression through `OPEN`, `CLOSED`, provisional resolution, immutable finalization, INVALID finalization, and dispute-driven re-resolution.
+A dedicated simulation focused on **market status transitions and settlement phases** — verifying end-to-end progression through `OPEN`, `CLOSED`, provisional resolution, definitive admin resolution, immutable finalization, INVALID finalization, short settlement, and dispute-driven latest-outcome finalization.
 
 - **Full checklist:** `docs/MARKET_LIFECYCLE_QA_CHECKLIST.md` — manual verification of all lifecycle phases
 - **Smoke checklist:** `docs/MARKET_LIFECYCLE_SMOKE_CHECKLIST.md` — short pre-deploy lifecycle regression pass
@@ -661,6 +680,10 @@ Then the NO trader files a dispute, which moves the market into `DISPUTED`. The 
 
 Finally, the script forces immutable finalization after the dispute window and verifies that the YES and NO positions both close, but only the latest NO outcome is actually settled. In other words, the NO trader gets the payout, the YES trader does not, and the system does not accidentally pay both resolutions.
 
+#### L7 — Short lifecycle keeps collateral pending, then settles definitively
+
+This scenario opens a short position before expiry, verifies that the short collateral stays locked through provisional resolution, and then checks that finalization releases or consumes that collateral correctly depending on the resolved outcome.
+
 ### Simulation Smoke Tests
 
 Quick pre-deploy verification without full manual testing:
@@ -675,5 +698,5 @@ Quick pre-deploy verification without full manual testing:
 - **Balance smoke:** `docs/MARKET_BALANCE_SMOKE_CHECKLIST.md` — short smoke test for wallet and balance movement behavior
 - **Leaderboard smoke:** `docs/MARKET_LEADERBOARD_SMOKE_CHECKLIST.md` — short smoke test for leaderboard sorting and payload behavior
 - **MultiMarket smoke:** `docs/MARKET_MULTIMARKET_MULTITRADER_SMOKE_CHECKLIST.md` — short smoke test for cross-market multi-user activity
-- **Conservation smoke:** `docs/MONEY_CONSERVATION_SMOKE_CHECKLIST.md` — 6-check smoke test for money invariants
+- **Conservation smoke:** `docs/MONEY_CONSERVATION_SMOKE_CHECKLIST.md` — smoke test for money invariants including naked ASK collateral
 - **Lifecycle smoke:** `docs/MARKET_LIFECYCLE_SMOKE_CHECKLIST.md` — short smoke test for lifecycle transitions
