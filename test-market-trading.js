@@ -286,6 +286,9 @@ async function exchangeSection(ctx) {
   });
 
   await step('Non-crossing GTC ASK can be placed naked and remains unfilled', async () => {
+    const beforePortfolio = await getPortfolio(bob.jar);
+    const beforeReserved = Number(beforePortfolio.stats?.reservedBalance || 0);
+
     const ask = await request('POST', `/api/markets/${market.id}/order`, {
       outcome: 'YES',
       side: 'ASK',
@@ -296,7 +299,15 @@ async function exchangeSection(ctx) {
 
     assert(ask.ok, `GTC ASK failed: ${JSON.stringify(ask.data)}`);
     assert(Number(ask.data.filledShares || 0) === 0, 'ask should not fill against lower bid');
-    assert(Number(ask.data.order?.reservedAmount || 0) > 0, 'naked ask should reserve short collateral');
+
+    const afterPortfolio = await getPortfolio(bob.jar);
+    const afterReserved = Number(afterPortfolio.stats?.reservedBalance || 0);
+    const reserveDelta = afterReserved - beforeReserved;
+    assert(reserveDelta > 0, `naked ask should increase reserved balance, got delta ${reserveDelta}`);
+
+    const expectedReserve = 10 * (1 - 0.8);
+    assertApprox(reserveDelta, expectedReserve,
+      'naked ask reserve increase should equal shares*(1-price)', 0.01);
   });
 
   await step('Crossing BID matches existing ASK with filled shares', async () => {

@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3001",
+    "dev": "next dev -H 0.0.0.0 -p 3001",
+    "dev:clean-port": "node scripts/kill-port.js 3001",
+    "dev:safe": "npm run dev:clean-port && npm run dev",
     "build": "next build",
     "postinstall": "prisma generate",
     "start": "npm run db:migrate && next start",
@@ -89,8 +91,8 @@
     "test:conservation:api": "node test-money-conservation.js api",
     "test:conservation:lifecycle": "node test-money-conservation.js lifecycle",
     "seed": "tsx prisma/seed.ts",
-    "db:reset": "prisma migrate reset --force && npm run seed",
-    "db:migrate": "prisma migrate deploy",
+    "db:reset": "node scripts/db-reset.js",
+    "db:migrate": "node scripts/db-migrate.js",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio"
   },

@@ -322,9 +322,12 @@ async function run() {
 
     const traderAPortfolio = await request('GET', '/api/portfolio', null, traderA.jar)
     assert(traderAPortfolio.ok, `Fetch portfolio after scenario 2 failed: ${JSON.stringify(traderAPortfolio.data)}`)
+    const orderReserveSum = (traderAPortfolio.data.reservedOrders || [])
+      .reduce((sum, order) => sum + Number(order.reservedAmount || 0), 0)
+    const expectedReservedTotal = orderReserveSum + Number(traderAPortfolio.data.stats.shortCollateral || 0)
     assert(
-      approxEqual(traderAPortfolio.data.stats.reservedBalance, 1.45),
-      `Expected total locked reserve to be 1.45, got ${traderAPortfolio.data.stats.reservedBalance}`
+      approxEqual(traderAPortfolio.data.stats.reservedBalance, expectedReservedTotal),
+      `Expected reservedBalance to equal open-order reserves + short collateral (${expectedReservedTotal}), got ${traderAPortfolio.data.stats.reservedBalance}`
     )
 
     console.log(

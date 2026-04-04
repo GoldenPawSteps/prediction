@@ -536,8 +536,9 @@ async function partA_exchangeNakedShortAskReserveFlow() {
   await check('A8a: naked ASK placement locks initial reserve of shares×(1-price)', async () => {
     assertApprox(sellerBeforeAsk - sellerAfterAsk, initialReserve,
       'naked ASK should lock initial reserve', 0.001)
-    assertApprox(Number(ask.order.reservedAmount), initialReserve,
-      'order.reservedAmount should reflect initial naked-ask reserve', 0.001)
+    const portfolioAfterAsk = await getPortfolio(seller.jar)
+    assertApprox(Number(portfolioAfterAsk.stats.reservedBalance), initialReserve,
+      'portfolio reserved balance should reflect initial naked-ask reserve', 0.001)
   })
 
   const buyerBeforeBid = await getBalance(buyer.jar)

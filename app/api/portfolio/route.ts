@@ -323,12 +323,13 @@ export async function GET(req: NextRequest) {
       totalRealizedPnl: positionsWithValue.reduce((sum, p) => sum + p.realizedPnl, 0),
     }
 
-    // reservedBalance = open order reserves only (BID + ASK order collateral)
-    stats.reservedBalance = toNumber(reservedOpenOrders._sum.reservedAmount)
+    const openOrderReservedBalance = toNumber(reservedOpenOrders._sum.reservedAmount)
     // shortCollateral = payoff reserve required by current negative positions
     stats.shortCollateral = shortCollateral
-    // lockedBalance = all locked funds across orders and negative positions
-    stats.lockedBalance = stats.reservedBalance + stats.shortCollateral
+    // reservedBalance = all reserve obligations (open orders + short collateral)
+    stats.reservedBalance = openOrderReservedBalance + stats.shortCollateral
+    // lockedBalance tracks total locked funds; align with full reserve obligations
+    stats.lockedBalance = stats.reservedBalance
     stats.totalBalance = stats.availableBalance + stats.lockedBalance
 
     return apiSuccess({
