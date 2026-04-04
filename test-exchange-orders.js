@@ -189,8 +189,8 @@ async function run() {
 
     const balanceBAfterBid = await getBalance(traderB.jar)
     assert(
-      approxEqual(balanceBAfterBid, balanceBBeforeBid - bidReserve),
-      `Bid reserve mismatch. Before=${balanceBBeforeBid} After=${balanceBAfterBid} Reserve=${bidReserve}`
+      approxEqual(balanceBAfterBid, balanceBBeforeBid),
+      `Placing resting BID should not change total balance. Before=${balanceBBeforeBid} After=${balanceBAfterBid}`
     )
 
     const askRes = await request(
@@ -557,10 +557,9 @@ async function run() {
     assert(askRes.ok, `ASK placement failed: ${JSON.stringify(askRes.data)}`)
     
     const balanceAfterAsk = await getBalance(traderC.jar)
-    const askReserveExpected = 5 * (1 - 0.6) // 5*(1-0.6)=2 (5 shares covered by position, 5 uncovered need 2 reserve)
     assert(
-      approxEqual(balanceAfterAsk, balanceBefore - askReserveExpected, 0.01),
-      `Balance after ASK should decrease by ${askReserveExpected}, got delta ${balanceBefore - balanceAfterAsk}`
+      approxEqual(balanceAfterAsk, balanceBefore, 0.01),
+      `Placing ASK should not change total balance. Before=${balanceBefore}, After=${balanceAfterAsk}`
     )
     
     // At this point: balance is locked in ASK reserve

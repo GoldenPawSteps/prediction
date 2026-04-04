@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client'
 import { roundMoney, roundPrice } from '@/lib/money'
+import { canonicalizeShares } from '@/lib/simple-reserve'
 
 type TradeOutcome = 'YES' | 'NO'
 
@@ -10,12 +11,6 @@ function toNumber(value: unknown, fallback: number = 0): number {
 
 function nearZero(value: number, epsilon: number = 0.0000001): boolean {
   return Math.abs(value) <= epsilon
-}
-
-function requiredShortCollateralForMarket(yesShares: number, noShares: number) {
-  const shortYes = Math.max(0, -yesShares)
-  const shortNo = Math.max(0, -noShares)
-  return roundMoney(Math.max(shortYes, shortNo))
 }
 
 type PositionTransition = {
@@ -120,24 +115,18 @@ export async function applySignedPositionTrade(
 
   const yesPosition = positions.find((p) => p.outcome === 'YES')
   const noPosition = positions.find((p) => p.outcome === 'NO')
-  const targetPosition = params.outcome === 'YES' ? yesPosition : noPosition
+  const beforeYesRaw = toNumber(yesPosition?.shares)
+  const beforeNoRaw = toNumber(noPosition?.shares)
 
-  const beforeYesShares = toNumber(yesPosition?.shares)
-  const beforeNoShares = toNumber(noPosition?.shares)
-  const beforeCollateral = requiredShortCollateralForMarket(beforeYesShares, beforeNoShares)
+  // Apply delta on raw side first; then canonicalize so the user never ends
+  // with both YES and NO open simultaneously for this market.
+  let yesRaw = beforeYesRaw
+  let noRaw = beforeNoRaw
+  if (params.outcome === 'YES') yesRaw = roundMoney(yesRaw + params.deltaShares)
+  else noRaw = roundMoney(noRaw + params.deltaShares)
 
-  const transition = calculatePositionTransition(
-    toNumber(targetPosition?.shares),
-    toNumber(targetPosition?.avgEntryPrice),
-    params.deltaShares,
-    params.executionPrice
-  )
-
-  const afterYesShares = params.outcome === 'YES' ? transition.newShares : beforeYesShares
-  const afterNoShares = params.outcome === 'NO' ? transition.newShares : beforeNoShares
-  const afterCollateral = requiredShortCollateralForMarket(afterYesShares, afterNoShares)
-  const collateralDelta = roundMoney(afterCollateral - beforeCollateral)
-  const netBalanceDelta = roundMoney(params.cashDelta - collateralDelta)
+  const canonical = canonicalizeShares(yesRaw, noRaw)
+  const netBalanceDelta = roundMoney(params.cashDelta + canonical.collapsedPairs)
 
   if (!nearZero(netBalanceDelta)) {
     const user = await tx.user.findUnique({
@@ -149,64 +138,55 @@ export async function applySignedPositionTrade(
       throw new Error('User not found')
     }
 
-    const resultingBalance = roundMoney(toNumber(user.balance) + netBalanceDelta)
-    if (resultingBalance < -0.000001) {
-      throw new Error('Insufficient balance for short collateral')
-    }
-
     await tx.user.update({
       where: { id: params.userId },
       data: { balance: { increment: netBalanceDelta } },
     })
   }
 
-  if (targetPosition) {
-    if (transition.newShares === 0) {
-      await tx.position.delete({ where: { id: targetPosition.id } })
-    } else {
+  const upsertPosition = async (
+    existing: { id: string; avgEntryPrice: unknown; realizedPnl: unknown } | undefined,
+    outcome: TradeOutcome,
+    shares: number
+  ) => {
+    if (nearZero(shares)) {
+      if (existing) await tx.position.delete({ where: { id: existing.id } })
+      return
+    }
+
+    if (existing) {
       await tx.position.update({
-        where: { id: targetPosition.id },
+        where: { id: existing.id },
         data: {
-          shares: transition.newShares,
-          avgEntryPrice: transition.newAvgEntryPrice,
-          realizedPnl: { increment: transition.realizedPnlDelta },
+          shares,
+        },
+      })
+    } else {
+      await tx.position.create({
+        data: {
+          userId: params.userId,
+          marketId: params.marketId,
+          outcome,
+          shares,
+          avgEntryPrice: roundPrice(params.executionPrice),
         },
       })
     }
-  } else if (transition.newShares !== 0) {
-    await tx.position.create({
-      data: {
-        userId: params.userId,
-        marketId: params.marketId,
-        outcome: params.outcome,
-        shares: transition.newShares,
-        avgEntryPrice: transition.newAvgEntryPrice,
-      },
-    })
   }
 
+  await upsertPosition(yesPosition, 'YES', roundMoney(canonical.yesShares))
+  await upsertPosition(noPosition, 'NO', roundMoney(canonical.noShares))
+
   return {
-    collateralDelta,
     netBalanceDelta,
+    collapsedPairs: canonical.collapsedPairs,
   }
 }
 
 export function getRequiredShortCollateralFromPositions(
   positions: Array<{ marketId: string; outcome: TradeOutcome; shares: number }>
 ) {
-  const byMarket = new Map<string, { yesShares: number; noShares: number }>()
-
-  for (const position of positions) {
-    const entry = byMarket.get(position.marketId) ?? { yesShares: 0, noShares: 0 }
-    if (position.outcome === 'YES') entry.yesShares = position.shares
-    else entry.noShares = position.shares
-    byMarket.set(position.marketId, entry)
-  }
-
-  let total = 0
-  for (const market of byMarket.values()) {
-    total = roundMoney(total + requiredShortCollateralForMarket(market.yesShares, market.noShares))
-  }
-
-  return total
+  void positions
+  // In the simplified model there is no separate short-collateral lock.
+  return 0
 }

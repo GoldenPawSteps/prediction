@@ -4,8 +4,7 @@ import { requireAuth, apiError, apiSuccess } from '@/lib/api-helpers'
 import { getMarketProbabilities } from '@/lib/lmsr'
 import { activeOrderWhere } from '@/lib/order-expiration'
 import { finalizeImmutableResolutions } from '@/lib/market-status'
-import { computeAskAllocation, type AskOrderInput } from '@/lib/order-reserve-rebalance'
-import { getRequiredShortCollateralFromPositions } from '@/lib/position-accounting'
+import { computeUserReserveFromRows } from '@/lib/simple-reserve'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -29,22 +28,11 @@ export async function GET(req: NextRequest) {
     const MATCH_WINDOW_MS = 60000
     const now = new Date()
 
-    const [user, reservedOpenOrders, reservedOrders, createdMarkets, positions, trades, fills, allOpenAskOrders] = await Promise.all([
+    const [user, reservedOrders, createdMarkets, positions, trades, fills] = await Promise.all([
       prisma.user.findUnique({
         where: { id: authUser.userId },
         select: { balance: true },
       }),
-      prisma.marketOrder.aggregate({
-        where: {
-          userId: authUser.userId,
-          status: { in: ['OPEN', 'PARTIAL'] },
-          remainingShares: { gt: 0 },
-          reservedAmount: { gt: 0 },
-          ...activeOrderWhere(now),
-        },
-        _sum: { reservedAmount: true },
-      }),
-      // All open orders that have reserved balance (for the "reserved orders" display)
       prisma.marketOrder.findMany({
         where: {
           userId: authUser.userId,
@@ -140,56 +128,7 @@ export async function GET(req: NextRequest) {
         orderBy: { createdAt: 'desc' },
         take: 200,
       }),
-      // All open ASK orders for computing per-position locked shares
-      prisma.marketOrder.findMany({
-        where: {
-          userId: authUser.userId,
-          side: 'ASK',
-          status: { in: ['OPEN', 'PARTIAL'] },
-          remainingShares: { gt: 0 },
-          ...activeOrderWhere(now),
-        },
-        select: {
-          id: true,
-          marketId: true,
-          outcome: true,
-          price: true,
-          remainingShares: true,
-          reservedAmount: true,
-        },
-      }),
     ])
-
-    // Build a map: (marketId, outcome) → ask orders for locked-share computation
-    type AskOrderRaw = { id: string; marketId: string; outcome: string; price: unknown; remainingShares: unknown; reservedAmount: unknown }
-    const askOrdersByKey = new Map<string, AskOrderInput[]>()
-    for (const o of (allOpenAskOrders as AskOrderRaw[])) {
-      const key = `${o.marketId}:${o.outcome}`
-      if (!askOrdersByKey.has(key)) askOrdersByKey.set(key, [])
-      askOrdersByKey.get(key)!.push({
-        id: o.id,
-        price: toNumber(o.price),
-        remainingShares: toNumber(o.remainingShares),
-        currentReservedAmount: toNumber(o.reservedAmount),
-      })
-    }
-
-    const longSharesByKey = new Map<string, number>()
-    for (const position of positions) {
-      const key = `${position.marketId}:${position.outcome}`
-      longSharesByKey.set(key, Math.max(0, toNumber(position.shares)))
-    }
-
-    const askLockedSharesByOrderId = new Map<string, number>()
-    const askBalanceCoveredSharesByOrderId = new Map<string, number>()
-    for (const [key, askOrders] of askOrdersByKey.entries()) {
-      const longShares = longSharesByKey.get(key) ?? 0
-      const { orderAllocations } = computeAskAllocation(longShares, askOrders)
-      for (const alloc of orderAllocations) {
-        askLockedSharesByOrderId.set(alloc.id, alloc.lockedShares)
-        askBalanceCoveredSharesByOrderId.set(alloc.id, alloc.uncoveredShares)
-      }
-    }
 
     const positionsWithValue = positions.map((p) => {
       let currentPrice: number
@@ -212,13 +151,9 @@ export async function GET(req: NextRequest) {
       const costBasis = avgEntryPrice * shares
       const unrealizedPnl = currentValue - costBasis
 
-      // Compute locked / available shares for this position
-      const askKey = `${p.marketId}:${p.outcome}`
-      const askOrders = askOrdersByKey.get(askKey) ?? []
-      const posLong = Math.max(0, shares)
-      const { totalLockedShares } = computeAskAllocation(posLong, askOrders)
-      const lockedShares = Math.min(totalLockedShares, posLong)
-      const availableShares = posLong - lockedShares
+      // Simplified model: no per-order share locks.
+      const lockedShares = 0
+      const availableShares = Math.max(0, shares)
 
       return {
         ...p,
@@ -233,44 +168,7 @@ export async function GET(req: NextRequest) {
       }
     })
 
-    const shortReservesByMarket = new Map<string, {
-      marketId: string
-      marketTitle: string
-      shortYesShares: number
-      shortNoShares: number
-    }>()
-
-    for (const position of positions) {
-      const shares = toNumber(position.shares)
-      if (shares >= 0) continue
-
-      const existing = shortReservesByMarket.get(position.marketId) ?? {
-        marketId: position.marketId,
-        marketTitle: position.market.title,
-        shortYesShares: 0,
-        shortNoShares: 0,
-      }
-
-      if (position.outcome === 'YES') existing.shortYesShares = Math.max(0, -shares)
-      else existing.shortNoShares = Math.max(0, -shares)
-
-      shortReservesByMarket.set(position.marketId, existing)
-    }
-
-    const shortReserves = Array.from(shortReservesByMarket.values())
-      .map((reserve) => ({
-        ...reserve,
-        reservedAmount: Math.max(reserve.shortYesShares, reserve.shortNoShares),
-      }))
-      .filter((reserve) => reserve.reservedAmount > 0)
-
-    const shortCollateral = getRequiredShortCollateralFromPositions(
-      positions.map((position) => ({
-        marketId: position.marketId,
-        outcome: position.outcome,
-        shares: toNumber(position.shares),
-      }))
-    )
+    const shortReserves: Array<unknown> = []
 
     const unmatchedFills = [...fills]
     const tradesWithExchangeInfo = trades.map((trade) => {
@@ -311,10 +209,10 @@ export async function GET(req: NextRequest) {
     })
 
     const stats = {
-      availableBalance: toNumber(user?.balance),
+      availableBalance: 0,
       shortCollateral: 0,
       lockedBalance: 0,
-      totalBalance: 0,
+      totalBalance: toNumber(user?.balance),
       reservedBalance: 0,
       liquidityLocked: createdMarkets.reduce((sum, m) => sum + toNumber(m.initialLiquidity), 0),
       totalPositions: positionsWithValue.length,
@@ -323,22 +221,32 @@ export async function GET(req: NextRequest) {
       totalRealizedPnl: positionsWithValue.reduce((sum, p) => sum + p.realizedPnl, 0),
     }
 
-    const openOrderReservedBalance = toNumber(reservedOpenOrders._sum.reservedAmount)
-    // shortCollateral = payoff reserve required by current negative positions
-    stats.shortCollateral = shortCollateral
-    // reservedBalance = all reserve obligations (open orders + short collateral)
-    stats.reservedBalance = openOrderReservedBalance + stats.shortCollateral
-    // lockedBalance tracks total locked funds; align with full reserve obligations
+    const computedReserve = computeUserReserveFromRows({
+      positions: positions.map((p) => ({
+        marketId: p.marketId,
+        outcome: p.outcome as 'YES' | 'NO',
+        shares: p.shares,
+      })),
+      openOrders: reservedOrders
+        .filter((o) => toNumber(o.remainingShares) > 0)
+        .map((o) => ({
+          marketId: o.marketId,
+          outcome: o.outcome as 'YES' | 'NO',
+          side: o.side as 'BID' | 'ASK',
+          price: o.price,
+          remainingShares: o.remainingShares,
+        })),
+    })
+
+    stats.shortCollateral = 0
+    stats.reservedBalance = computedReserve
     stats.lockedBalance = stats.reservedBalance
-    stats.totalBalance = stats.availableBalance + stats.lockedBalance
+    stats.availableBalance = stats.totalBalance - stats.lockedBalance
 
     return apiSuccess({
       positions: positionsWithValue,
       trades: tradesWithExchangeInfo,
       reservedOrders: reservedOrders.map((order) => {
-        const askLockedShares = askLockedSharesByOrderId.get(order.id) ?? 0
-        const askBalanceCoveredShares = askBalanceCoveredSharesByOrderId.get(order.id) ?? 0
-
         return {
           ...order,
           createdAt: order.createdAt.toISOString(),
@@ -346,8 +254,9 @@ export async function GET(req: NextRequest) {
           outcome: order.outcome as string,
           side: order.side as string,
           orderType: order.orderType as string,
-          reservedShares: order.side === 'ASK' ? askLockedShares : 0,
-          balanceCoveredShares: order.side === 'ASK' ? askBalanceCoveredShares : 0,
+          reservedAmount: 0,
+          reservedShares: 0,
+          balanceCoveredShares: 0,
         }
       }),
       createdMarkets: createdMarkets.map((m) => ({

@@ -2,15 +2,10 @@ import type { Prisma } from '@prisma/client'
 
 type TransactionClient = Prisma.TransactionClient
 
-function toNumber(value: unknown, fallback: number = 0): number {
-  const numericValue = Number(value)
-  return Number.isFinite(numericValue) ? numericValue : fallback
-}
-
 /**
- * Atomically cancel an order and refund any reserved amount.
+ * Atomically cancel an order.
  * Uses `updateMany` with a status guard so only the first concurrent
- * transaction that hits the row actually performs the refund.
+ * transaction that hits the row actually performs the cancellation.
  */
 async function safeCancelAndRefund(
   tx: TransactionClient,
@@ -28,15 +23,6 @@ async function safeCancelAndRefund(
       reservedAmount: 0,
     },
   })
-
-  const reservedAmount = toNumber(order.reservedAmount)
-
-  if (result.count > 0 && reservedAmount > 0) {
-    await tx.user.update({
-      where: { id: order.userId },
-      data: { balance: { increment: reservedAmount } },
-    })
-  }
 
   return result.count
 }
