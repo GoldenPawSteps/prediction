@@ -265,11 +265,8 @@ export function PortfolioSummarySection({ isPrefetched = false }: { isPrefetched
 
         {(reservedOrders.length > 0 || shortReserves.length > 0) && (
           <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-800">
-            <div className="flex items-center justify-between px-3 sm:px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/60">
+            <div className="px-3 sm:px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/60">
               <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t('reservedBalance')}</h3>
-              <span className="text-sm font-semibold text-amber-600 dark:text-amber-400">
-                {formatCurrency(stats.reservedBalance)}
-              </span>
             </div>
             <div className="divide-y divide-gray-200 dark:divide-gray-700">
               {reservedOrders.map((order) => (
@@ -308,21 +305,14 @@ export function PortfolioSummarySection({ isPrefetched = false }: { isPrefetched
                   </div>
                   <div className="shrink-0 text-right">
                     <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">
-                      {formatCurrency(Number(order.reservedAmount))}
+                      {formatCurrency(
+                        Number(order.remainingShares) *
+                        (order.side === 'BID' ? Number(order.price) : (1 - Number(order.price)))
+                      )}
                     </p>
                     <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                      {tTradePanel('reserveHint', { amount: formatCurrency(Number(order.reservedAmount)) })}
+                      {order.side === 'BID' ? 'Bid nominal lock' : 'Ask nominal lock'}
                     </p>
-                    {order.side === 'ASK' && (
-                      <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                        {t('locked')} {t('shares').toLowerCase()}: {formatFixed(Number(order.reservedShares))}
-                      </p>
-                    )}
-                    {order.side === 'ASK' && Number(order.balanceCoveredShares) > 0 && (
-                      <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                        {formatFixed(Number(order.balanceCoveredShares))} {t('shares').toLowerCase()} covered by {formatCurrency(Number(order.reservedAmount))}
-                      </p>
-                    )}
                   </div>
                 </div>
               ))}
@@ -349,14 +339,7 @@ export function PortfolioSummarySection({ isPrefetched = false }: { isPrefetched
                       YES: {formatFixed(reserve.shortYesShares)} · NO: {formatFixed(reserve.shortNoShares)}
                     </p>
                   </div>
-                  <div className="shrink-0 text-right">
-                    <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">
-                      {formatCurrency(Number(reserve.reservedAmount))}
-                    </p>
-                    <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                      Max payout reserve
-                    </p>
-                  </div>
+
                 </div>
               ))}
             </div>

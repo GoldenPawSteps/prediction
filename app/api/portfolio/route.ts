@@ -240,8 +240,9 @@ export async function GET(req: NextRequest) {
 
     stats.shortCollateral = 0
     stats.reservedBalance = computedReserve
-    stats.lockedBalance = stats.reservedBalance
-    stats.availableBalance = stats.totalBalance - stats.lockedBalance
+    stats.lockedBalance = computedReserve
+    stats.availableBalance = toNumber(user?.balance)
+    stats.totalBalance = stats.availableBalance + stats.lockedBalance
 
     return apiSuccess({
       positions: positionsWithValue,
