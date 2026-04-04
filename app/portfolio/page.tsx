@@ -33,7 +33,7 @@ export default function PortfolioPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div className="rounded-2xl border border-gray-200/80 dark:border-gray-800 bg-white/90 dark:bg-gray-900/80 backdrop-blur-sm p-4 sm:p-6">
+      <div className="rounded-2xl border border-gray-200/80 dark:border-gray-800 bg-white/95 dark:bg-gray-900/90 p-4 sm:p-6 transform-gpu">
         <h1 className="text-xl sm:text-3xl font-bold text-gray-900 dark:text-white break-words leading-snug">{t('title')}</h1>
         <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">@{user.username}</p>
       </div>

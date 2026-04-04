@@ -55,6 +55,12 @@ interface UseSectionReturn<T> {
  *
  * return isLoading ? <CommentSkeleton /> : <Comments data={data} />
  */
+// Module-level cache of last successfully fetched value for each key.
+// Survives React unmount/remount cycles (e.g. back-navigation), so sections
+// can restore their previous content height immediately instead of showing a
+// short skeleton that causes a blank gap at the restored scroll position.
+const lastValueCache = new Map<string, unknown>()
+
 export function usePageSection<T>({
   key,
   url,
@@ -63,8 +69,9 @@ export function usePageSection<T>({
   fetchInit,
   debug = false,
 }: UseSectionOptions): UseSectionReturn<T> {
-  const [data, setData] = useState<T | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  // Seed initial state from last-value cache so remounts show content, not skeleton
+  const [data, setData] = useState<T | null>(() => (lastValueCache.get(key) as T) ?? null)
+  const [isLoading, setIsLoading] = useState(() => !lastValueCache.has(key))
   const [isStale] = useState(false)
   const [error, setError] = useState<Error | null>(null)
 
@@ -121,6 +128,7 @@ export function usePageSection<T>({
         if (newJson !== dataJsonRef.current) {
           dataJsonRef.current = newJson
           hasLoadedDataRef.current = true
+          lastValueCache.set(key, newData)
           setData(newData)
         }
         setIsLoading(false)

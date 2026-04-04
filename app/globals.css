@@ -43,6 +43,14 @@
     }
   }
 
+  /* iOS Safari/WebKit: fixed background attachments can leave stale blank
+     regions after history navigation until the next scroll repaint. */
+  @supports (-webkit-touch-callout: none) {
+    body {
+      background-attachment: scroll;
+    }
+  }
+
   * {
     scrollbar-width: thin;
     scrollbar-color: var(--scroll-thumb) transparent;

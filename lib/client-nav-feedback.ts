@@ -28,6 +28,7 @@ function getNavWindow() {
     __predictifyNavFeedbackTimeoutId?: number
     __predictifyNavWatchdogId?: number
     __predictifyNavTarget?: string
+    __predictifyShouldResetScroll?: boolean
   }
 }
 
@@ -40,6 +41,7 @@ export function beginNavFeedback(targetHref?: string) {
     pathname: window.location.pathname,
   })
 
+  navWindow.__predictifyShouldResetScroll = true
   document.documentElement.setAttribute(NAV_PENDING_ATTR, 'true')
 
   if (navWindow.__predictifyNavFeedbackTimeoutId) {
@@ -113,4 +115,13 @@ export function endNavFeedback() {
   navWindow.__predictifyNavTarget = undefined
 
   document.documentElement.removeAttribute(NAV_PENDING_ATTR)
+}
+
+export function consumeNavScrollReset() {
+  const navWindow = getNavWindow()
+  if (!navWindow) return false
+
+  const shouldResetScroll = Boolean(navWindow.__predictifyShouldResetScroll)
+  navWindow.__predictifyShouldResetScroll = false
+  return shouldResetScroll
 }
