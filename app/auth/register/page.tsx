@@ -14,6 +14,7 @@ export default function RegisterPage() {
   const router = useRouter()
   const [form, setForm] = useState({ email: '', username: '', password: '' })
   const [loading, setLoading] = useState(false)
+  const [checkingExistingSession, setCheckingExistingSession] = useState(false)
 
   const handleInvalidField = (target: EventTarget | null) => {
     if (!(target instanceof HTMLElement)) return
@@ -24,12 +25,34 @@ export default function RegisterPage() {
   }
 
   useEffect(() => {
-    if (!authLoading && user) {
+    let active = true
+
+    const verifyExistingSession = async () => {
+      if (authLoading) return
+      if (!user) {
+        if (active) setCheckingExistingSession(false)
+        return
+      }
+
+      if (active) setCheckingExistingSession(true)
+      await refreshUser()
+      if (active) setCheckingExistingSession(false)
+    }
+
+    void verifyExistingSession()
+
+    return () => {
+      active = false
+    }
+  }, [authLoading, refreshUser, user])
+
+  useEffect(() => {
+    if (!authLoading && !checkingExistingSession && user) {
       router.replace('/')
     }
-  }, [authLoading, user, router])
+  }, [authLoading, checkingExistingSession, user, router])
 
-  if (!authLoading && user) {
+  if ((!authLoading && user) || checkingExistingSession) {
     return null
   }
 

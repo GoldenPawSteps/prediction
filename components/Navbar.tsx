@@ -20,7 +20,7 @@ export function Navbar() {
     }, [])
   const pathname = usePathname()
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
   const isAuthenticated = Boolean(user)
   const isAdmin = Boolean(user?.isAdmin)
   const t = useT('nav')
@@ -30,32 +30,19 @@ export function Navbar() {
   const handleLogout = async () => {
     if (loggingOut) return
     setLoggingOut(true)
-    // Cancel any pending navigation watchdog before navigating away.
     endNavFeedback()
-    // Clear stale post-create back target so the next user doesn't land on
-    // the previous user's market detail page.
+    setMobileOpen(false)
+
     try { window.sessionStorage.removeItem('predictify:post-create-back-target') } catch {}
 
     try {
-      const res = await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
-        cache: 'no-store',
-      })
-
-      if (!res.ok) {
-        throw new Error(`Logout failed with status ${res.status}`)
+      const success = await logout()
+      if (success) {
+        router.replace('/auth/login')
+        router.refresh()
       }
-
-      // Client-side navigation avoids host/proxy mismatch issues from
-      // server-generated absolute redirects in certain dev/mobile setups.
-      window.location.assign('/auth/login')
-      return
-    } catch {
-      // Best effort fallback: still send user to login to break out of
-      // potentially stale authenticated UI state.
-      window.location.assign('/auth/login')
-      return
+    } finally {
+      setLoggingOut(false)
     }
   }
 
