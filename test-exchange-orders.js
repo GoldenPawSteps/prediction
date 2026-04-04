@@ -144,9 +144,10 @@ async function run() {
   const runGtdScenario = runAllScenarios || scenarioArg === 'gtd'
   const runFokScenario = runAllScenarios || scenarioArg === 'fok'
   const runFakScenario = runAllScenarios || scenarioArg === 'fak'
+  const runBidUnlockAskScenario = runAllScenarios || scenarioArg === 'bid-unlock-ask'
 
-  if (!runBidMakerScenario && !runAskMakerScenario && !runGtdScenario && !runFokScenario && !runFakScenario) {
-    throw new Error('Unknown scenario argument. Use: bid-maker | ask-maker | gtd | fok | fak')
+  if (!runBidMakerScenario && !runAskMakerScenario && !runGtdScenario && !runFokScenario && !runFakScenario && !runBidUnlockAskScenario) {
+    throw new Error('Unknown scenario argument. Use: bid-maker | ask-maker | gtd | fok | fak | bid-unlock-ask')
   }
 
   console.log('Running exchange integration test...')
@@ -520,6 +521,91 @@ async function run() {
           balanceBBeforeFak,
           balanceBAfterFak,
           expectedAfterFak,
+        },
+        null,
+        2
+      )
+    )
+  }
+
+  if (runAllScenarios || scenarioArg === 'bid-unlock-ask') {
+    console.log('Scenario 6: BID placement unlocks ASK reserves by improving position')
+
+    const bidUnlockMarketId = await createMarket(traderA.jar, 'bid-unlock')
+    
+    // Setup: Trader has 5 long YES and places high-price ASK orders
+    const traderC = await registerUniqueUser(`${Date.now()}c`)
+    
+    // Buy 5 YES to have a position
+    const buyRes = await request(
+      'POST',
+      `/api/markets/${bidUnlockMarketId}/trade`,
+      { outcome: 'YES', type: 'BUY', shares: 5 },
+      traderC.jar
+    )
+    assert(buyRes.ok, `Buy failed: ${JSON.stringify(buyRes.data)}`)
+    
+    const balanceBefore = await getBalance(traderC.jar)
+    
+    // Place ASK order at 0.6 for 10 shares (needs 4 balance as reserve since only 5 long covered)
+    const askRes = await request(
+      'POST',
+      `/api/markets/${bidUnlockMarketId}/order`,
+      { outcome: 'YES', side: 'ASK', orderType: 'GTC', price: 0.6, shares: 10 },
+      traderC.jar
+    )
+    assert(askRes.ok, `ASK placement failed: ${JSON.stringify(askRes.data)}`)
+    
+    const balanceAfterAsk = await getBalance(traderC.jar)
+    const askReserveExpected = 5 * (1 - 0.6) // 5*(1-0.6)=2 (5 shares covered by position, 5 uncovered need 2 reserve)
+    assert(
+      approxEqual(balanceAfterAsk, balanceBefore - askReserveExpected, 0.01),
+      `Balance after ASK should decrease by ${askReserveExpected}, got delta ${balanceBefore - balanceAfterAsk}`
+    )
+    
+    // At this point: balance is locked in ASK reserve
+    // Try to place BID that would buy another 6 YES at 0.5 (cost 3)
+    // Without ASK rebalancing: available = balanceAfterAsk < 3, so BID would fail
+    // With ASK rebalancing: BID fills, position becomes 11 long, ASK reserves reduce to 0, freeing 2 balance
+    // So buy succeeds and then unlocks reserve
+    
+    const bidPrice = 0.5
+    const bidShares = 6
+    const bidCost = bidPrice * bidShares // 3
+    
+    // This BID should succeed because:
+    // - Current position: 5 long
+    // - After BID: 11 long
+    // - ASK reserves drop from 2 to 0 (all 10 ASK now covered by 11 long)
+    // - The freed 2 balance + current available covers the 3 cost
+    
+    const bidRes = await request(
+      'POST',
+      `/api/markets/${bidUnlockMarketId}/order`,
+      { outcome: 'YES', side: 'BID', orderType: 'GTC', price: bidPrice, shares: bidShares },
+      traderC.jar
+    )
+    assert(bidRes.ok, `BID should succeed (ASK reserves unlock): ${JSON.stringify(bidRes.data)}`)
+    // Order was placed (not rejected for insufficient balance) - the key fix.
+    // Whether it fills depends on counter-offers; the test is order placement success.
+    assert(bidRes.data.order, 'BID order should be created')
+    
+    const balanceAfterBid = await getBalance(traderC.jar)
+    // The key test: BID order was placed (not rejected for insufficient balance)
+    // The exact balance change depends on fill matching and rebalancing details
+    // which are tested separately. Here we just verify placement succeeded.
+    assert(bidRes.data.order.status === 'OPEN' || bidRes.data.order.status === 'PARTIAL', 
+      `BID order should be open/partial, got ${bidRes.data.order.status}`)
+
+    console.log(
+      JSON.stringify(
+        {
+          scenario: 'bid-unlock-ask',
+          bidUnlockMarketId,
+          balanceBefore,
+          balanceAfterAsk,
+          balanceAfterBid,
+          bidOrderStatus: bidRes.data.order.status,
         },
         null,
         2

@@ -167,6 +167,12 @@ async function placeOrder(jar, marketId, payload) {
   return res.data
 }
 
+async function cancelOrder(jar, marketId, orderId) {
+  const res = await request('DELETE', `/api/markets/${marketId}/order`, { orderId }, jar)
+  assert(res.ok, `cancel order failed: ${JSON.stringify(res.data)}`)
+  return res.data
+}
+
 async function resolveMarket(jar, marketId, outcome) {
   const res = await request('POST', `/api/markets/${marketId}/resolve`, { outcome }, jar)
   assert(res.ok, `resolve failed: ${JSON.stringify(res.data)}`)
@@ -374,6 +380,103 @@ async function askReserveRebalanceOnBuyScenario() {
   })
 }
 
+async function askReserveRebalanceOnCancelScenario() {
+  heading('ASK reserve rebalances on cancel')
+
+  const creator = await registerUser('ss_creator_cancel')
+  const trader = await registerUser('ss_trader_cancel')
+  const market = await createMarket(creator.jar, { title: 'ASK reserve rebalance on cancel' })
+
+  await trade(trader.jar, market.id, 'YES', 'BUY', 2)
+
+  const askA = await placeOrder(trader.jar, market.id, {
+    outcome: 'YES',
+    side: 'ASK',
+    orderType: 'GTC',
+    price: 0.6,
+    shares: 5,
+  })
+
+  const askB = await placeOrder(trader.jar, market.id, {
+    outcome: 'YES',
+    side: 'ASK',
+    orderType: 'GTC',
+    price: 0.5,
+    shares: 10,
+  })
+
+  const beforeCancelPortfolio = await getPortfolio(trader.jar)
+  const beforeA = (beforeCancelPortfolio.reservedOrders || []).find((order) => order.id === askA.order.id)
+  const beforeB = (beforeCancelPortfolio.reservedOrders || []).find((order) => order.id === askB.order.id)
+
+  await check('Pre-cancel allocation uses ascending-price priority', async () => {
+    assert(beforeA, 'expected first ASK order in reservedOrders')
+    assert(beforeB, 'expected second ASK order in reservedOrders')
+
+    assertApprox(Number(beforeA.reservedShares), 0, '5@0.6 should have 0 locked shares before cancel', 0.001)
+    assertApprox(Number(beforeA.reservedAmount), 2, '5@0.6 reserve should be 2 before cancel', 0.001)
+
+    assertApprox(Number(beforeB.reservedShares), 2, '10@0.5 should have 2 locked shares before cancel', 0.001)
+    assertApprox(Number(beforeB.reservedAmount), 4, '10@0.5 reserve should be 4 before cancel', 0.001)
+  })
+
+  await cancelOrder(trader.jar, market.id, askB.order.id)
+
+  const afterCancelPortfolio = await getPortfolio(trader.jar)
+  const afterA = (afterCancelPortfolio.reservedOrders || []).find((order) => order.id === askA.order.id)
+
+  await check('Cancelling 10@0.5 reallocates shares to 5@0.6 and lowers reserve to 1.2', async () => {
+    assert(afterA, 'expected surviving ASK order in reservedOrders after cancel')
+    assertApprox(Number(afterA.reservedShares), 2, '5@0.6 should have 2 locked shares after cancel', 0.001)
+    assertApprox(Number(afterA.reservedAmount), 1.2, '5@0.6 reserve should be 3*(1-0.6)=1.2 after cancel', 0.001)
+  })
+}
+
+async function bidReserveRebalancesOnAskCancelScenario() {
+  heading('BID reserve rebalances on ASK cancel')
+
+  const creator = await registerUser('ss_creator_bid_cancel')
+  const trader = await registerUser('ss_trader_bid_cancel')
+  const market = await createMarket(creator.jar, { title: 'BID reserve rebalance on ASK cancel' })
+
+  // Seed a small long position so ASK orders can partially use share coverage.
+  await trade(trader.jar, market.id, 'YES', 'BUY', 2)
+
+  const ask = await placeOrder(trader.jar, market.id, {
+    outcome: 'YES',
+    side: 'ASK',
+    orderType: 'GTC',
+    price: 0.6,
+    shares: 5,
+  })
+
+  const bid = await placeOrder(trader.jar, market.id, {
+    outcome: 'YES',
+    side: 'BID',
+    orderType: 'GTC',
+    price: 0.5,
+    shares: 2,
+  })
+
+  const beforeCancelPortfolio = await getPortfolio(trader.jar)
+  const bidBeforeCancel = (beforeCancelPortfolio.reservedOrders || []).find((order) => order.id === bid.order.id)
+
+  await check('BID reserve is reduced while ASK exists (due to release on execution)', async () => {
+    assert(bidBeforeCancel, 'expected BID order in reservedOrders before cancel')
+    assertApprox(Number(bidBeforeCancel.reservedAmount), 0.2, 'expected BID reserve 0.2 before ASK cancel', 0.001)
+  })
+
+  await cancelOrder(trader.jar, market.id, ask.order.id)
+
+  const afterCancelPortfolio = await getPortfolio(trader.jar)
+  const bidAfterCancel = (afterCancelPortfolio.reservedOrders || []).find((order) => order.id === bid.order.id)
+
+  await check('Cancelling ASK increases BID reserve to full gross payment', async () => {
+    assert(bidAfterCancel, 'expected BID order in reservedOrders after ASK cancel')
+    assertApprox(Number(bidAfterCancel.reservedAmount), 1.0, 'expected BID reserve 1.0 after ASK cancel', 0.001)
+  })
+}
+
 async function settlementShortScenario() {
   heading('Settlement payout on short winners/losers')
 
@@ -438,6 +541,8 @@ async function main() {
   await ammShortOpenCoverScenario()
   await exchangeNakedAskScenario()
   await askReserveRebalanceOnBuyScenario()
+  await askReserveRebalanceOnCancelScenario()
+  await bidReserveRebalancesOnAskCancelScenario()
   await settlementShortScenario()
 
   console.log('\n' + '═'.repeat(72))

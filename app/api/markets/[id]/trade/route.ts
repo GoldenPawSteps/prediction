@@ -6,7 +6,12 @@ import { lmsrTradeCost, getMarketProbabilities } from '@/lib/lmsr'
 import { roundMoney, roundPrice } from '@/lib/money'
 import { expireStaleMarketOrders, activeOrderWhere } from '@/lib/order-expiration'
 import { applySignedPositionTrade } from '@/lib/position-accounting'
-import { rebalanceAskReservesForOutcome, computeAskAllocation, type AskOrderInput } from '@/lib/order-reserve-rebalance'
+import {
+  rebalanceAskReservesForOutcome,
+  rebalanceBidReservesForOutcome,
+  computeAskAllocation,
+  type AskOrderInput,
+} from '@/lib/order-reserve-rebalance'
 import { z } from 'zod'
 
 // AMM trade handler: buy/sell flow with reservation-aware sell checks.
@@ -157,6 +162,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       })
 
       await rebalanceAskReservesForOutcome(tx, authUser.userId, marketId, outcome)
+      await rebalanceBidReservesForOutcome(tx, authUser.userId, marketId, outcome)
 
       // Record price history
       const newProbs = getMarketProbabilities(newYesShares, newNoShares, b)

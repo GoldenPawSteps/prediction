@@ -3,7 +3,14 @@ import { prisma } from '@/lib/prisma'
 import { requireAuth, apiError, apiSuccess } from '@/lib/api-helpers'
 import { activeOrderWhere, expireStaleMarketOrders } from '@/lib/order-expiration'
 import { applySignedPositionTrade } from '@/lib/position-accounting'
-import { rebalanceAskReservesForOutcome, computeAskAllocation, type AskOrderInput } from '@/lib/order-reserve-rebalance'
+import {
+	rebalanceAskReservesForOutcome,
+	rebalanceBidReservesForOutcome,
+	computeAskAllocation,
+	computeBidAllocation,
+	type AskOrderInput,
+	type BidOrderInput,
+} from '@/lib/order-reserve-rebalance'
 import { roundMoney } from '@/lib/money'
 import { z } from 'zod'
 
@@ -79,11 +86,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 		// Get current time for activeOrderWhere filter
 		const now = new Date()
 
-		// BID orders lock price * shares as reserved balance.
-		// ASK orders: use the full allocation simulation so that adding a new
-		// order at any price correctly accounts for reallocation of existing
-		// orders (ascending-price priority = cheapest covered first).
-		let reserveAmount = side === 'BID' ? roundMoney(price * shares) : 0
+		// Orders are created with reservedAmount = 0 and then rebalanced.
+		let reserveAmount = 0
 
 		if (side === 'ASK') {
 				const [position, existingAskOrders] = await Promise.all([
@@ -138,13 +142,98 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 					throw new Error('Insufficient balance')
 				}
 
-				// The order is placed with reservedAmount = 0; rebalanceAskReservesForOutcome
-				// (always called below) will set the correct reserve and adjust balances.
+				// Order is created with reservedAmount = 0; rebalance at the end
+				// sets the canonical reserve and applies balance deltas.
 				reserveAmount = 0
 			}
 
-			if (side === 'BID' && toNumber(user.balance) < reserveAmount) {
-				throw new Error('Insufficient balance')
+			if (side === 'BID') {
+				const [positions, openAskOrders, openBidOrders] = await Promise.all([
+					tx.position.findMany({
+						where: { userId: authUser.userId, marketId, outcome: { in: ['YES', 'NO'] } },
+						select: { outcome: true, shares: true },
+					}),
+					tx.marketOrder.findMany({
+						where: {
+							userId: authUser.userId,
+							marketId,
+							outcome,
+							side: 'ASK',
+							status: { in: ['OPEN', 'PARTIAL'] },
+							remainingShares: { gt: 0 },
+							...activeOrderWhere(now),
+						},
+						orderBy: [{ price: 'asc' }, { createdAt: 'asc' }],
+						select: { id: true, price: true, remainingShares: true, reservedAmount: true },
+					}),
+					tx.marketOrder.findMany({
+						where: {
+							userId: authUser.userId,
+							marketId,
+							outcome,
+							side: 'BID',
+							status: { in: ['OPEN', 'PARTIAL'] },
+							remainingShares: { gt: 0 },
+							...activeOrderWhere(now),
+						},
+						orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+						select: { id: true, price: true, remainingShares: true, reservedAmount: true },
+					}),
+				])
+
+				let yesShares = 0
+				let noShares = 0
+				for (const p of positions) {
+					if (p.outcome === 'YES') yesShares = toNumber(p.shares)
+					if (p.outcome === 'NO') noShares = toNumber(p.shares)
+				}
+
+				const askInputs: AskOrderInput[] = openAskOrders.map((o) => ({
+					id: o.id,
+					price: toNumber(o.price),
+					remainingShares: toNumber(o.remainingShares),
+					currentReservedAmount: toNumber(o.reservedAmount),
+				}))
+
+				const existingBids: BidOrderInput[] = openBidOrders.map((o) => ({
+					id: o.id,
+					price: toNumber(o.price),
+					remainingShares: toNumber(o.remainingShares),
+					currentReservedAmount: toNumber(o.reservedAmount),
+				}))
+
+				const currentRequired = computeBidAllocation({
+					outcome,
+					yesShares,
+					noShares,
+					askOrdersSameOutcome: askInputs,
+					bidsChronological: existingBids,
+				}).totalRequiredBalance
+
+				const withNewOrder: BidOrderInput[] = [
+					...existingBids,
+					{
+						id: '__new__',
+						price,
+						remainingShares: shares,
+						currentReservedAmount: 0,
+					},
+				]
+
+				const newRequired = computeBidAllocation({
+					outcome,
+					yesShares,
+					noShares,
+					askOrdersSameOutcome: askInputs,
+					bidsChronological: withNewOrder,
+				}).totalRequiredBalance
+
+				const netBalanceIncrease = roundMoney(Math.max(0, newRequired - currentRequired))
+				if (toNumber(user.balance) + 0.0000001 < netBalanceIncrease) {
+					throw new Error('Insufficient balance')
+				}
+
+				reserveAmount = 0
 			}
 
 			const avgEntryPriceSnapshot = 0
@@ -169,13 +258,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 			const matchableShares = matchingOrders.reduce((total, order) => total + toNumber(order.remainingShares), 0)
 			if (orderType === 'FOK' && matchableShares + 0.0000001 < shares) {
 				throw new Error('FOK order could not be fully matched immediately')
-			}
-
-			if (reserveAmount > 0) {
-				await tx.user.update({
-					where: { id: authUser.userId },
-					data: { balance: { decrement: reserveAmount } },
-				})
 			}
 
 			const order = await tx.marketOrder.create({
@@ -219,10 +301,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 					data: {
 						remainingShares: makerRemainingShares,
 						status: makerStatus,
-						...(match.side === 'BID'
-							? { reservedAmount: { decrement: fillNotional } }
-							: match.side === 'ASK'
+						...(match.side === 'ASK'
 							? { reservedAmount: { decrement: makerAskReserveRelease } }
+							: match.side === 'BID' && makerStatus === 'FILLED'
+							? { reservedAmount: 0 }
 							: {}),
 					},
 				})
@@ -255,7 +337,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 					outcome,
 					deltaShares: fillShares,
 					executionPrice: fillPrice,
-					cashDelta: 0,
+					cashDelta: roundMoney(-fillNotional),
 				})
 				usersToRebalance.add(buyerUserId)
 
@@ -320,21 +402,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 				filledNotional += fillNotional
 			}
 
-			const remainingReserve = side === 'BID' ? remainingShares * price : takerAskReserveRemaining
-			const refundAmount = side === 'BID' ? reserveAmount - filledNotional - remainingReserve : 0
-
-			if (refundAmount > 0) {
-				await tx.user.update({
-					where: { id: authUser.userId },
-					data: { balance: { increment: refundAmount } },
-				})
-			}
+			const remainingAskReserve = takerAskReserveRemaining
 
 			const cancelRemainder = remainingShares > 0 && orderType === 'FAK'
-			if (cancelRemainder && remainingReserve > 0) {
+			if (cancelRemainder && side === 'ASK' && remainingAskReserve > 0) {
 				await tx.user.update({
 					where: { id: authUser.userId },
-					data: { balance: { increment: remainingReserve } },
+					data: { balance: { increment: remainingAskReserve } },
 				})
 			}
 
@@ -351,7 +425,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 				data: {
 					status: finalStatus,
 					remainingShares: cancelRemainder ? 0 : remainingShares,
-					reservedAmount: cancelRemainder ? 0 : remainingReserve,
+					reservedAmount: cancelRemainder ? 0 : side === 'ASK' ? remainingAskReserve : 0,
 				},
 			})
 
@@ -361,10 +435,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 			if (side === 'ASK') {
 				usersToRebalance.add(authUser.userId)
 			}
+			if (side === 'BID') {
+				usersToRebalance.add(authUser.userId)
+			}
 
-			// Rebalance ASK reserves for every user whose position changed
+			// Rebalance ASK and BID reserves for every user whose position or order set changed
 			for (const userId of usersToRebalance) {
 				await rebalanceAskReservesForOutcome(tx, userId, marketId, outcome)
+				await rebalanceBidReservesForOutcome(tx, userId, marketId, outcome)
 			}
 
 			if (filledShares > 0) {
@@ -422,6 +500,10 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 				throw new Error('Order is no longer open')
 			}
 
+			const orderOutcome = order.outcome as 'YES' | 'NO'
+			const isAskOrder = order.side === 'ASK'
+			const isBidOrder = order.side === 'BID'
+
 			if (toNumber(order.reservedAmount) > 0) {
 				await tx.user.update({
 					where: { id: authUser.userId },
@@ -437,6 +519,14 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 					reservedAmount: 0,
 				},
 			})
+
+			if (isAskOrder) {
+				await rebalanceAskReservesForOutcome(tx, authUser.userId, marketId, orderOutcome)
+				await rebalanceBidReservesForOutcome(tx, authUser.userId, marketId, orderOutcome)
+			}
+			if (isBidOrder) {
+				await rebalanceBidReservesForOutcome(tx, authUser.userId, marketId, orderOutcome)
+			}
 
 			return { order: cancelledOrder }
 		})
