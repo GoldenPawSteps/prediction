@@ -15,6 +15,7 @@
  *   node test-exchange-orders.js gtd            # runs scenario 3 only
  *   node test-exchange-orders.js fok            # runs scenario 4 only
  *   node test-exchange-orders.js fak            # runs scenario 5 only
+ *   node test-exchange-orders.js cross          # runs cross-matching scenario only
  */
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3001'
@@ -145,9 +146,10 @@ async function run() {
   const runFokScenario = runAllScenarios || scenarioArg === 'fok'
   const runFakScenario = runAllScenarios || scenarioArg === 'fak'
   const runBidUnlockAskScenario = runAllScenarios || scenarioArg === 'bid-unlock-ask'
+  const runCrossScenario = runAllScenarios || scenarioArg === 'cross'
 
-  if (!runBidMakerScenario && !runAskMakerScenario && !runGtdScenario && !runFokScenario && !runFakScenario && !runBidUnlockAskScenario) {
-    throw new Error('Unknown scenario argument. Use: bid-maker | ask-maker | gtd | fok | fak | bid-unlock-ask')
+  if (!runBidMakerScenario && !runAskMakerScenario && !runGtdScenario && !runFokScenario && !runFakScenario && !runBidUnlockAskScenario && !runCrossScenario) {
+    throw new Error('Unknown scenario argument. Use: bid-maker | ask-maker | gtd | fok | fak | bid-unlock-ask | cross')
   }
 
   console.log('Running exchange integration test...')
@@ -605,6 +607,140 @@ async function run() {
           balanceAfterAsk,
           balanceAfterBid,
           bidOrderStatus: bidRes.data.order.status,
+        },
+        null,
+        2
+      )
+    )
+  }
+
+  if (runCrossScenario) {
+    console.log('Scenario 7: cross matching (opposite bids >= 1, opposite asks <= 1)')
+
+    // Part A: opposite bids cross when bid_yes + bid_no >= 1
+    const crossBidMarketId = await createMarket(traderA.jar, 'cross-bids')
+    const balanceABeforeCrossBid = await getBalance(traderA.jar)
+    const balanceBBeforeCrossBid = await getBalance(traderB.jar)
+
+    const makerBidYesPrice = 0.62
+    const takerBidNoLimit = 0.4
+
+    const bidYesRes = await request(
+      'POST',
+      `/api/markets/${crossBidMarketId}/order`,
+      { outcome: 'YES', side: 'BID', orderType: 'GTC', price: makerBidYesPrice, shares: 1 },
+      traderA.jar
+    )
+    assert(bidYesRes.ok, `Place maker YES bid failed: ${JSON.stringify(bidYesRes.data)}`)
+    assert(approxEqual(bidYesRes.data.filledShares, 0), 'Maker YES bid should rest initially')
+
+    const bidNoRes = await request(
+      'POST',
+      `/api/markets/${crossBidMarketId}/order`,
+      { outcome: 'NO', side: 'BID', orderType: 'GTC', price: takerBidNoLimit, shares: 1 },
+      traderB.jar
+    )
+    assert(bidNoRes.ok, `Place taker NO bid failed: ${JSON.stringify(bidNoRes.data)}`)
+    assert(approxEqual(bidNoRes.data.filledShares, 1), `Expected cross BID fill of 1, got ${bidNoRes.data.filledShares}`)
+
+    const balanceAAfterCrossBid = await getBalance(traderA.jar)
+    const balanceBAfterCrossBid = await getBalance(traderB.jar)
+    const expectedBBidSpend = 1 - makerBidYesPrice // taker executes at complement of maker price
+
+    assert(
+      approxEqual(balanceAAfterCrossBid, balanceABeforeCrossBid - makerBidYesPrice),
+      `Maker BID balance mismatch. Expected ${balanceABeforeCrossBid - makerBidYesPrice}, got ${balanceAAfterCrossBid}`
+    )
+    assert(
+      approxEqual(balanceBAfterCrossBid, balanceBBeforeCrossBid - expectedBBidSpend),
+      `Taker BID balance mismatch. Expected ${balanceBBeforeCrossBid - expectedBBidSpend}, got ${balanceBAfterCrossBid}`
+    )
+
+    const crossBidMarketForMaker = await request('GET', `/api/markets/${crossBidMarketId}`, null, traderA.jar)
+    assert(crossBidMarketForMaker.ok, `Fetch cross-bid market for maker failed: ${JSON.stringify(crossBidMarketForMaker.data)}`)
+    const crossBidMakerHistory = (crossBidMarketForMaker.data.userOrders || []).find((o) => o.id === bidYesRes.data.order.id)
+    assert(crossBidMakerHistory, 'Expected maker cross-bid order in recent orders')
+    assert(
+      approxEqual(Number(crossBidMakerHistory.filledShares), 1),
+      `Maker cross-bid recent orders should show filledShares=1, got ${crossBidMakerHistory.filledShares}`
+    )
+
+    const crossBidMarketForTaker = await request('GET', `/api/markets/${crossBidMarketId}`, null, traderB.jar)
+    assert(crossBidMarketForTaker.ok, `Fetch cross-bid market for taker failed: ${JSON.stringify(crossBidMarketForTaker.data)}`)
+    const crossBidTakerHistory = (crossBidMarketForTaker.data.userOrders || []).find((o) => o.id === bidNoRes.data.order.id)
+    assert(crossBidTakerHistory, 'Expected taker cross-bid order in recent orders')
+    assert(
+      approxEqual(Number(crossBidTakerHistory.filledShares), 1),
+      `Taker cross-bid recent orders should show filledShares=1, got ${crossBidTakerHistory.filledShares}`
+    )
+
+    // Part B: opposite asks cross when ask_yes + ask_no <= 1
+    const crossAskMarketId = await createMarket(traderA.jar, 'cross-asks')
+    const balanceABeforeCrossAsk = await getBalance(traderA.jar)
+    const balanceBBeforeCrossAsk = await getBalance(traderB.jar)
+
+    const makerAskYesPrice = 0.35
+    const takerAskNoLimit = 0.6
+
+    const askYesRes = await request(
+      'POST',
+      `/api/markets/${crossAskMarketId}/order`,
+      { outcome: 'YES', side: 'ASK', orderType: 'GTC', price: makerAskYesPrice, shares: 1 },
+      traderA.jar
+    )
+    assert(askYesRes.ok, `Place maker YES ask failed: ${JSON.stringify(askYesRes.data)}`)
+    assert(approxEqual(askYesRes.data.filledShares, 0), 'Maker YES ask should rest initially')
+
+    const askNoRes = await request(
+      'POST',
+      `/api/markets/${crossAskMarketId}/order`,
+      { outcome: 'NO', side: 'ASK', orderType: 'GTC', price: takerAskNoLimit, shares: 1 },
+      traderB.jar
+    )
+    assert(askNoRes.ok, `Place taker NO ask failed: ${JSON.stringify(askNoRes.data)}`)
+    assert(approxEqual(askNoRes.data.filledShares, 1), `Expected cross ASK fill of 1, got ${askNoRes.data.filledShares}`)
+
+    const balanceAAfterCrossAsk = await getBalance(traderA.jar)
+    const balanceBAfterCrossAsk = await getBalance(traderB.jar)
+    const expectedTakerAskReceive = 1 - makerAskYesPrice // taker executes at complement of maker price
+
+    assert(
+      approxEqual(balanceAAfterCrossAsk, balanceABeforeCrossAsk + makerAskYesPrice),
+      `Maker ASK balance mismatch. Expected ${balanceABeforeCrossAsk + makerAskYesPrice}, got ${balanceAAfterCrossAsk}`
+    )
+    assert(
+      approxEqual(balanceBAfterCrossAsk, balanceBBeforeCrossAsk + expectedTakerAskReceive),
+      `Taker ASK balance mismatch. Expected ${balanceBBeforeCrossAsk + expectedTakerAskReceive}, got ${balanceBAfterCrossAsk}`
+    )
+
+    const crossAskMarketForMaker = await request('GET', `/api/markets/${crossAskMarketId}`, null, traderA.jar)
+    assert(crossAskMarketForMaker.ok, `Fetch cross-ask market for maker failed: ${JSON.stringify(crossAskMarketForMaker.data)}`)
+    const crossAskMakerHistory = (crossAskMarketForMaker.data.userOrders || []).find((o) => o.id === askYesRes.data.order.id)
+    assert(crossAskMakerHistory, 'Expected maker cross-ask order in recent orders')
+    assert(
+      approxEqual(Number(crossAskMakerHistory.filledShares), 1),
+      `Maker cross-ask recent orders should show filledShares=1, got ${crossAskMakerHistory.filledShares}`
+    )
+
+    const crossAskMarketForTaker = await request('GET', `/api/markets/${crossAskMarketId}`, null, traderB.jar)
+    assert(crossAskMarketForTaker.ok, `Fetch cross-ask market for taker failed: ${JSON.stringify(crossAskMarketForTaker.data)}`)
+    const crossAskTakerHistory = (crossAskMarketForTaker.data.userOrders || []).find((o) => o.id === askNoRes.data.order.id)
+    assert(crossAskTakerHistory, 'Expected taker cross-ask order in recent orders')
+    assert(
+      approxEqual(Number(crossAskTakerHistory.filledShares), 1),
+      `Taker cross-ask recent orders should show filledShares=1, got ${crossAskTakerHistory.filledShares}`
+    )
+
+    console.log(
+      JSON.stringify(
+        {
+          scenario: 'cross',
+          crossBidMarketId,
+          crossAskMarketId,
+          makerBidYesPrice,
+          takerBidNoExecPrice: expectedBBidSpend,
+          makerAskYesPrice,
+          takerAskNoExecPrice: expectedTakerAskReceive,
         },
         null,
         2

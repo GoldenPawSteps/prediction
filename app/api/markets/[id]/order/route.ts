@@ -5,6 +5,7 @@ import { activeOrderWhere, expireStaleMarketOrders } from '@/lib/order-expiratio
 import { applySignedPositionTrade } from '@/lib/position-accounting'
 import { roundMoney } from '@/lib/money'
 import { assertUserHasNonNegativeAvailable } from '@/lib/simple-reserve'
+import { buildMatchCandidates, getMatchableShares, getOppositeOutcome } from '@/lib/exchange-matching'
 import { z } from 'zod'
 
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
@@ -85,23 +86,49 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 			const avgEntryPriceSnapshot = 0
 
 
-			const matchingOrders = await tx.marketOrder.findMany({
-				where: {
-					marketId,
-					outcome,
-					side: side === 'BID' ? 'ASK' : 'BID',
-					userId: { not: authUser.userId },
-					status: { in: ['OPEN', 'PARTIAL'] },
-					remainingShares: { gt: 0 },
-					price: side === 'BID' ? { lte: price } : { gte: price },
-					...activeOrderWhere(now),
-				},
-				orderBy: side === 'BID'
-					? [{ price: 'asc' }, { createdAt: 'asc' }]
-					: [{ price: 'desc' }, { createdAt: 'asc' }],
+			const oppositeOutcome = getOppositeOutcome(outcome)
+
+			const [directMatchingOrders, crossMatchingOrders] = await Promise.all([
+				tx.marketOrder.findMany({
+					where: {
+						marketId,
+						outcome,
+						side: side === 'BID' ? 'ASK' : 'BID',
+						userId: { not: authUser.userId },
+						status: { in: ['OPEN', 'PARTIAL'] },
+						remainingShares: { gt: 0 },
+						price: side === 'BID' ? { lte: price } : { gte: price },
+						...activeOrderWhere(now),
+					},
+					orderBy: side === 'BID'
+						? [{ price: 'asc' }, { createdAt: 'asc' }]
+						: [{ price: 'desc' }, { createdAt: 'asc' }],
+				}),
+				tx.marketOrder.findMany({
+					where: {
+						marketId,
+						outcome: oppositeOutcome,
+						side,
+						userId: { not: authUser.userId },
+						status: { in: ['OPEN', 'PARTIAL'] },
+						remainingShares: { gt: 0 },
+						price: side === 'BID' ? { gte: 1 - price } : { lte: 1 - price },
+						...activeOrderWhere(now),
+					},
+					orderBy: side === 'BID'
+						? [{ price: 'desc' }, { createdAt: 'asc' }]
+						: [{ price: 'asc' }, { createdAt: 'asc' }],
+				}),
+			])
+
+			const matchCandidates = buildMatchCandidates({
+				takerOutcome: outcome,
+				takerSide: side,
+				directOrders: directMatchingOrders,
+				crossOrders: crossMatchingOrders,
 			})
 
-			const matchableShares = matchingOrders.reduce((total, order) => total + toNumber(order.remainingShares), 0)
+			const matchableShares = getMatchableShares(matchCandidates)
 			if (orderType === 'FOK' && matchableShares + 0.0000001 < shares) {
 				throw new Error('FOK order could not be fully matched immediately')
 			}
@@ -128,12 +155,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 			let filledNotional = 0
 			const usersToValidate = new Set<string>([authUser.userId])
 
-			for (const match of matchingOrders) {
+			for (const candidate of matchCandidates) {
 				if (remainingShares <= 0) break
 
+				const match = candidate.order
+
 				const fillShares = Math.min(remainingShares, toNumber(match.remainingShares))
-				const fillPrice = toNumber(match.price)
+				const fillPrice = candidate.takerPrice
 				const fillNotional = fillShares * fillPrice
+				const makerPrice = candidate.makerPrice
+				const makerNotional = fillShares * makerPrice
 				const makerRemainingShares = toNumber(match.remainingShares) - fillShares
 				const makerStatus = makerRemainingShares <= 0 ? 'FILLED' : 'PARTIAL'
 
@@ -148,65 +179,180 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 					},
 				})
 
-				const buyerUserId = side === 'BID' ? authUser.userId : match.userId
-				const sellerUserId = side === 'ASK' ? authUser.userId : match.userId
-				const sellerCashDelta = fillNotional
+				if (candidate.mode === 'DIRECT') {
+					const buyerUserId = side === 'BID' ? authUser.userId : match.userId
+					const sellerUserId = side === 'ASK' ? authUser.userId : match.userId
+					const sellerCashDelta = fillNotional
 
-				await applySignedPositionTrade(tx, {
-					userId: buyerUserId,
-					marketId,
-					outcome,
-					deltaShares: fillShares,
-					executionPrice: fillPrice,
-					cashDelta: roundMoney(-fillNotional),
-				})
-				usersToValidate.add(buyerUserId)
-
-				await applySignedPositionTrade(tx, {
-					userId: sellerUserId,
-					marketId,
-					outcome,
-					deltaShares: -fillShares,
-					executionPrice: fillPrice,
-					cashDelta: sellerCashDelta,
-				})
-				usersToValidate.add(sellerUserId)
-
-				await tx.marketOrderFill.create({
-					data: {
+					await applySignedPositionTrade(tx, {
+						userId: buyerUserId,
 						marketId,
-						makerOrderId: match.id,
-						takerOrderId: order.id,
 						outcome,
-						price: fillPrice,
-						shares: fillShares,
-						makerUserId: match.userId,
-						takerUserId: authUser.userId,
-					},
-				})
+						deltaShares: fillShares,
+						executionPrice: fillPrice,
+						cashDelta: roundMoney(-fillNotional),
+					})
+					usersToValidate.add(buyerUserId)
 
-				await tx.trade.createMany({
-					data: [
-						{
-							userId: buyerUserId,
+					await applySignedPositionTrade(tx, {
+						userId: sellerUserId,
+						marketId,
+						outcome,
+						deltaShares: -fillShares,
+						executionPrice: fillPrice,
+						cashDelta: sellerCashDelta,
+					})
+					usersToValidate.add(sellerUserId)
+
+					await tx.marketOrderFill.create({
+						data: {
 							marketId,
+							makerOrderId: match.id,
+							takerOrderId: order.id,
 							outcome,
-							type: 'BUY',
-							shares: fillShares,
 							price: fillPrice,
-							totalCost: fillNotional,
+							shares: fillShares,
+							makerUserId: match.userId,
+							takerUserId: authUser.userId,
 						},
-						{
-							userId: sellerUserId,
+					})
+
+					await tx.trade.createMany({
+						data: [
+							{
+								userId: buyerUserId,
+								marketId,
+								outcome,
+								type: 'BUY',
+								shares: fillShares,
+								price: fillPrice,
+								totalCost: fillNotional,
+							},
+							{
+								userId: sellerUserId,
+								marketId,
+								outcome,
+								type: 'SELL',
+								shares: fillShares,
+								price: fillPrice,
+								totalCost: -fillNotional,
+							},
+						],
+					})
+				} else {
+					if (side === 'BID') {
+						await applySignedPositionTrade(tx, {
+							userId: authUser.userId,
 							marketId,
-							outcome,
-							type: 'SELL',
-							shares: fillShares,
-							price: fillPrice,
-							totalCost: -fillNotional,
-						},
-					],
-				})
+							outcome: candidate.takerOutcome,
+							deltaShares: fillShares,
+							executionPrice: fillPrice,
+							cashDelta: roundMoney(-fillNotional),
+						})
+						usersToValidate.add(authUser.userId)
+
+						await applySignedPositionTrade(tx, {
+							userId: match.userId,
+							marketId,
+							outcome: candidate.makerOutcome,
+							deltaShares: fillShares,
+							executionPrice: makerPrice,
+							cashDelta: roundMoney(-makerNotional),
+						})
+						usersToValidate.add(match.userId)
+
+						await tx.trade.createMany({
+							data: [
+								{
+									userId: authUser.userId,
+									marketId,
+									outcome: candidate.takerOutcome,
+									type: 'BUY',
+									shares: fillShares,
+									price: fillPrice,
+									totalCost: fillNotional,
+								},
+								{
+									userId: match.userId,
+									marketId,
+									outcome: candidate.makerOutcome,
+									type: 'BUY',
+									shares: fillShares,
+									price: makerPrice,
+									totalCost: makerNotional,
+								},
+							],
+						})
+					} else {
+						await applySignedPositionTrade(tx, {
+							userId: authUser.userId,
+							marketId,
+							outcome: candidate.takerOutcome,
+							deltaShares: -fillShares,
+							executionPrice: fillPrice,
+							cashDelta: roundMoney(fillNotional),
+						})
+						usersToValidate.add(authUser.userId)
+
+						await applySignedPositionTrade(tx, {
+							userId: match.userId,
+							marketId,
+							outcome: candidate.makerOutcome,
+							deltaShares: -fillShares,
+							executionPrice: makerPrice,
+							cashDelta: roundMoney(makerNotional),
+						})
+						usersToValidate.add(match.userId)
+
+						await tx.trade.createMany({
+							data: [
+								{
+									userId: authUser.userId,
+									marketId,
+									outcome: candidate.takerOutcome,
+									type: 'SELL',
+									shares: fillShares,
+									price: fillPrice,
+									totalCost: -fillNotional,
+								},
+								{
+									userId: match.userId,
+									marketId,
+									outcome: candidate.makerOutcome,
+									type: 'SELL',
+									shares: fillShares,
+									price: makerPrice,
+									totalCost: -makerNotional,
+								},
+							],
+						})
+					}
+
+					await tx.marketOrderFill.createMany({
+						data: [
+							{
+								marketId,
+								makerOrderId: match.id,
+								takerOrderId: order.id,
+								outcome: candidate.takerOutcome,
+								price: fillPrice,
+								shares: fillShares,
+								makerUserId: match.userId,
+								takerUserId: authUser.userId,
+							},
+							{
+								marketId,
+								makerOrderId: match.id,
+								takerOrderId: order.id,
+								outcome: candidate.makerOutcome,
+								price: makerPrice,
+								shares: fillShares,
+								makerUserId: match.userId,
+								takerUserId: authUser.userId,
+							},
+						],
+					})
+				}
 
 				const impliedYesPrice = outcome === 'YES' ? fillPrice : 1 - fillPrice
 				await tx.priceHistory.create({

@@ -17,6 +17,54 @@ function toNumber(value: unknown, fallback: number = 0): number {
   return Number.isFinite(numericValue) ? numericValue : fallback
 }
 
+async function getFilledSharesByOrderId(
+  orderRows: Array<{ id: string; outcome: string }>
+) {
+  const orderIds = orderRows.map((order) => order.id)
+  const outcomeByOrderId = new Map(orderRows.map((order) => [order.id, order.outcome]))
+
+  if (orderIds.length === 0) {
+    return new Map<string, number>()
+  }
+
+  const fills = await prisma.marketOrderFill.findMany({
+    where: {
+      OR: [
+        { makerOrderId: { in: orderIds } },
+        { takerOrderId: { in: orderIds } },
+      ],
+    },
+    select: {
+      makerOrderId: true,
+      takerOrderId: true,
+      outcome: true,
+      shares: true,
+    },
+  })
+
+  const filledSharesByOrderId = new Map<string, number>()
+
+  for (const fill of fills) {
+    const makerOutcome = outcomeByOrderId.get(fill.makerOrderId)
+    if (makerOutcome && makerOutcome === fill.outcome) {
+      filledSharesByOrderId.set(
+        fill.makerOrderId,
+        (filledSharesByOrderId.get(fill.makerOrderId) ?? 0) + toNumber(fill.shares)
+      )
+    }
+
+    const takerOutcome = outcomeByOrderId.get(fill.takerOrderId)
+    if (takerOutcome && takerOutcome === fill.outcome) {
+      filledSharesByOrderId.set(
+        fill.takerOrderId,
+        (filledSharesByOrderId.get(fill.takerOrderId) ?? 0) + toNumber(fill.shares)
+      )
+    }
+  }
+
+  return filledSharesByOrderId
+}
+
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
@@ -206,36 +254,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         })
       : []
 
-    const userOrderIds = userOrders.map((order) => order.id)
-
-    const [makerFillSums, takerFillSums] = userOrderIds.length > 0
-      ? await Promise.all([
-          prisma.marketOrderFill.groupBy({
-            by: ['makerOrderId'],
-            where: { makerOrderId: { in: userOrderIds } },
-            _sum: { shares: true },
-          }),
-          prisma.marketOrderFill.groupBy({
-            by: ['takerOrderId'],
-            where: { takerOrderId: { in: userOrderIds } },
-            _sum: { shares: true },
-          }),
-        ])
-      : [[], []]
-
-    const filledSharesByOrderId = new Map<string, number>()
-    for (const fill of makerFillSums) {
-      filledSharesByOrderId.set(
-        fill.makerOrderId,
-        (filledSharesByOrderId.get(fill.makerOrderId) ?? 0) + toNumber(fill._sum.shares)
-      )
-    }
-    for (const fill of takerFillSums) {
-      filledSharesByOrderId.set(
-        fill.takerOrderId,
-        (filledSharesByOrderId.get(fill.takerOrderId) ?? 0) + toNumber(fill._sum.shares)
-      )
-    }
+    const filledSharesByOrderId = await getFilledSharesByOrderId(
+      userOrders.map((order) => ({ id: order.id, outcome: String(order.outcome) }))
+    )
 
     const userOrdersWithFilledShares = userOrders.map((order) => ({
       ...order,
@@ -271,30 +292,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     // Build a map of child ID to user orders with filled shares
     const outcomeUserOrdersMap = new Map<string, Array<Record<string, unknown>>>()
     for (const outcomeOrders of outcomeUserOrders) {
-      // Get filled shares for these orders
-      const orderIds = outcomeOrders.orders.map((o) => o.id)
-      const [makerFills, takerFills] = orderIds.length > 0
-        ? await Promise.all([
-            prisma.marketOrderFill.groupBy({
-              by: ['makerOrderId'],
-              where: { makerOrderId: { in: orderIds } },
-              _sum: { shares: true },
-            }),
-            prisma.marketOrderFill.groupBy({
-              by: ['takerOrderId'],
-              where: { takerOrderId: { in: orderIds } },
-              _sum: { shares: true },
-            }),
-          ])
-        : [[], []]
-
-      const filledMap = new Map<string, number>()
-      for (const fill of makerFills) {
-        filledMap.set(fill.makerOrderId, (filledMap.get(fill.makerOrderId) ?? 0) + toNumber(fill._sum.shares))
-      }
-      for (const fill of takerFills) {
-        filledMap.set(fill.takerOrderId, (filledMap.get(fill.takerOrderId) ?? 0) + toNumber(fill._sum.shares))
-      }
+      const filledMap = await getFilledSharesByOrderId(
+        outcomeOrders.orders.map((order) => ({ id: order.id, outcome: String(order.outcome) }))
+      )
 
       outcomeUserOrdersMap.set(
         outcomeOrders.childId,

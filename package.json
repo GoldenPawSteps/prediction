@@ -15,6 +15,7 @@
     "test:exchange:gtd": "node test-exchange-orders.js gtd",
     "test:exchange:fok": "node test-exchange-orders.js fok",
     "test:exchange:fak": "node test-exchange-orders.js fak",
+    "test:exchange:cross-logic": "tsx test-cross-matching-logic.ts",
     "test:homepage:ssr": "node test-homepage-ssr.js",
     "test:resolution-refund": "node test-resolution-refund.js",
     "test:resolution-reresolution-refund": "node test-reresolution-refund.js",
